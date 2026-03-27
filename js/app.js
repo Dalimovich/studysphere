@@ -401,7 +401,7 @@ function openFile(f,course){
       }));
     }
     Promise.all(textPromises).then(function(pages){
-      pdfFullText=pages.join('\n\n').slice(0,12000); // cap at 12k chars for API
+      pdfFullText=pages.join('\n\n'); // full text — cap applied in ai/ai.js
     });
     updatePageInfo();updateZoomPct();
     document.getElementById('pdfAll').textContent='Single page';
@@ -1335,8 +1335,9 @@ stopGeneration=function(){
   currentGenId++; // invalidate any running generation
   if(activeTypeTimer){clearTimeout(activeTypeTimer);activeTypeTimer=null;}
   if(activeThinkTimer){clearInterval(activeThinkTimer);activeThinkTimer=null;}
-  document.getElementById('aiSend').disabled=false;
-  document.getElementById('stopBtn').style.display='none';
+  var btn=document.getElementById('aiSend');
+  btn.disabled=false;
+  btn.classList.remove('is-stop');
 };
 window.stopGeneration=stopGeneration;
 
@@ -1439,6 +1440,7 @@ window.askAI=askAI;
 
 // ── SEND BUTTON ───────────────────────────────────────────────────────────
 (document.getElementById('aiSend')||{addEventListener:function(){}}).addEventListener('click',function(){
+  if(this.classList.contains('is-stop')){if(window.stopGeneration)window.stopGeneration();return;}
   var q=document.getElementById('aiInput').value.trim();if(!q)return;
   document.getElementById('aiInput').value='';
   document.getElementById('aiInput').style.height='auto';

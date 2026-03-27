@@ -775,9 +775,25 @@ body.night .ai-input-box{background:rgba(26,24,38,.75);border-color:rgba(155,93,
 .ai-textarea::placeholder{color:var(--muted)}
 .ai-bottom-row{display:flex;align-items:center;justify-content:space-between;padding:4px 10px 8px}
 .ai-char-count{font-size:.63rem;color:var(--muted)}
-.ai-send{width:34px;height:34px;border:none;border-radius:10px;background:linear-gradient(135deg,var(--purple),var(--pink));color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;box-shadow:0 4px 14px rgba(155,93,229,.35)}
-.ai-send:hover{transform:scale(1.07);box-shadow:0 6px 20px rgba(155,93,229,.5)}
-.ai-send:disabled{opacity:.3;cursor:not-allowed;transform:none;box-shadow:none}
+/* file chip bar */
+.ai-file-chip-bar{padding:7px 14px;border-bottom:1px solid rgba(155,93,229,.1);flex-shrink:0}
+.ai-file-chip{display:inline-flex;align-items:center;gap:6px;background:rgba(155,93,229,.1);border:1px solid rgba(155,93,229,.22);border-radius:20px;padding:4px 10px 4px 8px;font-size:.68rem;font-weight:800;color:var(--purple);max-width:100%;overflow:hidden;white-space:nowrap}
+.ai-file-chip svg{flex-shrink:0;opacity:.7}
+.ai-file-chip #aiFileChipName{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ai-file-chip.empty{background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.08);color:var(--muted)}
+body.night .ai-file-chip{background:rgba(155,93,229,.13);border-color:rgba(155,93,229,.28)}
+body.night .ai-file-chip.empty{background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.07)}
+/* send / stop morph button */
+.ai-send{width:34px;height:34px;border:none;border-radius:10px;background:linear-gradient(135deg,var(--purple),var(--pink));color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .28s ease,box-shadow .28s ease,border-radius .28s ease,border .28s ease;box-shadow:0 4px 14px rgba(155,93,229,.35);position:relative;overflow:hidden;flex-shrink:0}
+.ai-send:hover:not(.is-stop){transform:scale(1.07);box-shadow:0 6px 20px rgba(155,93,229,.5)}
+.ai-send.is-stop{background:rgba(255,70,40,.12);box-shadow:0 4px 14px rgba(255,70,40,.18);border:1.5px solid rgba(255,90,55,.38);border-radius:9px}
+.ai-send.is-stop:hover{background:rgba(255,70,40,.22);box-shadow:0 4px 18px rgba(255,70,40,.32)}
+.ai-send:disabled:not(.is-stop){opacity:.3;cursor:not-allowed;transform:none;box-shadow:none}
+.ai-btn-icon{position:absolute;display:flex;align-items:center;justify-content:center;transition:opacity .22s ease,transform .22s ease}
+.ai-icon-plane{opacity:1;transform:scale(1)}
+.ai-icon-stop{opacity:0;transform:scale(.45);color:#ff5030}
+.ai-send.is-stop .ai-icon-plane{opacity:0;transform:scale(.45)}
+.ai-send.is-stop .ai-icon-stop{opacity:1;transform:scale(1)}
 .ai-row{display:flex;gap:6px;align-items:flex-end}
 .think-bubble{background:rgba(155,93,229,.06);border:1px dashed rgba(155,93,229,.22);border-radius:12px;padding:8px 12px;font-size:.73rem;color:var(--muted);max-width:220px;line-height:1.6;backdrop-filter:blur(4px)}
 body.night .think-bubble{background:rgba(155,93,229,.09)}

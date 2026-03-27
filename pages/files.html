@@ -96,6 +96,13 @@
             <button class="ai-close" id="aiClose" title="Close">✕</button>
           </div>
         </div>
+        <!-- File chip -->
+        <div class="ai-file-chip-bar">
+          <div class="ai-file-chip empty" id="aiFileChip">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <span id="aiFileChipName">No file open</span>
+          </div>
+        </div>
         <!-- Messages -->
         <div class="ai-msgs" id="aiMsgs"></div>
         <!-- Input -->
@@ -123,13 +130,17 @@
               <span class="chip-sub chip-sub-h" data-type="quiz" data-level="hard" data-i18n="chip_hard">Hard</span>
             </div>
           </div>
-          <button id="stopBtn" data-i18n="stop_btn" style="display:none;align-items:center;gap:6px;background:#FFE8F5;border:1.5px solid #FFB3D1;border-radius:10px;padding:7px 14px;color:#FF6FB7;font-family:'Nunito',sans-serif;font-weight:800;font-size:.78rem;cursor:pointer;margin-bottom:8px;width:100%;justify-content:center" onclick="window.stopGeneration ? window.stopGeneration() : stopGeneration()">⏹ Stop generating</button>
           <div class="ai-input-box">
             <textarea class="ai-textarea" id="aiInput" data-i18n-ph="ai_placeholder" placeholder="Ask anything about this document…" rows="2"></textarea>
             <div class="ai-bottom-row">
               <span class="ai-char-count" id="aiCharCount">0 / 2000</span>
               <button class="ai-send" id="aiSend" title="Send">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                <span class="ai-btn-icon ai-icon-plane">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5"/></svg>
+                </span>
+                <span class="ai-btn-icon ai-icon-stop">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="3"/></svg>
+                </span>
               </button>
             </div>
           </div>
