@@ -255,7 +255,7 @@ body.landing{overflow-y:auto;height:auto} body.page-transitioning{background:var
 @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(155,93,229,.4)}50%{box-shadow:0 0 0 8px rgba(155,93,229,0)}}
 
 /* PORTAL */
-#portal{position:fixed;inset:0;z-index:200;overflow-y:auto;display:none;background:var(--dp-bg)}
+#portal{position:fixed;inset:0;z-index:200;overflow-y:auto;overflow-x:hidden;display:none;background:var(--dp-bg)}
 #portal.show{display:block;opacity:1;pointer-events:auto}
 .blobs{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:0}
 .blob{position:absolute;border-radius:50%;filter:blur(90px);opacity:.22;animation:drift 12s ease-in-out infinite alternate}
@@ -360,6 +360,12 @@ body:not(.night) .blob{opacity:.32}
 /* Grid */
 .p-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;width:100%}
 @media(max-width:600px){.p-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:520px){
+  .p-inner{padding:40px 14px 60px}
+  .p-nav-bar{gap:2px;padding:4px;margin-bottom:28px}
+  .psb{padding:7px 10px;font-size:.72rem;gap:4px}
+  .psb-div{margin:0 1px}
+}
 
 /* Cards */
 .pc{

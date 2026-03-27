@@ -338,7 +338,7 @@ footer a:hover{color:rgba(192,132,252,.8)}
   .hero-btns { justify-content: center; }
   .hero-img-wrap { justify-content: center; min-height: auto; }
   .hero-img-wrap::before { width: min(100vw, 760px); height: min(100vw, 760px); right: auto; }
-  .hero-3d-img { width: min(88vw, 720px); margin-right: 0; }
+  .hero-3d-img { width: min(88vw, 720px); margin-right: 0; margin-left: auto; margin-right: auto; }
 }
 @media(max-width:900px){ .features-grid{grid-template-columns:repeat(2,1fr)} }
 @media(max-width:700px){ .features-grid{grid-template-columns:1fr} }
@@ -365,7 +365,7 @@ footer a:hover{color:rgba(192,132,252,.8)}
   .hero-cta, .hero-ghost { padding: 15px 22px; font-size: .92rem; }
   .hero-note { font-size: .88rem; }
   .hero-img-wrap { min-height: auto; margin-top: 8px; }
-  .hero-3d-img { width: 94vw; margin-right: 0; }
+  .hero-3d-img { width: 94vw; margin: 0 auto; }
   .section { padding: 0 14px 56px; }
   .section-title { font-size: clamp(1.5rem, 7vw, 2rem); margin-bottom: 6px; }
   .section-sub { font-size: .82rem; margin-bottom: 28px; }
@@ -382,6 +382,12 @@ footer a:hover{color:rgba(192,132,252,.8)}
   .cta-box h2 { font-size: 1.65rem; }
   .cta-box p { font-size: .86rem; margin-bottom: 22px; }
   footer { padding: 18px 16px; font-size: .72rem; }
+}
+@media(max-width:600px){
+  #ratings { padding: 40px 16px 60px; }
+  #ratingsStatsRow { flex-direction: column; }
+  #ratingsStatsRow > div { border-right: none !important; border-bottom: 1px solid rgba(255,255,255,.08); }
+  #ratingsStatsRow > div:last-child { border-bottom: none !important; }
 }
 
 </style>
@@ -449,7 +455,7 @@ footer a:hover{color:rgba(192,132,252,.8)}
 <section id="ratings" style="position:relative;z-index:2;padding:60px 56px 80px;max-width:1000px;margin:0 auto">
 
   <!-- Stats row -->
-  <div style="display:flex;max-width:700px;margin:0 auto 52px;border:1px solid rgba(255,255,255,.08);border-radius:20px;overflow:hidden;background:rgba(255,255,255,.03);backdrop-filter:blur(20px)">
+  <div id="ratingsStatsRow" style="display:flex;max-width:700px;margin:0 auto 52px;border:1px solid rgba(255,255,255,.08);border-radius:20px;overflow:hidden;background:rgba(255,255,255,.03);backdrop-filter:blur(20px)">
     <div style="flex:1;text-align:center;padding:28px 20px;border-right:1px solid rgba(255,255,255,.08)">
       <span style="font-family:'Fredoka One',cursive;font-size:2.2rem;display:block;background:linear-gradient(135deg,#c084fc,#f472b6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:4px">4.9★</span>
       <span style="font-size:.78rem;color:rgba(255,255,255,.35);font-weight:700">Average rating</span>
