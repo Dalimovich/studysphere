@@ -2348,7 +2348,7 @@ authSubmit.addEventListener('click', async function(){
       if (password !== confirmVal) { showAuthError('Passwords do not match'); authSubmit.textContent='Create Account'; authSubmit.disabled=false; return; }
       if (password.length < 8) { showAuthError('Password must be at least 8 characters'); authSubmit.textContent='Create Account'; authSubmit.disabled=false; return; }
 
-      var result = await _sb.auth.signUp(email, password, 'https://dalimovich.github.io/studysphere/');
+      var result = await _sb.auth.signUp(email, password, 'https://studysphere-website.netlify.app/');
       
       // Check for errors
       if (result.error || result.error_description) {

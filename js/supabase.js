@@ -448,6 +448,16 @@ window.addEventListener('ss-ready', function(){
     return;
   }
 
+  // Persistent login: sb_token in localStorage caused the full app to boot.
+  // Verify the token and enter the app, or fall back to the auth modal.
+  var savedTok = null;
+  try { savedTok = localStorage.getItem('sb_token'); } catch(e) {}
+  if (savedTok) {
+    console.log('[Auth] → path: persistent sb_token restore');
+    _verifyAndEnter(savedTok);
+    return;
+  }
+
   console.log('[Auth] → path: fallthrough (no action taken) — page will appear blank if full app is loaded');
   // Default startup path: stay on the landing page until the user clicks Login.
 });

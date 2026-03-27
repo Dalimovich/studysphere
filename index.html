@@ -49,6 +49,12 @@
     } catch(e) {}
   }
 
+  // Persistent login — sb_token saved from a previous "Stay signed in" session.
+  // Load the full app so supabase.js can verify the token and enter the dashboard.
+  if (!loggedIn) {
+    try { if (localStorage.getItem('sb_token')) loggedIn = true; } catch(e) {}
+  }
+
   window._ssIsLoggedIn = loggedIn;
 })();
 
