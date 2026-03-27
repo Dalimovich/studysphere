@@ -411,7 +411,7 @@ body:not(.night) .pc-icon{filter:drop-shadow(0 4px 14px rgba(155,93,229,.35))}
 .p-right{display:none}
 
 /* APP */
-#app{position:fixed;inset:0;display:none;flex-direction:column;z-index:10;background:var(--dp-solid)}
+#app{position:fixed;inset:0;display:none;flex-direction:column;z-index:10;background:var(--dp-solid);overflow-x:hidden}
 .topbar{height:var(--topbar-h);background:var(--card);display:flex;align-items:center;gap:10px;padding:0 16px;flex-shrink:0;z-index:100}
 .tb-toggle{width:34px;height:34px;border:none;border-radius:9px;background:#F3EEFF;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1.05rem;flex-shrink:0;transition:background .15s}
 .tb-toggle:hover{background:#E6D9FF}
