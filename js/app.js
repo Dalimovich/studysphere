@@ -1048,14 +1048,10 @@ function buildSbCourseNav(course,activeSection){
 }
 
 (document.getElementById('sbBack')||{addEventListener:function(){}}).addEventListener('click',function(){
-  activeCourseId=null;activeFileName=null;pdfDoc=null;pdfFullText='';
-  document.getElementById('courseOverview').style.display='none';
-  document.getElementById('pdfView').style.display='none';
-  document.getElementById('welcomeState').style.display='flex';
-  document.getElementById('sbCourse').style.display='none';
-  document.getElementById('sbMain').style.display='block';
-  closeSB();renderCourses();
-  // Stay in #app — just reset to subject list; do NOT jump to Stud.IP overlay
+  activeCourseId=null;activeCourseRef=null;activeFileName=null;pdfDoc=null;pdfFullText='';
+  closeSB();
+  showStudip();
+  _ssPushHistory({ view: 'studip' }, '#studip');
 });
 
 
@@ -2067,8 +2063,18 @@ restoreState();
 // Don't overwrite the URL hash if it contains an OAuth token — supabase.js
 // needs to read #access_token in its ss-ready handler. It will clean the hash itself.
 if (!window.location.hash || window.location.hash.indexOf('access_token') === -1) {
-  var _initSec = _pendingPortalRestore || 'dashboard';
-  _ssReplaceHistory({ view: 'portal', section: _initSec }, '#portal=' + encodeURIComponent(_initSec));
+  var _rst = {};
+  try { _rst = JSON.parse(localStorage.getItem('ss_state') || '{}'); } catch(e) {}
+  if (_rst.inApp && _rst.view === 'studip') {
+    _ssReplaceHistory({ view: 'studip' }, '#studip');
+  } else if (_rst.inApp && _rst.fileName) {
+    _ssReplaceHistory({ view: 'file', courseId: _rst.courseId, fileName: _rst.fileName, section: _rst.section }, '#file=' + encodeURIComponent(_rst.fileName));
+  } else if (_rst.inApp && _rst.courseId) {
+    _ssReplaceHistory({ view: 'course', courseId: _rst.courseId, section: _rst.section }, '#course=' + encodeURIComponent(_rst.courseId));
+  } else {
+    var _initSec = _pendingPortalRestore || 'dashboard';
+    _ssReplaceHistory({ view: 'portal', section: _initSec }, '#portal=' + encodeURIComponent(_initSec));
+  }
 }
 
 window.addEventListener('popstate', function(e) {
