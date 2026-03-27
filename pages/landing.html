@@ -23,12 +23,13 @@
   --border: rgba(255,255,255,0.12);
 }
 
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; overflow-x: hidden; max-width: 100%; }
 body {
   font-family: 'Nunito', sans-serif;
   color: var(--text);
   min-height: 100vh;
   overflow-x: hidden;
+  max-width: 100%;
   background:
     radial-gradient(circle at 68% 52%, rgba(170, 105, 255, 0.24), transparent 24%),
     radial-gradient(circle at 42% 88%, rgba(82, 163, 255, 0.12), transparent 18%),
@@ -337,7 +338,7 @@ footer a:hover{color:rgba(192,132,252,.8)}
   .hero-btns { justify-content: center; }
   .hero-img-wrap { justify-content: center; min-height: auto; }
   .hero-img-wrap::before { width: min(100vw, 760px); height: min(100vw, 760px); right: auto; }
-  .hero-3d-img { width: min(128vw, 980px); margin-right: 0; }
+  .hero-3d-img { width: min(88vw, 720px); margin-right: 0; }
 }
 @media(max-width:900px){ .features-grid{grid-template-columns:repeat(2,1fr)} }
 @media(max-width:700px){ .features-grid{grid-template-columns:1fr} }
