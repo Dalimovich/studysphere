@@ -2,7 +2,7 @@
      One Tap is initialised in index.html (_initOneTap / _handleGoogleCredential).
      Scripts injected via innerHTML never execute, so ALL auth JS lives in index.html.
      This file contains only the modal markup. -->
-<div id="authModal" style="position:fixed;inset:0;z-index:1000;background:var(--auth-bg);backdrop-filter:blur(12px);display:flex;align-items:center;justify-content:center">
+<div id="authModal" style="position:fixed;inset:0;z-index:1000;background:var(--auth-bg);backdrop-filter:blur(12px);display:none;align-items:center;justify-content:center">
   <div id="authBox" style="background:var(--auth-box-bg);border:1px solid var(--auth-box-border);border-radius:24px;padding:40px 36px;width:360px;max-width:calc(100vw - 32px);display:flex;flex-direction:column;gap:20px">
     <div style="text-align:center">
       <div style="font-family:'Fredoka One',cursive;font-size:1.8rem;background:linear-gradient(135deg,#c084fc,#f472b6,#fb923c);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:6px">StudySphere</div>

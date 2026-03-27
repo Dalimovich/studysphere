@@ -74,6 +74,7 @@ function showStudip(){
   var portal=document.getElementById('portal');
   var studip=document.getElementById('studipDash');
   sdRenderCourses();sdRenderTT();sdRenderMails();
+  try{var _sst=JSON.parse(localStorage.getItem('ss_state')||'{}');_sst.view='studip';localStorage.setItem('ss_state',JSON.stringify(_sst));}catch(e){}
   studip.style.display='block';
   studip.style.transition='none';
   studip.style.opacity='0';
@@ -113,7 +114,7 @@ function showPortal(){
     studip.style.transition='none'; studip.style.opacity='0'; studip.style.pointerEvents='none';
     portal.style.zIndex=''; portal.style.opacity=''; portal.style.transition=''; portal.style.transform='';
     portal.style.display='block';
-    try{var st=JSON.parse(localStorage.getItem('ss_state')||'{}');st.inApp=false;localStorage.setItem('ss_state',JSON.stringify(st));}catch(e){}
+    try{var st=JSON.parse(localStorage.getItem('ss_state')||'{}');st.inApp=false;st.view='';localStorage.setItem('ss_state',JSON.stringify(st));}catch(e){}
   }, 500);
 }
 
@@ -2033,6 +2034,7 @@ showCourseSection = function(c, s) {
 // Used to restore the correct section when _enterApp calls showPortalSection('dashboard').
 var _savedPortalTab = (function(){ try { return sessionStorage.getItem('ss_portal_tab'); } catch(e) { return null; } })();
 var _pendingPortalRestore = (_savedPortalTab && _savedPortalTab !== 'dashboard') ? _savedPortalTab : null;
+var _pendingStudipRestore = (function(){ try { return JSON.parse(localStorage.getItem('ss_state')||'{}').view === 'studip'; } catch(e) { return false; } })();
 
 var _origShowPortalSection = showPortalSection;
 showPortalSection = function(sec) {
@@ -2040,6 +2042,11 @@ showPortalSection = function(sec) {
 
   // When _enterApp calls showPortalSection('dashboard'), the portal is already
   // visible at that exact moment. Intercept and redirect to the saved section.
+  if (target === 'dashboard' && _pendingStudipRestore) {
+    _pendingStudipRestore = false;
+    setTimeout(showStudip, 0);
+    return;
+  }
   if (target === 'dashboard' && _pendingPortalRestore) {
     target = _pendingPortalRestore;
     _pendingPortalRestore = null;
@@ -2062,8 +2069,12 @@ restoreState();
 // Don't overwrite the URL hash if it contains an OAuth token — supabase.js
 // needs to read #access_token in its ss-ready handler. It will clean the hash itself.
 if (!window.location.hash || window.location.hash.indexOf('access_token') === -1) {
-  var _initSec = _pendingPortalRestore || 'dashboard';
-  _ssReplaceHistory({ view: 'portal', section: _initSec }, '#portal=' + encodeURIComponent(_initSec));
+  if (_pendingStudipRestore) {
+    _ssReplaceHistory({ view: 'studip' }, '#studip');
+  } else {
+    var _initSec = _pendingPortalRestore || 'dashboard';
+    _ssReplaceHistory({ view: 'portal', section: _initSec }, '#portal=' + encodeURIComponent(_initSec));
+  }
 }
 
 window.addEventListener('popstate', function(e) {
@@ -2240,7 +2251,7 @@ _bindIf('nightBtn', 'click', function() {
 });
 
 // Dashboard cards
-_bindIf('pcStudip','click',showStudip);
+_bindIf('pcStudip','click',function(){ showStudip(); _ssPushHistory({ view: 'studip' }, '#studip'); });
 _bindIf('pcMail','click',function(){window.open('https://mail.tu-braunschweig.de','_blank');});
 _bindIf('pcConnect','click',function(){window.open('https://connect.tu-braunschweig.de','_blank');});
 _bindIf('pcTT','click',function(){window.open('https://connect.tu-braunschweig.de','_blank');});
