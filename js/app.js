@@ -74,7 +74,7 @@ function showStudip(){
   var portal=document.getElementById('portal');
   var studip=document.getElementById('studipDash');
   sdRenderCourses();sdRenderTT();sdRenderMails();
-  try{var _sst=JSON.parse(localStorage.getItem('ss_state')||'{}');_sst.view='studip';localStorage.setItem('ss_state',JSON.stringify(_sst));}catch(e){}
+  try{var _sst=JSON.parse(localStorage.getItem('ss_state')||'{}');_sst.view='studip';_sst.inApp=true;localStorage.setItem('ss_state',JSON.stringify(_sst));}catch(e){}
   studip.style.display='block';
   studip.style.transition='none';
   studip.style.opacity='0';
@@ -188,6 +188,11 @@ function restoreState(){
     var _pEl=document.getElementById('portal');
     if(!_pEl){ console.warn('restoreState skipped: #portal not found'); return; }
     _pEl.style.opacity='';_pEl.style.transition='';_pEl.style.pointerEvents='';_pEl.style.zIndex='';_pEl.classList.remove('show');
+
+    if(st.view === 'studip') { showStudip(); return; }
+
+    var _appEl=document.getElementById('app');
+    if(_appEl) _appEl.style.display='flex';
 
     // Night mode is controlled by Supabase settings, not localStorage
 
@@ -2034,19 +2039,12 @@ showCourseSection = function(c, s) {
 // Used to restore the correct section when _enterApp calls showPortalSection('dashboard').
 var _savedPortalTab = (function(){ try { return sessionStorage.getItem('ss_portal_tab'); } catch(e) { return null; } })();
 var _pendingPortalRestore = (_savedPortalTab && _savedPortalTab !== 'dashboard') ? _savedPortalTab : null;
-var _pendingStudipRestore = (function(){ try { return JSON.parse(localStorage.getItem('ss_state')||'{}').view === 'studip'; } catch(e) { return false; } })();
-
 var _origShowPortalSection = showPortalSection;
 showPortalSection = function(sec) {
   var target = sec || 'dashboard';
 
   // When _enterApp calls showPortalSection('dashboard'), the portal is already
   // visible at that exact moment. Intercept and redirect to the saved section.
-  if (target === 'dashboard' && _pendingStudipRestore) {
-    _pendingStudipRestore = false;
-    setTimeout(showStudip, 0);
-    return;
-  }
   if (target === 'dashboard' && _pendingPortalRestore) {
     target = _pendingPortalRestore;
     _pendingPortalRestore = null;
@@ -2069,12 +2067,8 @@ restoreState();
 // Don't overwrite the URL hash if it contains an OAuth token — supabase.js
 // needs to read #access_token in its ss-ready handler. It will clean the hash itself.
 if (!window.location.hash || window.location.hash.indexOf('access_token') === -1) {
-  if (_pendingStudipRestore) {
-    _ssReplaceHistory({ view: 'studip' }, '#studip');
-  } else {
-    var _initSec = _pendingPortalRestore || 'dashboard';
-    _ssReplaceHistory({ view: 'portal', section: _initSec }, '#portal=' + encodeURIComponent(_initSec));
-  }
+  var _initSec = _pendingPortalRestore || 'dashboard';
+  _ssReplaceHistory({ view: 'portal', section: _initSec }, '#portal=' + encodeURIComponent(_initSec));
 }
 
 window.addEventListener('popstate', function(e) {
