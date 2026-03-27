@@ -1,0 +1,141 @@
+<!-- APP -->
+<div id="app">
+  <div class="topbar">
+    <button class="tb-toggle" id="sidebarToggle">☰</button>
+    <span class="tb-logo">📚 StudySphere</span>
+    <span class="tb-crumb" id="breadcrumb">Stud.IP — <b>TU Braunschweig</b></span>
+    <button class="night-btn" id="nightBtn" title="Night mode">☀️</button>
+    <button class="tb-portal-btn" id="goPortal" data-i18n="back_btn">← Back</button>
+  </div>
+  <div class="app-body">
+    <!-- SIDEBAR -->
+    <div class="sidebar" id="sidebar">
+      <button class="sb-x-btn" id="sbClose" title="Close">✕</button>
+      <!-- SIDEBAR: main view -->
+      <div class="sb-scroll" id="sbMain">
+        <div class="sb-section">
+          <div class="sb-section-title" data-i18n="sb_subjects">📚 Subjects</div>
+          <div class="sem-wrap">
+            <button class="sem-btn" id="semBtn">
+              <span class="sem-btn-l"><span class="sem-dot" id="semDot" style="background:#06D6A0"></span><span id="semLabel">WS 2025/26</span></span>
+              <span class="sem-chev" id="semChev">▼</span>
+            </button>
+            <div class="sem-dd" id="semDD">
+              <div class="sem-opt sel" data-sid="ws2526" data-col="#06D6A0">🟢 WS 2025/26</div>
+              <div class="sem-opt" data-sid="ss25" data-col="#9B5DE5">📁 SS 2025</div>
+              <div class="sem-opt" data-sid="ws2425" data-col="#FF6FB7">📁 WS 2024/25</div>
+              <div class="sem-opt" data-sid="ss24" data-col="#4CC9F0">📁 SS 2024</div>
+              <div class="sem-opt" data-sid="ws2324" data-col="#FF6B35">📁 WS 2023/24</div>
+            </div>
+          </div>
+          <div id="courseList"></div>
+        </div>
+        <div class="sb-section">
+          <div class="sb-section-title" data-i18n="sb_timetable">🗓️ Timetable</div>
+          <div id="ttList"></div>
+        </div>
+        <div class="sb-section">
+          <div class="sb-section-title" data-i18n="sb_mails">✉️ Mails</div>
+          <div id="mailList"></div>
+        </div>
+      </div>
+      <!-- SIDEBAR: course view (shown when subject selected) -->
+      <div id="sbCourse" style="display:none;flex-direction:column;flex:1;overflow:hidden;min-height:0">
+        <div style="padding:10px 10px 6px;border-bottom:1px solid #EDE8F5;flex-shrink:0">
+          <div class="sb-back" id="sbBack" data-i18n="sb_back">← All subjects</div>
+        </div>
+        <div class="sb-course-nav" id="sbCourseNav" style="padding:10px;display:flex;flex-direction:column;gap:5px;overflow-y:scroll;flex:1;min-height:0;scrollbar-width:thin;scrollbar-color:var(--purple) #F0F0F0"></div>
+      </div>
+    </div>
+
+    <!-- PDF VIEWER (centre) -->
+    <div class="pdf-viewer-wrap" id="pdfViewerWrap" style="flex-direction:row">
+      <div id="centreContent" style="flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;position:relative">
+      <!-- Course overview (shown when subject clicked, not file) -->
+      <div id="courseOverview" style="display:none;flex:1;overflow-y:auto"></div>
+      <div class="welcome-state" id="welcomeState">
+        <span class="ws-icon">📂</span>
+        <div class="ws-title" data-i18n="welcome_title">Select a file to read</div>
+        <div class="ws-sub" data-i18n="welcome_sub">Open a subject in the sidebar and click any file — it loads here as a real document.</div>
+        <div class="ws-hint" data-i18n="welcome_hint">💡 Select any text or formula → AI automatically asks if you need help</div>
+      </div>
+      <div id="pdfView" style="display:none;flex-direction:column;flex:1;overflow:hidden">
+        <div class="pdf-toolbar" id="pdfToolbar">
+          <button class="pdf-tb-btn" id="pdfPrev" style="display:none">◀</button>
+          <span class="pdf-page-info" id="pdfPageInfo" style="display:none">1 / 1</span>
+          <button class="pdf-tb-btn" id="pdfNext" style="display:none">▶</button>
+          <button class="pdf-tb-btn" id="pdfZoomOut">−</button>
+          <span class="pdf-zoom-pct" id="pdfZoomPct">90%</span>
+          <button class="pdf-tb-btn" id="pdfZoomIn">+</button>
+          <button class="pdf-tb-btn" id="pdfFit" data-i18n="pdf_fit">Fit</button>
+          <button class="pdf-tb-btn" id="pdfAll" data-i18n="pdf_single">Single page</button>
+          <button class="pdf-tb-btn" id="pdfDownload" title="Download PDF" data-i18n="pdf_download">⬇ Download</button>
+          <span style="flex:1"></span>
+          <span id="pdfFileName" style="font-size:.73rem;font-weight:700;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px"></span>
+        </div>
+        <div class="pdf-body" id="pdfBody"></div>
+      </div>
+      <!-- AI tab & hover zone (inside centreContent for correct positioning) -->
+      <div id="aiTab">✨</div>
+      <div id="aiHoverZone"></div>
+      </div><!-- /centreContent -->
+      <!-- AI PANEL -->
+      <div id="aiPanel">
+        <!-- Header -->
+        <div class="ai-hdr">
+          <div class="ai-av-wrap">
+            <div class="ai-av">🎓</div>
+            <div class="ai-status-dot"></div>
+          </div>
+          <div class="ai-hdr-info">
+            <h3>StudySphere AI</h3>
+            <p id="aiFileLabel" data-i18n="ai_ready">Ready to help</p>
+          </div>
+          <div class="ai-hdr-actions">
+            <button class="ai-icon-btn" id="aiClearBtn" title="Clear chat">🗑️</button>
+            <button class="ai-close" id="aiClose" title="Close">✕</button>
+          </div>
+        </div>
+        <!-- Messages -->
+        <div class="ai-msgs" id="aiMsgs"></div>
+        <!-- Input -->
+        <div class="ai-input-area">
+          <div class="ai-chips">
+            <span class="ai-tip" id="chip-summarise" data-i18n="chip_summarise">✨ Summarise</span>
+            <span class="ai-tip" id="chip-formulas" data-i18n="chip_formulas">🔢 Formulas</span>
+            <span class="ai-tip" id="chip-quiz" data-i18n="chip_quiz">📝 Quiz me</span>
+            <span class="ai-tip" id="chip-keyideas" data-i18n="chip_keyideas">💡 Key ideas</span>
+            <span class="ai-tip" id="chip-analogy" data-i18n="chip_analogy">🔗 Analogy</span>
+          </div>
+          <div class="chip-drawer" id="opts-summarise">
+            <div class="chip-drawer-inner">
+              <span class="chip-drawer-label" data-i18n="depth_label">Depth:</span>
+              <span class="chip-sub chip-sub-s" data-type="summarise" data-level="small" data-i18n="chip_brief">Brief</span>
+              <span class="chip-sub chip-sub-m" data-type="summarise" data-level="medium" data-i18n="chip_standard">Standard</span>
+              <span class="chip-sub chip-sub-t" data-type="summarise" data-level="thorough" data-i18n="chip_thorough">In-depth</span>
+            </div>
+          </div>
+          <div class="chip-drawer" id="opts-quiz">
+            <div class="chip-drawer-inner">
+              <span class="chip-drawer-label" data-i18n="level_label">Level:</span>
+              <span class="chip-sub chip-sub-e" data-type="quiz" data-level="easy" data-i18n="chip_easy">Easy</span>
+              <span class="chip-sub chip-sub-m" data-type="quiz" data-level="medium" data-i18n="chip_medium">Medium</span>
+              <span class="chip-sub chip-sub-h" data-type="quiz" data-level="hard" data-i18n="chip_hard">Hard</span>
+            </div>
+          </div>
+          <button id="stopBtn" data-i18n="stop_btn" style="display:none;align-items:center;gap:6px;background:#FFE8F5;border:1.5px solid #FFB3D1;border-radius:10px;padding:7px 14px;color:#FF6FB7;font-family:'Nunito',sans-serif;font-weight:800;font-size:.78rem;cursor:pointer;margin-bottom:8px;width:100%;justify-content:center" onclick="window.stopGeneration ? window.stopGeneration() : stopGeneration()">⏹ Stop generating</button>
+          <div class="ai-input-box">
+            <textarea class="ai-textarea" id="aiInput" data-i18n-ph="ai_placeholder" placeholder="Ask anything about this document…" rows="2"></textarea>
+            <div class="ai-bottom-row">
+              <span class="ai-char-count" id="aiCharCount">0 / 2000</span>
+              <button class="ai-send" id="aiSend" title="Send">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+

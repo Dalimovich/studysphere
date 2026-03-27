@@ -1,0 +1,62 @@
+<!-- ONBOARDING MODAL -->
+<div id="onboardModal" style="position:fixed;inset:0;z-index:9500;background:rgba(10,8,18,.92);backdrop-filter:blur(16px);display:none;align-items:center;justify-content:center">
+  <div style="background:linear-gradient(135deg,#110d20,#0d0f1e);border:1px solid rgba(192,132,252,.25);border-radius:24px;padding:40px 36px;width:420px;max-width:calc(100vw - 32px);display:flex;flex-direction:column;gap:20px">
+    <!-- Progress -->
+    <div style="display:flex;gap:8px;margin-bottom:4px">
+      <div id="obProg1" style="flex:1;height:4px;border-radius:4px;background:linear-gradient(90deg,#c084fc,#f472b6);transition:all .3s"></div>
+      <div id="obProg2" style="flex:1;height:4px;border-radius:4px;background:rgba(255,255,255,.12);transition:all .3s"></div>
+    </div>
+    <!-- Header -->
+    <div style="text-align:center">
+      <div style="font-size:2rem;margin-bottom:8px">👋</div>
+      <div id="obTitle" style="font-family:'Fredoka One',cursive;font-size:1.5rem;background:linear-gradient(135deg,#c084fc,#f472b6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">Welcome to StudySphere!</div>
+      <div id="obSub" style="font-size:.8rem;color:rgba(255,255,255,.4);font-weight:700;margin-top:4px" data-i18n="ob_step1">Let's set up your profile — step 1 of 2</div>
+    </div>
+    <!-- Step 1 -->
+    <div id="obStep1" style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;gap:10px">
+        <div style="flex:1;display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:.7rem;font-weight:800;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.04em" data-i18n="ob_first_name">First Name</label>
+          <input id="obFirst" type="text" placeholder="e.g. Mohamed" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:11px 14px;font-family:'Nunito',sans-serif;font-size:.85rem;font-weight:700;color:#fff;outline:none;width:100%" />
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:.7rem;font-weight:800;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.04em" data-i18n="ob_last_name">Last Name</label>
+          <input id="obLast" type="text" placeholder="e.g. Al-Rashid" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:11px 14px;font-family:'Nunito',sans-serif;font-size:.85rem;font-weight:700;color:#fff;outline:none;width:100%" />
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <label style="font-size:.7rem;font-weight:800;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.04em" data-i18n="ob_age">Age</label>
+        <input id="obAge" type="number" min="16" max="99" placeholder="e.g. 21" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:11px 14px;font-family:'Nunito',sans-serif;font-size:.85rem;font-weight:700;color:#fff;outline:none;width:100%" />
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <label style="font-size:.7rem;font-weight:800;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.04em" data-i18n="ob_email">TU-Mail</label>
+        <input id="obEmail" type="email" placeholder="e.g. m.name@tu-braunschweig.de" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:11px 14px;font-family:'Nunito',sans-serif;font-size:.85rem;font-weight:700;color:#fff;outline:none;width:100%" />
+      </div>
+      <div id="obErr1" style="display:none;color:#ef4444;font-size:.75rem;font-weight:700;text-align:center"></div>
+      <button onclick="window._obNext()" style="padding:13px;background:linear-gradient(135deg,#c084fc,#f472b6);border:none;border-radius:30px;font-family:'Nunito',sans-serif;font-weight:800;font-size:.9rem;color:#fff;cursor:pointer;margin-top:4px" data-i18n="ob_continue_btn">Continue →</button>
+    </div>
+    <!-- Step 2 -->
+    <div id="obStep2" style="display:none;flex-direction:column;gap:12px">
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <label style="font-size:.7rem;font-weight:800;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.04em" data-i18n="ob_programme">Study Programme</label>
+        <input id="obProg" type="text" placeholder="e.g. Maschinenbau" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:11px 14px;font-family:'Nunito',sans-serif;font-size:.85rem;font-weight:700;color:#fff;outline:none;width:100%" />
+      </div>
+      <div style="display:flex;gap:10px">
+        <div style="flex:1;display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:.7rem;font-weight:800;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.04em" data-i18n="ob_semester">Semester</label>
+          <input id="obSem" type="number" min="1" max="20" placeholder="e.g. 3" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:11px 14px;font-family:'Nunito',sans-serif;font-size:.85rem;font-weight:700;color:#fff;outline:none;width:100%" />
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:.7rem;font-weight:800;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.04em" data-i18n="ob_matrikel">Matrikel Nr.</label>
+          <input id="obMatrikel" type="text" placeholder="e.g. 2456789" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:11px 14px;font-family:'Nunito',sans-serif;font-size:.85rem;font-weight:700;color:#fff;outline:none;width:100%" />
+        </div>
+      </div>
+      <div id="obErr2" style="display:none;color:#ef4444;font-size:.75rem;font-weight:700;text-align:center"></div>
+      <div style="display:flex;gap:10px">
+        <button onclick="window._obBack()" style="padding:13px;flex:1;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:30px;font-family:'Nunito',sans-serif;font-weight:800;font-size:.9rem;color:rgba(255,255,255,.7);cursor:pointer" data-i18n="ob_back_btn">← Back</button>
+        <button id="obFinish" onclick="window._obFinish()" style="padding:13px;flex:2;background:linear-gradient(135deg,#c084fc,#f472b6);border:none;border-radius:30px;font-family:'Nunito',sans-serif;font-weight:800;font-size:.9rem;color:#fff;cursor:pointer" data-i18n="ob_finish_btn">🎓 Let's go!</button>
+      </div>
+    </div>
+  </div>
+</div>
+

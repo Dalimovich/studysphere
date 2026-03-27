@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  width: 300px;
+  font-family: 'Segoe UI', sans-serif;
+  background: #0F0E17;
+  color: #E8E4F0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.header {
+  background: linear-gradient(135deg, #9B5DE5, #FF6FB7);
+  padding: 14px 16px;
+  display: flex; align-items: center; gap: 10px;
+}
+.header h1 {
+  font-size: 15px; font-weight: 800; color: #fff;
+}
+.header p { font-size: 11px; color: rgba(255,255,255,.8); margin-top: 2px; }
+.logo { font-size: 1.4rem; }
+.body { padding: 14px; }
+.status-card {
+  background: #1A1826;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  border: 1px solid #2A2640;
+  font-size: 12px;
+  color: #B0A8C8;
+  line-height: 1.6;
+}
+#page-status { font-weight: 700; color: #9B5DE5; margin-bottom: 4px; }
+.btn {
+  width: 100%; padding: 10px;
+  border: none; border-radius: 10px;
+  font-family: 'Segoe UI', sans-serif;
+  font-weight: 700; font-size: 13px;
+  cursor: pointer; margin-bottom: 7px;
+  transition: opacity .15s;
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+}
+.btn:hover { opacity: .88; }
+.btn-primary { background: linear-gradient(135deg, #9B5DE5, #FF6FB7); color: #fff; }
+.btn-secondary { background: #1A1826; color: #B47FFF; border: 1px solid #2A2640; }
+.btn-stop { background: #FFE8F5; color: #FF6FB7; border: 1px solid #FFB3D1; }
+.last-summary {
+  background: #1A1826;
+  border-radius: 10px;
+  padding: 10px 12px;
+  border: 1px solid #2A2640;
+  font-size: 11px;
+  color: #7A748A;
+  margin-top: 4px;
+}
+.last-summary b { color: #9B5DE5; display: block; margin-bottom: 3px; font-size: 12px; }
+.tip {
+  font-size: 11px; color: #7A748A; text-align: center;
+  padding: 8px 0 2px; line-height: 1.5;
+}
+#not-lecture {
+  text-align: center; padding: 20px 14px;
+  font-size: 12px; color: #7A748A; line-height: 1.7;
+}
+#not-lecture .big { font-size: 2rem; display: block; margin-bottom: 8px; }
+#not-lecture b { color: #9B5DE5; }
+</style>
+</head>
+<body>
+<div class="header">
+  <span class="logo">📚</span>
+  <div>
+    <h1>StudySphere</h1>
+    <p>Lecture Assistant</p>
+  </div>
+</div>
+<div class="body" id="main-body">
+  <div id="lecture-ui" style="display:none">
+    <div class="status-card">
+      <div id="page-status">Detecting…</div>
+      <div id="capture-status">Not capturing</div>
+    </div>
+    <button class="btn btn-primary" id="btn-capture">⏺ Start Capturing</button>
+    <button class="btn btn-primary" id="btn-summarize">✨ Summarize Lecture</button>
+    <div class="last-summary" id="last-summary" style="display:none">
+      <b>Last summary:</b>
+      <span id="last-title"></span>
+    </div>
+    <p class="tip">💡 Enable subtitles/captions on the video first for best results</p>
+  </div>
+  <div id="not-lecture">
+    <span class="big">🎬</span>
+    Navigate to a <b>YouTube</b>, <b>Opencast</b> or <b>Zoom</b> lecture video to use the assistant.
+  </div>
+</div>
+<script src="popup.js"></script>
+</body>
+</html>
