@@ -354,6 +354,54 @@ window.runMultiSummary = runMultiSummary;
   new MutationObserver(syncChip).observe(label, { childList: true, characterData: true, subtree: true });
 })();
 
+// ── AI panel resize (desktop only) ───────────────────────────────────────
+(function() {
+  var handle = document.getElementById('aiResizeHandle');
+  var panel  = document.getElementById('aiPanel');
+  if (!handle || !panel) return;
+
+  var AI_W_MIN = 280;
+  var AI_W_MAX = 600;
+  var AI_W_KEY = 'ss_ai_width';
+
+  // Restore saved width
+  var saved = parseInt(localStorage.getItem(AI_W_KEY), 10);
+  if (saved && saved >= AI_W_MIN && saved <= AI_W_MAX) {
+    document.documentElement.style.setProperty('--ai-w', saved + 'px');
+  }
+
+  var startX, startW;
+
+  handle.addEventListener('mousedown', function(e) {
+    e.preventDefault();
+    startX = e.clientX;
+    startW = panel.offsetWidth || parseInt(getComputedStyle(document.documentElement).getPropertyValue('--ai-w'), 10) || 340;
+    handle.classList.add('dragging');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    function onMove(e) {
+      var delta = startX - e.clientX; // dragging left = wider
+      var newW  = Math.min(AI_W_MAX, Math.max(AI_W_MIN, startW + delta));
+      document.documentElement.style.setProperty('--ai-w', newW + 'px');
+    }
+
+    function onUp() {
+      handle.classList.remove('dragging');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      // Persist
+      var finalW = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--ai-w'), 10);
+      if (finalW) localStorage.setItem(AI_W_KEY, finalW);
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    }
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+})();
+
 // ── Scroll intent detection ───────────────────────────────────────────────
 // If the user scrolls up during generation, stop auto-scrolling.
 // When they scroll back to the bottom, resume.

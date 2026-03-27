@@ -935,6 +935,10 @@ body.night .chip-sub-h{background:#501313;color:#F7C1C1;border-color:#E24B4A}
   z-index:2;
 }
 #aiPanel{position:relative;overflow:visible}
+/* AI panel resize handle — desktop only */
+#aiResizeHandle{position:absolute;left:-4px;top:0;bottom:0;width:8px;cursor:col-resize;z-index:60;border-radius:4px;transition:background .18s}
+#aiResizeHandle:hover,#aiResizeHandle.dragging{background:rgba(155,93,229,.28)}
+@media(hover:none),(pointer:coarse){#aiResizeHandle{display:none}}
 /* STUDIP DASHBOARD */
 .sd-section-label{font-family:'Fredoka One',cursive;font-size:.72rem;color:var(--section-label);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px}
 .sd-glass-card{background:var(--card-inner);border:1px solid var(--card-inner-border);border-radius:20px;padding:18px;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);position:relative;overflow:hidden}
