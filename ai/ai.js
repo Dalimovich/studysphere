@@ -5,7 +5,8 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 // ── CONFIG ────────────────────────────────────────────────────────────────
-var _aiUserScrolled = false; // true when user has manually scrolled up during generation
+var _aiUserScrolled  = false; // true when user has manually scrolled up during generation
+var _attachedImage   = null;  // { data: base64string, mediaType: 'image/png' }
 
 var AI_MODEL   = 'claude-sonnet-4-5';
 var AI_MAX_TOK = 4096;    // was 1024 — allows long, thorough answers
@@ -82,6 +83,19 @@ askAI = function(question, skipUserBubble) {
   cycleThought();
   activeThinkTimer = setInterval(cycleThought, 1100);
 
+  // Build message content — include image if one is attached
+  var _img = _attachedImage;
+  _attachedImage = null;
+  var aiImgPreviewEl = document.getElementById('aiImgPreview');
+  if (aiImgPreviewEl) aiImgPreviewEl.style.display = 'none';
+
+  var msgContent = _img
+    ? [
+        { type: 'image', source: { type: 'base64', media_type: _img.mediaType, data: _img.data } },
+        { type: 'text', text: question }
+      ]
+    : question;
+
   fetch(BACKEND_URL + '/api/ai', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -89,7 +103,7 @@ askAI = function(question, skipUserBubble) {
       model: AI_MODEL,
       max_tokens: AI_MAX_TOK,
       system: _buildSystemPrompt(),
-      messages: [{ role: 'user', content: question }]
+      messages: [{ role: 'user', content: msgContent }]
     })
   })
   .then(function(r) { return r.json(); })
@@ -345,13 +359,151 @@ window.runMultiSummary = runMultiSummary;
   if (!label || !chip || !name) return;
 
   function syncChip() {
-    var txt = label.textContent || '';
-    var isEmpty = !txt || txt === 'Ready to help' || txt === 'Bereit zu helfen';
-    name.textContent = isEmpty ? 'No file open' : txt;
+    var fname = window.activeFileName || '';
+    var isEmpty = !fname;
+    name.textContent = isEmpty ? 'No file open' : fname;
     chip.className   = 'ai-file-chip' + (isEmpty ? ' empty' : '');
+    // Also keep the label text in sync
+    if (label) label.textContent = isEmpty ? 'Ready to help' : fname;
   }
   syncChip();
+  // Re-sync whenever the label changes (openFile sets it) or language is applied
   new MutationObserver(syncChip).observe(label, { childList: true, characterData: true, subtree: true });
+})();
+
+// ── Image attachment helpers ──────────────────────────────────────────────
+function _setAttachedImage(img) {
+  _attachedImage = img;
+  var preview = document.getElementById('aiImgPreview');
+  var thumb   = document.getElementById('aiImgThumb');
+  if (!preview || !thumb) return;
+  thumb.src = 'data:' + img.mediaType + ';base64,' + img.data;
+  preview.style.display = 'flex';
+}
+
+// Crops the selected viewport region from all visible PDF canvases
+function _captureSnipRegion(x1, y1, x2, y2) {
+  var selX = Math.min(x1, x2), selY = Math.min(y1, y2);
+  var selW = Math.abs(x2 - x1), selH = Math.abs(y2 - y1);
+  if (selW < 8 || selH < 8) return null;
+
+  var dpr = window.devicePixelRatio || 1;
+  var out = document.createElement('canvas');
+  out.width  = Math.round(selW * dpr);
+  out.height = Math.round(selH * dpr);
+  var ctx = out.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, out.width, out.height);
+
+  var canvases = document.querySelectorAll('#pdfBody canvas');
+  var drawn = 0;
+  canvases.forEach(function(c) {
+    var cr = c.getBoundingClientRect();
+    var ix = Math.max(selX, cr.left);
+    var iy = Math.max(selY, cr.top);
+    var iw = Math.min(selX + selW, cr.right)  - ix;
+    var ih = Math.min(selY + selH, cr.bottom) - iy;
+    if (iw <= 0 || ih <= 0) return;
+
+    var scaleX = c.width  / cr.width;
+    var scaleY = c.height / cr.height;
+
+    ctx.drawImage(
+      c,
+      (ix - cr.left) * scaleX, (iy - cr.top) * scaleY, iw * scaleX, ih * scaleY,
+      (ix - selX) * dpr,       (iy - selY) * dpr,       iw * dpr,    ih * dpr
+    );
+    drawn++;
+  });
+
+  if (drawn === 0) return null;
+  return { data: out.toDataURL('image/png').split(',')[1], mediaType: 'image/png' };
+}
+
+// ── Snip tool ─────────────────────────────────────────────────────────────
+(function() {
+  var btn = document.getElementById('aiSnipBtn');
+  if (!btn) return;
+
+  btn.addEventListener('click', function() {
+    var overlay = document.createElement('div');
+    overlay.id = 'snipOverlay';
+    var hint = document.createElement('div');
+    hint.id = 'snipHint';
+    hint.textContent = 'Drag to select an area — Esc to cancel';
+    var sel = document.createElement('div');
+    sel.id = 'snipSel';
+    overlay.appendChild(hint);
+    overlay.appendChild(sel);
+    document.body.appendChild(overlay);
+
+    var startX = 0, startY = 0, dragging = false;
+
+    overlay.addEventListener('mousedown', function(e) {
+      startX = e.clientX; startY = e.clientY;
+      dragging = true;
+      hint.style.display = 'none';
+      sel.style.cssText = 'left:' + startX + 'px;top:' + startY + 'px;width:0;height:0;display:block';
+    });
+
+    overlay.addEventListener('mousemove', function(e) {
+      if (!dragging) return;
+      var x = Math.min(e.clientX, startX), y = Math.min(e.clientY, startY);
+      var w = Math.abs(e.clientX - startX), h = Math.abs(e.clientY - startY);
+      sel.style.cssText = 'left:' + x + 'px;top:' + y + 'px;width:' + w + 'px;height:' + h + 'px;display:block';
+    });
+
+    overlay.addEventListener('mouseup', function(e) {
+      if (!dragging) return;
+      dragging = false;
+      overlay.remove();
+      document.removeEventListener('keydown', onKey);
+      var result = _captureSnipRegion(startX, startY, e.clientX, e.clientY);
+      if (!result) {
+        if (typeof showToast === 'function') showToast('Nothing captured', 'Select an area over the PDF');
+        return;
+      }
+      _setAttachedImage(result);
+      // Focus the textarea so the user can type their question
+      var ta = document.getElementById('aiInput');
+      if (ta) ta.focus();
+    });
+
+    function onKey(e) {
+      if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', onKey); }
+    }
+    document.addEventListener('keydown', onKey);
+  });
+})();
+
+// ── Image file upload ─────────────────────────────────────────────────────
+(function() {
+  var input  = document.getElementById('aiFileInput');
+  var remove = document.getElementById('aiImgRemove');
+  if (input) {
+    input.addEventListener('change', function() {
+      var file = this.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function(ev) {
+        var dataUrl = ev.target.result;
+        _setAttachedImage({ data: dataUrl.split(',')[1], mediaType: file.type || 'image/png' });
+        var ta = document.getElementById('aiInput');
+        if (ta) ta.focus();
+      };
+      reader.readAsDataURL(file);
+      this.value = ''; // allow re-selecting same file
+    });
+  }
+  if (remove) {
+    remove.addEventListener('click', function() {
+      _attachedImage = null;
+      var preview = document.getElementById('aiImgPreview');
+      var thumb   = document.getElementById('aiImgThumb');
+      if (preview) preview.style.display = 'none';
+      if (thumb)   thumb.src = '';
+    });
+  }
 })();
 
 // ── AI panel resize (desktop only) ───────────────────────────────────────
