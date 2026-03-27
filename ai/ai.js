@@ -5,6 +5,8 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 // ── CONFIG ────────────────────────────────────────────────────────────────
+var _aiUserScrolled = false; // true when user has manually scrolled up during generation
+
 var AI_MODEL   = 'claude-sonnet-4-5';
 var AI_MAX_TOK = 4096;    // was 1024 — allows long, thorough answers
 var AI_PDF_CAP = 100000;  // was 12000 — covers ~120+ pages
@@ -129,6 +131,7 @@ askAI = function(question, skipUserBubble) {
           meta   = ansWrap.querySelector('.msg-meta');
           bubble.innerHTML = renderMarkdown(rawText.slice(0, i));
           meta.style.display = 'flex';
+          _aiUserScrolled = false;
           return;
         }
         // Tab is hidden — render immediately so the answer is ready when user returns
@@ -138,13 +141,13 @@ askAI = function(question, skipUserBubble) {
           bubble.innerHTML = renderMarkdown(rawText);
           meta.style.display = 'flex';
           document.getElementById('aiSend').classList.remove('is-stop');
+          _aiUserScrolled = false;
           spawnConfetti();
           return;
         }
         bubble.innerHTML = renderMarkdown(rawText.slice(0, i + 1)) + '<span class="stream-cursor">\u258b</span>';
         i++;
-        var atBottom = (aiMsgs.scrollHeight - aiMsgs.scrollTop - aiMsgs.clientHeight) < 80;
-        if (atBottom) aiMsgs.scrollTop = aiMsgs.scrollHeight;
+        if (!_aiUserScrolled) aiMsgs.scrollTop = aiMsgs.scrollHeight;
         activeTypeTimer = setTimeout(typeNext, 16 + (Math.random() > 0.93 ? 55 : 0));
       }
       // When user returns to tab mid-animation, flush to end instantly
@@ -349,6 +352,25 @@ window.runMultiSummary = runMultiSummary;
   }
   syncChip();
   new MutationObserver(syncChip).observe(label, { childList: true, characterData: true, subtree: true });
+})();
+
+// ── Scroll intent detection ───────────────────────────────────────────────
+// If the user scrolls up during generation, stop auto-scrolling.
+// When they scroll back to the bottom, resume.
+(function() {
+  var msgs = document.getElementById('aiMsgs');
+  if (!msgs) return;
+  var prevScrollTop = 0;
+  msgs.addEventListener('scroll', function() {
+    var atBottom = (msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight) < 60;
+    if (atBottom) {
+      _aiUserScrolled = false;
+    } else if (msgs.scrollTop < prevScrollTop) {
+      // User actively scrolled up
+      _aiUserScrolled = true;
+    }
+    prevScrollTop = msgs.scrollTop;
+  }, { passive: true });
 })();
 
 console.log('\u2713 ai/ai.js loaded — model: ' + AI_MODEL + ', max_tokens: ' + AI_MAX_TOK + ', pdf_cap: ' + AI_PDF_CAP);
