@@ -962,8 +962,10 @@ body.night .chip-sub-h{background:#501313;color:#F7C1C1;border-color:#E24B4A}
   z-index:2;
 }
 #aiPanel{position:relative;overflow:visible}
+/* When panel is closed (width:0), its overflow content must not block clicks */
+#aiPanel:not(.visible){pointer-events:none}
 /* AI panel resize handle — desktop only */
-#aiResizeHandle{position:absolute;left:-4px;top:0;bottom:0;width:8px;cursor:col-resize;z-index:60;border-radius:4px;transition:background .18s}
+#aiResizeHandle{position:absolute;left:-4px;top:0;bottom:0;width:8px;cursor:col-resize;z-index:60;border-radius:4px;transition:background .18s;pointer-events:auto}
 #aiResizeHandle:hover,#aiResizeHandle.dragging{background:rgba(155,93,229,.28)}
 @media(hover:none),(pointer:coarse){#aiResizeHandle{display:none}}
 /* STUDIP DASHBOARD */
