@@ -247,28 +247,34 @@
 
   function loadAppScript() {
     var _v = Date.now();
-    var script = document.createElement('script');
-    script.src = 'js/app.js?v=' + _v;
-    script.onload = function() {
-      console.log('✓ app.js loaded');
-      // Load ai/ai.js after app.js so it can override AI functions
-      var aiScript = document.createElement('script');
-      aiScript.src = 'ai/ai.js?v=' + _v;
-      aiScript.onload = function() {
-        console.log('✓ ai/ai.js loaded');
+    // Use fetch+inline injection to avoid ERR_CONNECTION_RESET on dynamic <script src>
+    fetch('js/app.js?v=' + _v)
+      .then(function(r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.text();
+      })
+      .then(function(code) {
+        var script = document.createElement('script');
+        script.textContent = code;
+        document.body.appendChild(script);
+        console.log('✓ app.js loaded');
+        // Load ai/ai.js after app.js so it can override AI functions
+        var aiScript = document.createElement('script');
+        aiScript.src = 'ai/ai.js?v=' + _v;
+        aiScript.onload = function() {
+          console.log('✓ ai/ai.js loaded');
+          window.dispatchEvent(new Event('ss-ready'));
+        };
+        aiScript.onerror = function() {
+          console.error('✗ Failed to load ai/ai.js — falling back to default AI');
+          window.dispatchEvent(new Event('ss-ready'));
+        };
+        document.body.appendChild(aiScript);
+      })
+      .catch(function(err) {
+        console.error('✗ Failed to load app.js:', err);
         window.dispatchEvent(new Event('ss-ready'));
-      };
-      aiScript.onerror = function() {
-        console.error('✗ Failed to load ai/ai.js — falling back to default AI');
-        window.dispatchEvent(new Event('ss-ready'));
-      };
-      document.body.appendChild(aiScript);
-    };
-    script.onerror = function() {
-      console.error('✗ Failed to load app.js');
-      window.dispatchEvent(new Event('ss-ready'));
-    };
-    document.body.appendChild(script);
+      });
   }
 
   loadSequential(0);
