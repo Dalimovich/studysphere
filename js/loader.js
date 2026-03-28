@@ -248,7 +248,7 @@
   function loadAppScript() {
     var _v = Date.now();
     // Use fetch+inline injection to avoid ERR_CONNECTION_RESET on dynamic <script src>
-    fetch('js/app.js')
+    fetch('https://raw.githubusercontent.com/Dalimovich/studysphere/main/js/app.js')
       .then(function(r) {
         if (!r.ok) throw new Error('HTTP ' + r.status);
         return r.text();
