@@ -1,0 +1,4 @@
+[[headers]]
+  for = "/js/app.js"
+  [headers.values]
+    Content-Type = "text/plain; charset=UTF-8"
