@@ -388,8 +388,9 @@ window.runMultiSummary = runMultiSummary;
     var isEmpty = !fname;
     name.textContent = isEmpty ? 'No file open' : fname;
     chip.className   = 'ai-file-chip' + (isEmpty ? ' empty' : '');
-    // Also keep the label text in sync
-    if (label) label.textContent = isEmpty ? 'Ready to help' : fname;
+    // NOTE: do NOT set label.textContent here — this function is called from a
+    // MutationObserver watching label, so writing back to label would cause an
+    // infinite mutation loop that freezes the browser.
   }
   syncChip();
   // Re-sync whenever the label changes (openFile sets it) or language is applied
