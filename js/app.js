@@ -386,29 +386,32 @@ function openFile(f,course){
     return;
   }
   document.getElementById('pdfBody').innerHTML='<div class="pdf-loading"><div class="loading-dots"><span></span><span></span><span></span></div><p>Loading PDF…</p></div>';
-  var binary=atob(b64),bytes=new Uint8Array(binary.length);
-  for(var i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
-  pdfjsLib.getDocument({data:bytes}).promise.then(function(pdf){
-    pdfDoc=pdf;pdfTotal=pdf.numPages;pdfPage=1;pdfShowAll=true;
-    pdfFullText=''; // reset text
-    // Extract text from all pages for AI context
-    var textPromises=[];
-    for(var pi=1;pi<=pdf.numPages;pi++){
-      textPromises.push(pdf.getPage(pi).then(function(pg){
-        return pg.getTextContent().then(function(tc){
-          return tc.items.map(function(it){return it.str;}).join(' ');
-        });
-      }));
-    }
-    Promise.all(textPromises).then(function(pages){
-      pdfFullText=pages.join('\n\n'); // full text — cap applied in ai/ai.js
+  // Decode base64 via fetch so the main thread is never blocked (fixes freeze on large PDFs)
+  fetch('data:application/pdf;base64,'+b64)
+    .then(function(r){return r.arrayBuffer();})
+    .then(function(buf){return pdfjsLib.getDocument({data:new Uint8Array(buf)}).promise;})
+    .then(function(pdf){
+      pdfDoc=pdf;pdfTotal=pdf.numPages;pdfPage=1;pdfShowAll=true;
+      pdfFullText=''; // reset text
+      // Extract text from all pages for AI context
+      var textPromises=[];
+      for(var pi=1;pi<=pdf.numPages;pi++){
+        textPromises.push(pdf.getPage(pi).then(function(pg){
+          return pg.getTextContent().then(function(tc){
+            return tc.items.map(function(it){return it.str;}).join(' ');
+          });
+        }));
+      }
+      Promise.all(textPromises).then(function(pages){
+        pdfFullText=pages.join('\n\n'); // full text — cap applied in ai/ai.js
+      });
+      updatePageInfo();updateZoomPct();
+      document.getElementById('pdfAll').textContent='Single page';
+      renderPages();
+    })
+    .catch(function(e){
+      document.getElementById('pdfBody').innerHTML='<div style="color:#fff;padding:40px">Error: '+e.message+'</div>';
     });
-    updatePageInfo();updateZoomPct();
-    document.getElementById('pdfAll').textContent='Single page';
-    renderPages();
-  }).catch(function(e){
-    document.getElementById('pdfBody').innerHTML='<div style="color:#fff;padding:40px">Error: '+e.message+'</div>';
-  });
 }
 
 function showCourseSection(course,section){
