@@ -1,4 +1,4 @@
-// ── StudySphere Section Loader ────────────────────────────────────────────────
+// ── StudySphere Section Loader ─────────────────────────────────────────────────
 // Fetches each HTML section file and injects it into the DOM in order,
 // then loads app.js and fires 'ss-ready' so supabase.js can do auth init.
 // All JS runs in the same window scope — no iframes, no module boundaries.
