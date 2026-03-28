@@ -304,9 +304,9 @@ async function runMultiSummary(fnames, course) {
   // Extract full text from all selected PDFs (no page cap)
   var promises = fnames.map(function(fname) {
     return new Promise(function(resolve) {
-      var b64 = PDF_DATA[fname];
-      if (!b64) { resolve('[' + fname + ': not available]'); return; }
-      _b64ToBytes(b64, function(bytes) {
+      var pdfPath = PDF_DATA[fname];
+      if (!pdfPath) { resolve('[' + fname + ': not available]'); return; }
+      _fetchPdfBytes(pdfPath, function(bytes) {
         pdfjsLib.getDocument({ data: bytes }).promise.then(function(pdf) {
           var pagePromises = [];
           for (var p = 1; p <= pdf.numPages; p++) {
@@ -320,7 +320,7 @@ async function runMultiSummary(fnames, course) {
             resolve('=== ' + fname + ' ===\n' + pages.join('\n'));
           });
         }).catch(function() { resolve('[' + fname + ': error reading]'); });
-      });
+      }, function() { resolve('[' + fname + ': error loading]'); });
     });
   });
 
