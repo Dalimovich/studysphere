@@ -1,4 +1,4 @@
 [[headers]]
-  for = "/js/app.js"
+  for = "/js/ss-app.js"
   [headers.values]
     Content-Type = "text/plain; charset=UTF-8"
