@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>StudySphere — Dashboard Preview</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+/* ── CSS vars (mirrors existing theme) ── */
+:root{
+  --purple:#9B5DE5;--pink:#FF6FB7;--orange:#FF6B35;--green:#06D6A0;--blue:#4CC9F0;
+  --bg:#F0EDF8;--card:#fff;--text:#2D2D2D;--muted:#888;
+  --shadow:0 2px 14px rgba(0,0,0,.08);
+  --border:#EDE8F5;
+  --dp-bg:linear-gradient(135deg,#EDE8F8 0%,#F3EEFF 40%,#EAEfFF 100%);
+  --glass-bg:rgba(255,255,255,.55);
+  --glass-border:rgba(155,93,229,.2);
+  --glass-border-top:rgba(255,255,255,.9);
+  --on-glass:rgba(60,40,100,.82);
+  --on-glass-muted:rgba(100,80,140,.55);
+  --on-glass-faint:rgba(100,80,140,.38);
+  --card-inner:rgba(255,255,255,.7);
+  --card-inner-border:rgba(155,93,229,.15);
+  --row-bg:rgba(255,255,255,.5);
+  --sb-w:220px;
+}
+body.night{
+  --purple:#B47FFF;--pink:#FF8EC7;--orange:#FF8C5A;--green:#06D6A0;--blue:#4CC9F0;
+  --bg:#0F0E17;--card:#1A1826;--text:#E8E4F0;--muted:#7A748A;
+  --shadow:0 2px 14px rgba(0,0,0,.4);--border:#2A2640;
+  --dp-bg:linear-gradient(135deg,#0a0812 0%,#110d20 40%,#0d0f1e 100%);
+  --glass-bg:rgba(255,255,255,.07);
+  --glass-border:rgba(255,255,255,.14);
+  --glass-border-top:rgba(255,255,255,.22);
+  --on-glass:rgba(255,255,255,.88);
+  --on-glass-muted:rgba(255,255,255,.45);
+  --on-glass-faint:rgba(255,255,255,.3);
+  --card-inner:rgba(255,255,255,.05);
+  --card-inner-border:rgba(255,255,255,.08);
+  --row-bg:rgba(255,255,255,.04);
+}
+
+/* ── Animated blobs (same as existing) ── */
+.blobs{position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:0}
+.blob{position:absolute;border-radius:50%;filter:blur(90px);opacity:.45;animation:blobmove 18s ease-in-out infinite alternate}
+body.night .blob{opacity:.25}
+.blob-1{width:520px;height:520px;background:var(--purple);top:-120px;left:-100px;animation-delay:0s}
+.blob-2{width:400px;height:400px;background:#4CC9F0;top:30%;right:-100px;animation-delay:-6s}
+.blob-3{width:350px;height:350px;background:var(--pink);bottom:-80px;left:25%;animation-delay:-11s}
+.blob-4{width:300px;height:300px;background:#06D6A0;bottom:10%;right:15%;animation-delay:-4s}
+@keyframes blobmove{0%{transform:translate(0,0) scale(1)}50%{transform:translate(40px,30px) scale(1.08)}100%{transform:translate(-30px,20px) scale(.95)}}
+
+/* ── Layout ── */
+html,body{height:100%;overflow:hidden;font-family:'Nunito',sans-serif;background:var(--dp-bg);color:var(--text)}
+
+.shell{
+  position:relative;z-index:1;
+  display:grid;
+  grid-template-columns:var(--sb-w) 1fr;
+  grid-template-rows:1fr;
+  height:100vh;
+  gap:0;
+}
+
+/* ── Sidebar ── */
+.sidebar{
+  display:flex;flex-direction:column;
+  background:var(--glass-bg);
+  backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  border-right:1px solid var(--glass-border);
+  box-shadow:2px 0 32px rgba(155,93,229,.08);
+  padding:0;
+  overflow:hidden;
+}
+
+.sb-logo{
+  display:flex;align-items:center;gap:10px;
+  padding:24px 20px 16px;
+  font-family:'Fredoka One',cursive;
+  font-size:1.3rem;
+  background:linear-gradient(135deg,#c084fc,#f472b6,#fb923c);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.sb-logo-icon{font-size:1.5rem;-webkit-text-fill-color:initial}
+
+.sb-user{
+  margin:0 12px 16px;
+  padding:12px 14px;
+  background:var(--card-inner);
+  border:1px solid var(--card-inner-border);
+  border-radius:16px;
+  display:flex;align-items:center;gap:12px;
+  cursor:pointer;
+  transition:all .2s;
+}
+.sb-user:hover{background:var(--row-bg);transform:translateX(2px)}
+.sb-avatar{
+  width:38px;height:38px;border-radius:50%;
+  background:linear-gradient(135deg,var(--purple),var(--pink));
+  display:flex;align-items:center;justify-content:center;
+  font-weight:800;font-size:.9rem;color:#fff;flex-shrink:0;
+}
+.sb-user-info{min-width:0}
+.sb-user-name{font-weight:800;font-size:.82rem;color:var(--on-glass);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-user-uni{font-size:.7rem;color:var(--on-glass-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.sb-nav{
+  flex:1;
+  padding:8px 12px;
+  display:flex;flex-direction:column;gap:4px;
+  overflow-y:auto;
+  scrollbar-width:none;
+}
+.sb-nav::-webkit-scrollbar{display:none}
+
+.sb-section-label{
+  font-size:.62rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--on-glass-faint);
+  padding:12px 8px 4px;
+}
+
+.sb-item{
+  display:flex;align-items:center;gap:12px;
+  padding:10px 12px;
+  border-radius:12px;
+  cursor:pointer;
+  transition:all .18s;
+  color:var(--on-glass-muted);
+  font-weight:700;font-size:.82rem;
+  position:relative;
+}
+.sb-item:hover{
+  background:var(--row-bg);
+  color:var(--on-glass);
+  transform:translateX(3px);
+}
+.sb-item.active{
+  background:linear-gradient(135deg,rgba(155,93,229,.18),rgba(255,111,183,.1));
+  color:var(--on-glass);
+  box-shadow:0 2px 12px rgba(155,93,229,.12);
+}
+body.night .sb-item.active{
+  background:linear-gradient(135deg,rgba(180,127,255,.2),rgba(255,142,199,.1));
+}
+.sb-item.active::before{
+  content:'';
+  position:absolute;left:0;top:50%;transform:translateY(-50%);
+  width:3px;height:60%;border-radius:3px;
+  background:linear-gradient(var(--purple),var(--pink));
+}
+.sb-item-icon{
+  width:30px;height:30px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:1rem;flex-shrink:0;
+  background:var(--card-inner);
+  border:1px solid var(--card-inner-border);
+}
+.sb-item.active .sb-item-icon{
+  background:linear-gradient(135deg,rgba(155,93,229,.25),rgba(255,111,183,.15));
+  border-color:rgba(155,93,229,.3);
+}
+.sb-item-badge{
+  margin-left:auto;
+  background:var(--purple);
+  color:#fff;
+  font-size:.6rem;font-weight:800;
+  padding:2px 7px;border-radius:20px;
+  flex-shrink:0;
+}
+
+.sb-divider{height:1px;background:var(--glass-border);margin:8px 0}
+
+.sb-bottom{
+  padding:12px;
+  border-top:1px solid var(--glass-border);
+  display:flex;flex-direction:column;gap:4px;
+}
+.sb-night-btn{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 12px;border-radius:12px;
+  cursor:pointer;background:none;border:none;
+  color:var(--on-glass-muted);font-family:'Nunito',sans-serif;
+  font-weight:700;font-size:.82rem;width:100%;
+  transition:all .18s;
+}
+.sb-night-btn:hover{background:var(--row-bg);color:var(--on-glass)}
+.sb-night-btn-icon{
+  width:30px;height:30px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:1rem;
+  background:var(--card-inner);
+  border:1px solid var(--card-inner-border);
+}
+
+/* ── Main content ── */
+.main{
+  display:flex;flex-direction:column;
+  overflow:hidden;
+  min-width:0;
+}
+
+/* Topbar inside main */
+.topbar{
+  display:flex;align-items:center;gap:12px;
+  padding:16px 28px;
+  background:var(--glass-bg);
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--glass-border);
+  flex-shrink:0;
+}
+.tb-title{
+  font-family:'Fredoka One',cursive;
+  font-size:1.1rem;
+  color:var(--on-glass);
+}
+.tb-crumb{
+  font-size:.75rem;font-weight:700;
+  color:var(--on-glass-muted);
+  padding:4px 10px;border-radius:8px;
+  background:var(--row-bg);
+  border:1px solid var(--glass-border);
+}
+.tb-spacer{flex:1}
+.tb-action{
+  display:flex;align-items:center;gap:7px;
+  padding:8px 14px;border-radius:12px;
+  background:linear-gradient(135deg,var(--purple),var(--pink));
+  color:#fff;font-weight:800;font-size:.78rem;
+  cursor:pointer;border:none;font-family:'Nunito',sans-serif;
+  box-shadow:0 4px 16px rgba(155,93,229,.35);
+  transition:all .2s;
+}
+.tb-action:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(155,93,229,.45)}
+
+/* Scroll area */
+.main-scroll{
+  flex:1;overflow-y:auto;overflow-x:hidden;
+  padding:28px;
+  scrollbar-width:thin;
+  scrollbar-color:var(--glass-border) transparent;
+}
+
+/* ── Section: Dashboard ── */
+.section{display:none}
+.section.active{display:block}
+
+.dash-greeting{
+  margin-bottom:28px;
+}
+.dash-greeting h1{
+  font-family:'Fredoka One',cursive;
+  font-size:2rem;
+  background:linear-gradient(135deg,#c084fc,#f472b6,#fb923c);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  margin-bottom:4px;
+}
+.dash-greeting p{
+  font-size:.85rem;font-weight:700;
+  color:var(--on-glass-muted);
+}
+
+/* Quick stats row */
+.stat-row{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:14px;
+  margin-bottom:28px;
+}
+.stat-card{
+  background:var(--glass-bg);
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border:1px solid var(--glass-border);
+  border-top:1px solid var(--glass-border-top);
+  border-radius:18px;
+  padding:18px 20px;
+  position:relative;overflow:hidden;
+  cursor:default;
+  transition:transform .2s,box-shadow .2s;
+}
+.stat-card:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(155,93,229,.15)}
+.stat-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  background:var(--accent);border-radius:3px 3px 0 0;
+}
+.stat-card[data-accent="purple"]{--accent:linear-gradient(90deg,var(--purple),var(--pink))}
+.stat-card[data-accent="green"]{--accent:linear-gradient(90deg,var(--green),#4CC9F0)}
+.stat-card[data-accent="orange"]{--accent:linear-gradient(90deg,var(--orange),var(--pink))}
+.stat-card[data-accent="blue"]{--accent:linear-gradient(90deg,var(--blue),var(--purple))}
+.stat-icon{font-size:1.4rem;margin-bottom:10px;display:block}
+.stat-value{font-family:'Fredoka One',cursive;font-size:1.7rem;color:var(--on-glass);line-height:1}
+.stat-label{font-size:.7rem;font-weight:800;color:var(--on-glass-muted);margin-top:4px;text-transform:uppercase;letter-spacing:.06em}
+
+/* Grid for cards */
+.card-grid{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:16px;
+  margin-bottom:28px;
+}
+
+/* App cards (Stud.IP, Mail, etc.) */
+.app-card{
+  background:var(--glass-bg);
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border:1px solid var(--glass-border);
+  border-top:1px solid var(--glass-border-top);
+  border-radius:20px;
+  padding:22px;
+  display:flex;flex-direction:column;gap:10px;
+  cursor:pointer;
+  transition:all .22s;
+  position:relative;overflow:hidden;
+}
+.app-card::after{
+  content:'';position:absolute;
+  top:-60px;right:-60px;
+  width:140px;height:140px;border-radius:50%;
+  background:var(--card-glow);
+  opacity:.12;filter:blur(30px);
+  pointer-events:none;
+  transition:opacity .3s;
+}
+.app-card:hover::after{opacity:.22}
+.app-card:hover{
+  transform:translateY(-3px) scale(1.01);
+  box-shadow:0 12px 40px rgba(155,93,229,.18);
+  border-color:rgba(155,93,229,.35);
+}
+.app-card[data-glow="purple"]{--card-glow:var(--purple)}
+.app-card[data-glow="blue"]{--card-glow:var(--blue)}
+.app-card[data-glow="pink"]{--card-glow:var(--pink)}
+.app-card[data-glow="orange"]{--card-glow:var(--orange)}
+.app-card[data-glow="green"]{--card-glow:var(--green)}
+
+.app-card-header{display:flex;align-items:flex-start;justify-content:space-between}
+.app-card-icon-wrap{
+  width:46px;height:46px;border-radius:14px;
+  background:var(--card-inner);
+  border:1px solid var(--card-inner-border);
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.4rem;
+  flex-shrink:0;
+}
+.app-card-arrow{
+  color:var(--on-glass-faint);font-size:.9rem;
+  transition:transform .2s,color .2s;
+}
+.app-card:hover .app-card-arrow{transform:translate(3px,-3px);color:var(--on-glass-muted)}
+.app-card-name{font-weight:900;font-size:.92rem;color:var(--on-glass)}
+.app-card-desc{font-size:.75rem;font-weight:700;color:var(--on-glass-muted);line-height:1.4}
+
+/* Wide card (spans 2 cols) */
+.app-card.wide{grid-column:span 2}
+
+/* Lecture notes / recent activity */
+.widget-card{
+  background:var(--glass-bg);
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border:1px solid var(--glass-border);
+  border-top:1px solid var(--glass-border-top);
+  border-radius:20px;
+  padding:22px;
+  margin-bottom:16px;
+}
+.widget-title{
+  font-weight:900;font-size:.85rem;color:var(--on-glass);
+  display:flex;align-items:center;gap:8px;
+  margin-bottom:14px;
+}
+.widget-title-badge{
+  font-size:.62rem;padding:3px 8px;border-radius:20px;
+  background:rgba(155,93,229,.12);border:1px solid rgba(155,93,229,.2);
+  color:var(--purple);font-weight:800;
+}
+
+/* Timetable rows */
+.tt-row{
+  display:flex;align-items:center;gap:12px;
+  padding:10px 0;
+  border-bottom:1px solid var(--glass-border);
+}
+.tt-row:last-child{border-bottom:none}
+.tt-dot{
+  width:10px;height:10px;border-radius:50%;
+  flex-shrink:0;
+  box-shadow:0 0 8px currentColor;
+}
+.tt-time{font-size:.7rem;font-weight:800;color:var(--on-glass-muted);width:60px;flex-shrink:0}
+.tt-name{font-weight:800;font-size:.8rem;color:var(--on-glass);flex:1}
+.tt-room{font-size:.7rem;font-weight:700;color:var(--on-glass-muted)}
+
+/* Mail rows */
+.mail-row{
+  display:flex;align-items:center;gap:12px;
+  padding:10px 0;
+  border-bottom:1px solid var(--glass-border);
+  cursor:pointer;transition:all .15s;
+}
+.mail-row:last-child{border-bottom:none}
+.mail-row:hover{transform:translateX(4px)}
+.mail-avatar-s{
+  width:32px;height:32px;border-radius:50%;
+  background:linear-gradient(135deg,var(--purple),var(--pink));
+  display:flex;align-items:center;justify-content:center;
+  font-size:.75rem;font-weight:800;color:#fff;flex-shrink:0;
+}
+.mail-sender{font-weight:800;font-size:.78rem;color:var(--on-glass)}
+.mail-subject{font-size:.72rem;font-weight:600;color:var(--on-glass-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mail-time{font-size:.65rem;font-weight:700;color:var(--on-glass-faint);flex-shrink:0;margin-left:auto}
+
+/* Two-col bottom row */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+
+/* ── Profile section ── */
+.profile-hero{
+  background:var(--glass-bg);
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border:1px solid var(--glass-border);
+  border-top:1px solid var(--glass-border-top);
+  border-radius:24px;
+  padding:32px;
+  display:flex;align-items:center;gap:28px;
+  margin-bottom:20px;
+}
+.ph-avatar{
+  width:80px;height:80px;border-radius:50%;flex-shrink:0;
+  background:linear-gradient(135deg,var(--purple),var(--pink));
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.8rem;font-weight:900;color:#fff;
+  border:3px solid rgba(255,255,255,.3);
+  box-shadow:0 4px 24px rgba(155,93,229,.4);
+}
+.ph-info h2{font-family:'Fredoka One',cursive;font-size:1.4rem;color:var(--on-glass);margin-bottom:4px}
+.ph-info p{font-size:.78rem;font-weight:700;color:var(--on-glass-muted)}
+.profile-fields{
+  display:grid;grid-template-columns:1fr 1fr;gap:14px;
+}
+.pf-group{display:flex;flex-direction:column;gap:6px}
+.pf-label{font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--on-glass-faint)}
+.pf-input{
+  background:var(--row-bg);
+  border:1px solid var(--glass-border);
+  border-radius:12px;
+  padding:10px 14px;
+  font-family:'Nunito',sans-serif;
+  font-weight:700;font-size:.83rem;
+  color:var(--on-glass);
+  outline:none;transition:border-color .15s,box-shadow .15s;
+}
+.pf-input:focus{
+  border-color:var(--purple);
+  box-shadow:0 0 0 3px rgba(155,93,229,.12);
+}
+.pf-save{
+  grid-column:span 2;
+  background:linear-gradient(135deg,var(--purple),var(--pink));
+  color:#fff;border:none;border-radius:14px;
+  padding:12px 24px;font-family:'Nunito',sans-serif;
+  font-weight:800;font-size:.85rem;cursor:pointer;
+  box-shadow:0 4px 16px rgba(155,93,229,.35);
+  transition:all .2s;text-align:center;
+}
+.pf-save:hover{transform:translateY(-1px);box-shadow:0 6px 24px rgba(155,93,229,.45)}
+
+/* ── Settings section ── */
+.settings-block{
+  background:var(--glass-bg);
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border:1px solid var(--glass-border);
+  border-top:1px solid var(--glass-border-top);
+  border-radius:20px;
+  padding:24px;
+  margin-bottom:16px;
+}
+.settings-block-title{
+  font-weight:900;font-size:.8rem;text-transform:uppercase;letter-spacing:.08em;
+  color:var(--on-glass-muted);margin-bottom:16px;
+  display:flex;align-items:center;gap:8px;
+}
+.settings-row-new{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:11px 0;
+  border-bottom:1px solid var(--glass-border);
+}
+.settings-row-new:last-child{border-bottom:none}
+.settings-row-lbl{
+  display:flex;align-items:center;gap:10px;
+  font-weight:700;font-size:.82rem;color:var(--on-glass);
+}
+.settings-row-ico{
+  width:28px;height:28px;border-radius:8px;
+  background:var(--card-inner);border:1px solid var(--card-inner-border);
+  display:flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0;
+}
+/* Toggle */
+.toggle{position:relative;display:inline-flex;align-items:center;cursor:pointer}
+.toggle input{position:absolute;opacity:0;width:0;height:0}
+.toggle-track{
+  width:42px;height:24px;background:var(--glass-border);border-radius:12px;
+  transition:background .2s;position:relative;
+}
+.toggle input:checked+.toggle-track{background:linear-gradient(90deg,var(--purple),var(--pink))}
+.toggle-track::after{
+  content:'';position:absolute;top:3px;left:3px;
+  width:18px;height:18px;border-radius:50%;background:#fff;
+  box-shadow:0 1px 4px rgba(0,0,0,.2);transition:left .2s;
+}
+.toggle input:checked+.toggle-track::after{left:21px}
+.settings-select-new{
+  background:var(--row-bg);border:1px solid var(--glass-border);
+  border-radius:10px;padding:6px 10px;
+  font-family:'Nunito',sans-serif;font-weight:700;font-size:.8rem;
+  color:var(--on-glass);outline:none;cursor:pointer;
+}
+
+/* ── Subscription section ── */
+.sub-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.sub-card{
+  background:var(--glass-bg);
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border:1px solid var(--glass-border);
+  border-top:1px solid var(--glass-border-top);
+  border-radius:22px;padding:28px 24px;
+  display:flex;flex-direction:column;gap:16px;
+  position:relative;overflow:hidden;
+}
+.sub-card.featured{
+  border:1px solid rgba(155,93,229,.4);
+  background:linear-gradient(135deg,rgba(155,93,229,.12),rgba(255,111,183,.08));
+}
+.sub-badge{
+  position:absolute;top:18px;right:18px;
+  background:linear-gradient(135deg,var(--purple),var(--pink));
+  color:#fff;font-size:.62rem;font-weight:800;
+  padding:4px 10px;border-radius:20px;
+  letter-spacing:.06em;text-transform:uppercase;
+}
+.sub-name{font-family:'Fredoka One',cursive;font-size:1.2rem;color:var(--on-glass)}
+.sub-price{
+  font-family:'Fredoka One',cursive;font-size:2rem;color:var(--on-glass);
+  line-height:1;
+}
+.sub-price span{font-size:.8rem;font-family:'Nunito',sans-serif;font-weight:700;color:var(--on-glass-muted)}
+.sub-features{display:flex;flex-direction:column;gap:8px;flex:1}
+.sub-feat{
+  display:flex;align-items:center;gap:8px;
+  font-size:.78rem;font-weight:700;color:var(--on-glass-muted);
+}
+.sub-feat::before{content:'✓';color:var(--green);font-weight:900;flex-shrink:0}
+.sub-feat.off::before{content:'✕';color:var(--on-glass-faint)}
+.sub-feat.off{opacity:.5}
+.sub-btn{
+  background:linear-gradient(135deg,var(--purple),var(--pink));
+  color:#fff;border:none;border-radius:14px;
+  padding:12px;font-family:'Nunito',sans-serif;
+  font-weight:800;font-size:.83rem;cursor:pointer;
+  box-shadow:0 4px 16px rgba(155,93,229,.3);
+  transition:all .2s;
+}
+.sub-btn:hover{transform:translateY(-1px);box-shadow:0 6px 24px rgba(155,93,229,.4)}
+.sub-btn.outline{
+  background:var(--row-bg);color:var(--on-glass);
+  border:1px solid var(--glass-border);
+  box-shadow:none;
+}
+.sub-btn.outline:hover{background:var(--card-inner);box-shadow:none}
+
+/* ── Responsive ── */
+@media(max-width:1100px){
+  .stat-row{grid-template-columns:repeat(2,1fr)}
+  .card-grid{grid-template-columns:repeat(2,1fr)}
+  .app-card.wide{grid-column:span 2}
+}
+@media(max-width:768px){
+  :root{--sb-w:64px}
+  .sb-item span,.sb-section-label,.sb-user-info,.sb-logo span:last-child,.sb-night-btn span{display:none}
+  .sb-item{padding:12px;justify-content:center}
+  .sb-item-icon{margin:0}
+  .sb-user{padding:8px;justify-content:center}
+  .sb-user-info{display:none}
+  .card-grid{grid-template-columns:1fr}
+  .app-card.wide{grid-column:span 1}
+  .two-col{grid-template-columns:1fr}
+  .stat-row{grid-template-columns:repeat(2,1fr)}
+  .sub-grid{grid-template-columns:1fr}
+  .profile-fields{grid-template-columns:1fr}
+  .pf-save{grid-column:span 1}
+}
+</style>
+</head>
+<body>
+
+<!-- Ambient blobs -->
+<div class="blobs">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+  <div class="blob blob-4"></div>
+</div>
+
+<div class="shell">
+
+  <!-- ════ SIDEBAR ════ -->
+  <nav class="sidebar">
+    <div class="sb-logo">
+      <span class="sb-logo-icon">📚</span>
+      <span>StudySphere</span>
+    </div>
+
+    <!-- User pill -->
+    <div class="sb-user" title="Profile">
+      <div class="sb-avatar">D</div>
+      <div class="sb-user-info">
+        <div class="sb-user-name">Dalim</div>
+        <div class="sb-user-uni">TU Braunschweig</div>
+      </div>
+    </div>
+
+    <div class="sb-nav">
+      <!-- Main nav -->
+      <div class="sb-section-label">Main</div>
+
+      <div class="sb-item active" data-section="dashboard">
+        <div class="sb-item-icon">🏠</div>
+        <span>Home</span>
+      </div>
+      <div class="sb-item" data-section="studip">
+        <div class="sb-item-icon">📖</div>
+        <span>Stud.IP</span>
+        <span class="sb-item-badge">6</span>
+      </div>
+      <div class="sb-item" data-section="notes">
+        <div class="sb-item-icon">📝</div>
+        <span>Lecture Notes</span>
+      </div>
+
+      <div class="sb-section-label">Services</div>
+
+      <div class="sb-item" data-coming-soon="true">
+        <div class="sb-item-icon">📧</div>
+        <span>TUMail</span>
+        <span class="sb-item-badge">3</span>
+      </div>
+      <div class="sb-item" data-coming-soon="true">
+        <div class="sb-item-icon">🎓</div>
+        <span>TUConnect</span>
+      </div>
+      <div class="sb-item" data-coming-soon="true">
+        <div class="sb-item-icon">🗓️</div>
+        <span>Timetable</span>
+      </div>
+      <div class="sb-item" data-coming-soon="true">
+        <div class="sb-item-icon">📜</div>
+        <span>Certificates</span>
+      </div>
+      <div class="sb-item" data-coming-soon="true">
+        <div class="sb-item-icon">🌐</div>
+        <span>TU Website</span>
+      </div>
+
+      <div class="sb-section-label">Account</div>
+
+      <div class="sb-item" data-section="profile">
+        <div class="sb-item-icon">👤</div>
+        <span>Profile</span>
+      </div>
+      <div class="sb-item" data-section="settings">
+        <div class="sb-item-icon">⚙️</div>
+        <span>Settings</span>
+      </div>
+      <div class="sb-item" data-section="subscription">
+        <div class="sb-item-icon">⭐</div>
+        <span>Subscription</span>
+      </div>
+    </div>
+
+    <!-- Bottom -->
+    <div class="sb-bottom">
+      <button class="sb-night-btn" id="nightBtn">
+        <span class="sb-night-btn-icon" id="nightIcon">☀️</span>
+        <span id="nightLabel">Night mode</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ════ MAIN ════ -->
+  <div class="main">
+
+    <!-- Topbar -->
+    <div class="topbar">
+      <span class="tb-title" id="topTitle">Dashboard</span>
+      <span class="tb-crumb">Stud.IP — <b>TU Braunschweig</b></span>
+      <div class="tb-spacer"></div>
+      <button class="tb-action">✨ Open AI</button>
+    </div>
+
+    <div class="main-scroll">
+
+      <!-- ══ DASHBOARD ══ -->
+      <div class="section active" id="sec-dashboard">
+
+        <div class="dash-greeting">
+          <h1>Good morning, Dalim 👋</h1>
+          <p>WS 2025/26 · 6 courses · 3 new mails</p>
+        </div>
+
+        <!-- Stats -->
+        <div class="stat-row">
+          <div class="stat-card" data-accent="purple">
+            <span class="stat-icon">📚</span>
+            <div class="stat-value">6</div>
+            <div class="stat-label">Active courses</div>
+          </div>
+          <div class="stat-card" data-accent="green">
+            <span class="stat-icon">📝</span>
+            <div class="stat-value">12</div>
+            <div class="stat-label">Lecture notes</div>
+          </div>
+          <div class="stat-card" data-accent="orange">
+            <span class="stat-icon">✉️</span>
+            <div class="stat-value">3</div>
+            <div class="stat-label">Unread mails</div>
+          </div>
+          <div class="stat-card" data-accent="blue">
+            <span class="stat-icon">🗓️</span>
+            <div class="stat-value">2</div>
+            <div class="stat-label">Classes today</div>
+          </div>
+        </div>
+
+        <!-- App cards grid -->
+        <div class="card-grid">
+
+          <div class="app-card wide" data-glow="purple" data-section="studip">
+            <div class="app-card-header">
+              <div class="app-card-icon-wrap">📖</div>
+              <span class="app-card-arrow">↗</span>
+            </div>
+            <div class="app-card-name">Stud.IP</div>
+            <div class="app-card-desc">Access your courses, upload materials, view files and open them with the AI reader.</div>
+          </div>
+
+          <div class="app-card" data-glow="blue" data-coming-soon="true">
+            <div class="app-card-header">
+              <div class="app-card-icon-wrap">📧</div>
+              <span class="app-card-arrow">↗</span>
+            </div>
+            <div class="app-card-name">TUMail</div>
+            <div class="app-card-desc">Outlook Web Access<br><span style="color:var(--pink);font-weight:800">3 unread</span></div>
+          </div>
+
+          <div class="app-card" data-glow="pink" data-coming-soon="true">
+            <div class="app-card-header">
+              <div class="app-card-icon-wrap">🎓</div>
+              <span class="app-card-arrow">↗</span>
+            </div>
+            <div class="app-card-name">TUConnect</div>
+            <div class="app-card-desc">Exams &amp; grades</div>
+          </div>
+
+          <div class="app-card" data-glow="orange" data-coming-soon="true">
+            <div class="app-card-header">
+              <div class="app-card-icon-wrap">🗓️</div>
+              <span class="app-card-arrow">↗</span>
+            </div>
+            <div class="app-card-name">Timetable</div>
+            <div class="app-card-desc">Semester schedule</div>
+          </div>
+
+          <div class="app-card" data-glow="green" data-coming-soon="true">
+            <div class="app-card-header">
+              <div class="app-card-icon-wrap">📜</div>
+              <span class="app-card-arrow">↗</span>
+            </div>
+            <div class="app-card-name">Certificates</div>
+            <div class="app-card-desc">Enrolment docs</div>
+          </div>
+
+          <div class="app-card" data-glow="blue" data-coming-soon="true">
+            <div class="app-card-header">
+              <div class="app-card-icon-wrap">🌐</div>
+              <span class="app-card-arrow">↗</span>
+            </div>
+            <div class="app-card-name">TU Website</div>
+            <div class="app-card-desc">tu-braunschweig.de</div>
+          </div>
+
+        </div>
+
+        <!-- Bottom two-col: timetable + mails -->
+        <div class="two-col">
+          <div class="widget-card">
+            <div class="widget-title">
+              🗓️ Today's classes
+              <span class="widget-title-badge">Monday</span>
+            </div>
+            <div class="tt-row">
+              <div class="tt-dot" style="color:#9B5DE5;background:#9B5DE5"></div>
+              <div class="tt-time">08:00</div>
+              <div class="tt-name">Mathematik III</div>
+              <div class="tt-room">PK 2.2</div>
+            </div>
+            <div class="tt-row">
+              <div class="tt-dot" style="color:#4CC9F0;background:#4CC9F0"></div>
+              <div class="tt-time">10:00</div>
+              <div class="tt-name">Algorithmen &amp; Datenstrukturen</div>
+              <div class="tt-room">IZ 160</div>
+            </div>
+            <div class="tt-row">
+              <div class="tt-dot" style="color:#06D6A0;background:#06D6A0"></div>
+              <div class="tt-time">14:00</div>
+              <div class="tt-name">Softwaretechnik</div>
+              <div class="tt-room">SN 19.2</div>
+            </div>
+          </div>
+
+          <div class="widget-card">
+            <div class="widget-title">
+              ✉️ Recent mails
+              <span class="widget-title-badge" style="background:rgba(255,111,183,.12);border-color:rgba(255,111,183,.25);color:var(--pink)">3 unread</span>
+            </div>
+            <div class="mail-row">
+              <div class="mail-avatar-s">P</div>
+              <div style="min-width:0;flex:1">
+                <div class="mail-sender">Prof. Müller</div>
+                <div class="mail-subject">Übungsblatt 5 — Abgabe Freitag</div>
+              </div>
+              <div class="mail-time">10:34</div>
+            </div>
+            <div class="mail-row">
+              <div class="mail-avatar-s" style="background:linear-gradient(135deg,#4CC9F0,#9B5DE5)">S</div>
+              <div style="min-width:0;flex:1">
+                <div class="mail-sender">Stud.IP System</div>
+                <div class="mail-subject">New material uploaded in Mathematik III</div>
+              </div>
+              <div class="mail-time">09:12</div>
+            </div>
+            <div class="mail-row">
+              <div class="mail-avatar-s" style="background:linear-gradient(135deg,#06D6A0,#4CC9F0)">T</div>
+              <div style="min-width:0;flex:1">
+                <div class="mail-sender">TU Braunschweig</div>
+                <div class="mail-subject">Semesterticket verlängerung</div>
+              </div>
+              <div class="mail-time">Ges.</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ══ STUD.IP ══ -->
+      <div class="section" id="sec-studip">
+        <div class="dash-greeting">
+          <h1>📖 Stud.IP</h1>
+          <p>TU Braunschweig · Your courses &amp; materials</p>
+        </div>
+        <div class="widget-card" style="text-align:center;padding:48px">
+          <div style="font-size:3rem;margin-bottom:12px">📖</div>
+          <div style="font-weight:800;color:var(--on-glass);margin-bottom:8px">Course list renders here</div>
+          <div style="font-size:.78rem;color:var(--on-glass-muted)">In the live app this section shows your semester courses</div>
+        </div>
+      </div>
+
+      <!-- ══ NOTES ══ -->
+      <div class="section" id="sec-notes">
+        <div class="dash-greeting">
+          <h1>📝 Lecture Notes</h1>
+          <p>Your AI-generated summaries</p>
+        </div>
+        <div class="widget-card" style="text-align:center;padding:48px">
+          <div style="font-size:3rem;margin-bottom:12px">📝</div>
+          <div style="font-weight:800;color:var(--on-glass);margin-bottom:8px">Notes grid renders here</div>
+          <div style="font-size:.78rem;color:var(--on-glass-muted)">Summaries generated from your PDFs appear here</div>
+        </div>
+      </div>
+
+      <!-- ══ PROFILE ══ -->
+      <div class="section" id="sec-profile">
+        <div class="dash-greeting">
+          <h1>👤 Profile</h1>
+          <p>Manage your account information</p>
+        </div>
+        <div class="profile-hero">
+          <div class="ph-avatar">D</div>
+          <div class="ph-info">
+            <h2>Dalim</h2>
+            <p>TU Braunschweig · Computer Science</p>
+          </div>
+        </div>
+        <div class="widget-card">
+          <div class="widget-title">Personal details</div>
+          <div class="profile-fields">
+            <div class="pf-group">
+              <label class="pf-label">Full name</label>
+              <input class="pf-input" type="text" value="Dalim" placeholder="Your name"/>
+            </div>
+            <div class="pf-group">
+              <label class="pf-label">Email</label>
+              <input class="pf-input" type="text" value="dalim@example.com" placeholder="Email"/>
+            </div>
+            <div class="pf-group">
+              <label class="pf-label">University</label>
+              <input class="pf-input" type="text" value="TU Braunschweig" placeholder="University"/>
+            </div>
+            <div class="pf-group">
+              <label class="pf-label">Programme</label>
+              <input class="pf-input" type="text" value="" placeholder="Programme"/>
+            </div>
+            <div class="pf-group">
+              <label class="pf-label">Matrikel No.</label>
+              <input class="pf-input" type="text" value="" placeholder="Matrikel no."/>
+            </div>
+            <div></div>
+            <button class="pf-save">💾 Save changes</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ SETTINGS ══ -->
+      <div class="section" id="sec-settings">
+        <div class="dash-greeting">
+          <h1>⚙️ Settings</h1>
+          <p>Customise your experience</p>
+        </div>
+        <div class="settings-block">
+          <div class="settings-block-title">✨ Appearance</div>
+          <div class="settings-row-new">
+            <div class="settings-row-lbl">
+              <div class="settings-row-ico">🌙</div> Dark mode
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="settingsDarkMode"/>
+              <div class="toggle-track"></div>
+            </label>
+          </div>
+          <div class="settings-row-new">
+            <div class="settings-row-lbl">
+              <div class="settings-row-ico">🌐</div> Language
+            </div>
+            <select class="settings-select-new">
+              <option value="en">🇬🇧 English</option>
+              <option value="de">🇩🇪 Deutsch</option>
+            </select>
+          </div>
+        </div>
+        <div class="settings-block">
+          <div class="settings-block-title">🤖 AI Assistant</div>
+          <div class="settings-row-new">
+            <div class="settings-row-lbl">
+              <div class="settings-row-ico">✨</div> Auto-open on text select
+            </div>
+            <label class="toggle">
+              <input type="checkbox" checked/>
+              <div class="toggle-track"></div>
+            </label>
+          </div>
+          <div class="settings-row-new">
+            <div class="settings-row-lbl">
+              <div class="settings-row-ico">💬</div> Save chat history per PDF
+            </div>
+            <label class="toggle">
+              <input type="checkbox" checked/>
+              <div class="toggle-track"></div>
+            </label>
+          </div>
+          <div style="padding-top:14px">
+            <button class="pf-save" style="grid-column:auto">Save Changes</button>
+          </div>
+        </div>
+        <div class="settings-block">
+          <div class="settings-block-title">🔔 Notifications <span style="font-size:.65rem;opacity:.4;text-transform:none;letter-spacing:0">(coming soon)</span></div>
+          <div class="settings-row-new">
+            <div class="settings-row-lbl">
+              <div class="settings-row-ico">🔔</div> Lecture note sync alerts
+            </div>
+            <label class="toggle">
+              <input type="checkbox" disabled/>
+              <div class="toggle-track"></div>
+            </label>
+          </div>
+          <div class="settings-row-new">
+            <div class="settings-row-lbl">
+              <div class="settings-row-ico">📧</div> New mail alerts
+            </div>
+            <label class="toggle">
+              <input type="checkbox" disabled/>
+              <div class="toggle-track"></div>
+            </label>
+          </div>
+        </div>
+        <div class="settings-block">
+          <div class="settings-block-title">🗂️ Data</div>
+          <div class="settings-row-new">
+            <div class="settings-row-lbl">
+              <div class="settings-row-ico">🗑️</div> Clear all AI chat history
+            </div>
+            <button style="background:rgba(255,107,53,.12);border:1px solid rgba(255,107,53,.25);color:var(--orange);border-radius:10px;padding:7px 14px;font-family:'Nunito',sans-serif;font-weight:800;font-size:.75rem;cursor:pointer">Clear</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ SUBSCRIPTION ══ -->
+      <div class="section" id="sec-subscription">
+        <div class="dash-greeting">
+          <h1>⭐ Subscription</h1>
+          <p>Choose the plan that fits your studies</p>
+        </div>
+        <div class="sub-grid">
+          <div class="sub-card">
+            <div class="sub-name">Free</div>
+            <div class="sub-price">€0 <span>/ month</span></div>
+            <div class="sub-features">
+              <div class="sub-feat">10 AI messages / day</div>
+              <div class="sub-feat">PDF reader</div>
+              <div class="sub-feat">3 lecture note summaries</div>
+              <div class="sub-feat off">Unlimited AI messages</div>
+              <div class="sub-feat off">Multi-PDF summaries</div>
+              <div class="sub-feat off">Priority support</div>
+            </div>
+            <button class="sub-btn outline">Current plan</button>
+          </div>
+          <div class="sub-card featured">
+            <div class="sub-badge">Popular</div>
+            <div class="sub-name">Pro</div>
+            <div class="sub-price">€4.99 <span>/ month</span></div>
+            <div class="sub-features">
+              <div class="sub-feat">Unlimited AI messages</div>
+              <div class="sub-feat">PDF reader</div>
+              <div class="sub-feat">Unlimited lecture notes</div>
+              <div class="sub-feat">Multi-PDF summaries</div>
+              <div class="sub-feat">Priority support</div>
+              <div class="sub-feat">Early access to new features</div>
+            </div>
+            <button class="sub-btn">🚀 Upgrade — Coming soon</button>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /main-scroll -->
+  </div><!-- /main -->
+
+</div><!-- /shell -->
+
+<script>
+(function(){
+  var titles={
+    dashboard:'Dashboard',studip:'Stud.IP',notes:'Lecture Notes',
+    profile:'Profile',settings:'Settings',subscription:'Subscription'
+  };
+
+  function switchSection(id, activateBtn){
+    document.querySelectorAll('.section').forEach(function(s){ s.classList.remove('active'); });
+    var sec = document.getElementById('sec-'+id);
+    if(sec) sec.classList.add('active');
+    document.querySelectorAll('.sb-item').forEach(function(i){ i.classList.remove('active'); });
+    if(activateBtn) activateBtn.classList.add('active');
+    var t = document.getElementById('topTitle');
+    if(t) t.textContent = titles[id] || id;
+  }
+
+  function toggleNight(){
+    var on = document.body.classList.toggle('night');
+    var icon = document.getElementById('nightIcon');
+    var lbl  = document.getElementById('nightLabel');
+    if(icon) icon.textContent = on ? '🌙' : '☀️';
+    if(lbl)  lbl.textContent  = on ? 'Light mode' : 'Night mode';
+    var cb = document.getElementById('settingsDarkMode');
+    if(cb) cb.checked = on;
+  }
+
+  // Night button
+  var nightBtn = document.getElementById('nightBtn');
+  if(nightBtn) nightBtn.addEventListener('click', toggleNight);
+
+  // Dark mode checkbox in settings
+  var dmCb = document.getElementById('settingsDarkMode');
+  if(dmCb) dmCb.addEventListener('change', function(){
+    document.body.classList.toggle('night', this.checked);
+    var icon = document.getElementById('nightIcon');
+    var lbl  = document.getElementById('nightLabel');
+    if(icon) icon.textContent = this.checked ? '🌙' : '☀️';
+    if(lbl)  lbl.textContent  = this.checked ? 'Light mode' : 'Night mode';
+  });
+
+  // Sidebar items — event delegation on the nav
+  document.querySelector('.sb-nav').addEventListener('click', function(e){
+    var item = e.target.closest('.sb-item');
+    if(!item) return;
+    if(item.dataset.comingSoon){
+      alert('Coming soon!');
+      return;
+    }
+    if(item.dataset.section){
+      switchSection(item.dataset.section, item);
+    }
+  });
+
+  // App cards — event delegation on main-scroll
+  document.querySelector('.main-scroll').addEventListener('click', function(e){
+    var card = e.target.closest('.app-card');
+    if(!card) return;
+    if(card.dataset.comingSoon){
+      alert('Coming soon!');
+      return;
+    }
+    if(card.dataset.section){
+      var sbItem = document.querySelector('.sb-item[data-section="'+card.dataset.section+'"]');
+      switchSection(card.dataset.section, sbItem);
+    }
+  });
+
+})();
+</script>
+</body>
+</html>

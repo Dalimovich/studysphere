@@ -149,6 +149,10 @@ function showPortalSection(sec) {
   var ext = document.getElementById('extBanner');
   if (ln) ln.style.display = isDash ? '' : 'none';
   if (ext) ext.style.display = isDash ? '' : 'none';
+  // Update topbar title
+  var _titles = {dashboard:'Dashboard',profile:'Profile',settings:'Settings',subscription:'Subscription'};
+  var tt = document.getElementById('topTitle');
+  if (tt) tt.textContent = _titles[sec] || sec;
 }
 
 function openSB(){sbOpen=true;document.getElementById('sidebar').classList.add('visible');}
@@ -933,7 +937,12 @@ document.addEventListener('click',function(e){if(ddOpen&&!e.target.closest('.sem
 // nightOn is declared globally above DOMContentLoaded — sync the button here
 (function(){
   var _b = document.getElementById('nightBtn');
-  if (_b) _b.textContent = nightOn ? '☀️' : '🌙';
+  var _bIcon = document.getElementById('nightIcon');
+  if (_bIcon) {
+    _bIcon.textContent = nightOn ? '☀️' : '🌙';
+    var _bLbl = document.getElementById('nightLabel');
+    if (_bLbl) _bLbl.textContent = nightOn ? 'Light mode' : 'Dark mode';
+  } else if (_b) { _b.textContent = nightOn ? '☀️' : '🌙'; }
 })();
 // nightBtn listener moved to ss-ready
 
@@ -2223,7 +2232,12 @@ function _applyTheme(toNight, originEl) {
     nightOn = toNight;
     document.body.classList.toggle('night', toNight);
     var nb = document.getElementById('nightBtn');
-    if (nb) nb.textContent = toNight ? '☀️' : '🌙';
+    var nbIcon = document.getElementById('nightIcon');
+    if (nbIcon) {
+      nbIcon.textContent = toNight ? '☀️' : '🌙';
+      var nbLbl = document.getElementById('nightLabel');
+      if (nbLbl) nbLbl.textContent = toNight ? 'Light mode' : 'Dark mode';
+    } else if (nb) { nb.textContent = toNight ? '☀️' : '🌙'; }
     var dm = document.getElementById('settingsDarkMode');
     if (dm) dm.checked = toNight;
     localStorage.setItem('ss_dark', toNight ? '1' : '0');
@@ -3072,6 +3086,316 @@ window._obFinish = async function() {
   // Hide modal and enter app
   document.getElementById('onboardModal').style.display = 'none';
 };
+
+// ── New sidebar navigation (coming-soon + notes shortcut) ─────────────────
+(function(){
+  var sbNav = document.querySelector('#portal .sb-nav');
+  if (!sbNav) return;
+  sbNav.addEventListener('click', function(e){
+    var item = e.target.closest('.sb-item');
+    if (!item) return;
+    if (item.dataset.comingSoon) {
+      showToast('Coming soon!', 'This feature is on its way.');
+      return;
+    }
+    // "Lecture Notes" shortcut — scroll into dashboard view
+    if (item.id === 'psbNotes') {
+      setNavActive('psbDashboard');
+      showPortalSection('dashboard');
+      setTimeout(function(){
+        var ln = document.getElementById('lnSection');
+        if (ln) ln.scrollIntoView({ behavior: 'smooth' });
+      }, 80);
+    }
+  });
+})();
+
+// ── Widget Dashboard ──────────────────────────────────────────────────────
+(function(){
+  var COLS=4, ROW_H=160, GAP=14;
+
+  var DEFS=[
+    {type:'today',    icon:'📅',name:"Today's Calendar",cols:2,rows:2,desc:'Your schedule for today'},
+    {type:'courses',  icon:'📚',name:'Course Shortcuts', cols:2,rows:1,desc:'Jump into any course'},
+    {type:'mail',     icon:'✉️', name:'New Mails',        cols:2,rows:2,desc:'Unread messages only'},
+    {type:'notes',    icon:'📝',name:'Quick Notes',       cols:2,rows:2,desc:'Personal scratch pad'},
+    {type:'stats',    icon:'📊',name:'Study Stats',       cols:2,rows:1,desc:'Weekly progress'},
+    {type:'deadlines',icon:'⏰',name:'Deadlines',         cols:2,rows:2,desc:'Upcoming due dates'},
+    {type:'weather',  icon:'🌤️',name:'Campus Weather',   cols:1,rows:1,desc:'Braunschweig forecast'},
+    {type:'ai',       icon:'🤖',name:'AI Quick Chat',     cols:2,rows:1,desc:'Ask anything instantly'},
+  ];
+
+  var now=new Date();
+  var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  var MONS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var SCHEDULE={
+    0:[{time:'10:00',name:'Study session',color:'#7C3AED'},{time:'14:00',name:'Lab report prep',color:'#F59E0B'}],
+    1:[{time:'08:00',name:'Mathematik III',room:'PK 2.2',color:'#2563EB'},{time:'10:00',name:'Algorithmen & DS',room:'IZ 160',color:'#7C3AED'},{time:'14:00',name:'Softwaretechnik',room:'SN 19.2',color:'#22C55E'}],
+    2:[{time:'09:00',name:'Analysis I',room:'SN 19.1',color:'#F59E0B'},{time:'13:00',name:'Physik Praktikum',room:'PK 4.4',color:'#2563EB'}],
+    3:[{time:'08:00',name:'Mathematik III',room:'PK 2.2',color:'#2563EB'},{time:'11:00',name:'Informatik II',room:'IZ 305',color:'#7C3AED'},{time:'16:00',name:'Tutorium Analysis',room:'PK 3.3',color:'#22C55E'}],
+    4:[{time:'10:00',name:'Algorithmen & DS',room:'IZ 160',color:'#7C3AED'},{time:'14:00',name:'Softwaretechnik',room:'SN 19.2',color:'#22C55E'}],
+    5:[{time:'08:00',name:'Analysis I',room:'SN 19.1',color:'#F59E0B'},{time:'12:00',name:'Seminar',room:'IZ 105',color:'#2563EB'}],
+    6:[]
+  };
+
+  function widgetBody(type){
+    var day=now.getDay(),evs=SCHEDULE[day]||[];
+    if(type==='today'){
+      var evHtml=evs.length?evs.map(function(e){
+        return '<div class="tw-event"><span class="tw-dot" style="background:'+e.color+'"></span>'+
+               '<span class="tw-time">'+e.time+'</span><span class="tw-name">'+e.name+'</span>'+
+               (e.room?'<span class="tw-room">'+e.room+'</span>':'')+
+               '</div>';}).join(''):'<div class="tw-none">No classes today \uD83C\uDF89</div>';
+      return '<div class="tw-date">'+DAYS[day]+', '+MONS[now.getMonth()]+' '+now.getDate()+'</div>'+evHtml;
+    }
+    if(type==='courses')
+      return '<div class="cw-pills">'+['Mathematik III','Algorithmen & DS','Softwaretechnik','Analysis I','Physik','Informatik II'].map(function(c){return '<span class="cw-pill">'+c+'</span>';}).join('')+'</div>';
+    if(type==='mail')
+      return '<div class="mw-badge">3 unread</div>'+
+        [{av:'P',from:'Prof. M\xFCller',subj:'\xDCbungsblatt 5 \u2014 Abgabe Freitag',t:'10:34',g:'linear-gradient(135deg,#2563EB,#7C3AED)'},
+         {av:'S',from:'Stud.IP System',subj:'New material in Mathematik III',t:'09:12',g:'linear-gradient(135deg,#7C3AED,#22C55E)'},
+         {av:'T',from:'TU Braunschweig',subj:'Semesterticket Verl\xE4ngerung',t:'Ges.',g:'linear-gradient(135deg,#F59E0B,#2563EB)'}
+        ].map(function(m){return '<div class="mw-row"><div class="mw-av" style="background:'+m.g+'">'+m.av+'</div>'+
+          '<div class="mw-info"><div class="mw-from">'+m.from+'</div><div class="mw-subj">'+m.subj+'</div></div>'+
+          '<div class="mw-t">'+m.t+'</div></div>';}).join('');
+    if(type==='notes')
+      return '<textarea class="nw-ta" placeholder="Start typing your notes\u2026" spellcheck="false"></textarea>';
+    if(type==='stats')
+      return '<div class="sw-chips"><div class="sw-chip"><div class="sw-val">12</div><div class="sw-lbl">PDFs</div></div>'+
+             '<div class="sw-chip"><div class="sw-val">28</div><div class="sw-lbl">AI chats</div></div>'+
+             '<div class="sw-chip"><div class="sw-val">14h</div><div class="sw-lbl">This week</div></div></div>'+
+             '<div class="sw-bar-row"><span>Weekly goal</span><span>70%</span></div>'+
+             '<div class="sw-bar"><div class="sw-bar-fill" style="width:70%"></div></div>';
+    if(type==='deadlines')
+      return [{c:'#ef4444',n:'\xDCbungsblatt 5 Abgabe',d:'Fri 28 Mar'},{c:'#F59E0B',n:'Praktikumsbericht',d:'2 Apr'},
+              {c:'#22C55E',n:'Klausur Anmeldung',d:'15 Apr'},{c:'#7C3AED',n:'Seminararbeit',d:'30 Apr'}
+             ].map(function(x){return '<div class="dlw-row"><span class="dlw-dot" style="background:'+x.c+'"></span>'+
+               '<span class="dlw-name">'+x.n+'</span><span class="dlw-date">'+x.d+'</span></div>';}).join('');
+    if(type==='weather')
+      return '<div class="ww-temp">12\xB0</div><div class="ww-desc">\u26C5 Partly cloudy</div><div class="ww-loc">Braunschweig</div>';
+    if(type==='ai')
+      return '<div class="aw-row"><input class="aw-in" placeholder="Ask AI anything\u2026"/><button class="aw-btn">\u2192</button></div>'+
+             '<div class="aw-hint">Powered by StudySphere AI</div>';
+    return '';
+  }
+
+  var state=[],uid=1;
+  var canvas=document.getElementById('dashCanvas');
+  var empty=document.getElementById('dashEmpty');
+  var fab=document.getElementById('addWidgetFab');
+  var panel=document.getElementById('widgetPanel');
+  var overlay=document.getElementById('wpOverlay');
+  var wpGrid=document.getElementById('wpGrid');
+  var ghost=document.getElementById('dragGhost');
+  if(!canvas||!fab||!panel||!overlay||!wpGrid||!ghost){return;}
+  var dragging=null,resizing=null;
+
+  function overlap(a,b){return !(a.col+a.cs<=b.col||b.col+b.cs<=a.col||a.row+a.rs<=b.row||b.row+b.rs<=a.row);}
+  function isFree(col,row,cs,rs){var t={col:col,row:row,cs:cs,rs:rs};return !state.some(function(w){return overlap(w,t);});}
+  function findFree(cs,rs){for(var r=1;r<=20;r++)for(var c=1;c<=COLS-cs+1;c++)if(isFree(c,r,cs,rs))return {col:c,row:r};return {col:1,row:1};}
+
+  function compact(){
+    state.sort(function(a,b){return a.row!==b.row?a.row-b.row:a.col-b.col;});
+    state.forEach(function(w){
+      for(var r=1;r<w.row;r++){
+        var cand={col:w.col,row:r,cs:w.cs,rs:w.rs};
+        if(!state.some(function(x){return x.uid!==w.uid&&overlap(x,cand);})){w.row=r;break;}
+      }
+    });
+  }
+
+  function renderAnimated(){
+    var snap={};
+    canvas.querySelectorAll('.dash-widget').forEach(function(el){snap[el.dataset.uid]=el.getBoundingClientRect();});
+    compact();render();
+    canvas.querySelectorAll('.dash-widget').forEach(function(el){
+      var prev=snap[el.dataset.uid];if(!prev)return;
+      var cur=el.getBoundingClientRect();
+      var dx=prev.left-cur.left,dy=prev.top-cur.top;
+      if(Math.abs(dx)<1&&Math.abs(dy)<1)return;
+      el.style.transition='none';el.style.transform='translate('+dx+'px,'+dy+'px)';
+      requestAnimationFrame(function(){requestAnimationFrame(function(){el.style.transition='';el.style.transform='';});});
+    });
+  }
+
+  function computeDrop(w,col,row){
+    var newPos={col:col,row:row,cs:w.cs,rs:w.rs};
+    var displaced=state.filter(function(x){return x.uid!==w.uid&&overlap(x,newPos);});
+    if(!displaced.length)return [];
+    var tempUsed=state.filter(function(x){return x.uid!==w.uid&&!displaced.some(function(d){return d.uid===x.uid;});})
+      .map(function(x){return {col:x.col,row:x.row,cs:x.cs,rs:x.rs};});
+    tempUsed.push({col:col,row:row,cs:w.cs,rs:w.rs});
+    var moves=[];
+    displaced.forEach(function(d){
+      var preferred={col:w.col,row:w.row,cs:d.cs,rs:d.rs};
+      var fits=w.col+d.cs-1<=COLS&&!tempUsed.some(function(t){return overlap(t,preferred);});
+      var dest;
+      if(fits){dest={col:w.col,row:w.row};}
+      else{
+        dest=null;
+        scan:for(var r=1;r<=20;r++){for(var c=1;c<=COLS-d.cs+1;c++){var cand={col:c,row:r,cs:d.cs,rs:d.rs};if(!tempUsed.some(function(t){return overlap(t,cand);})){dest={col:c,row:r};break scan;}}}
+        if(!dest)dest={col:w.col,row:w.row};
+      }
+      moves.push({uid:d.uid,col:dest.col,row:dest.row,cs:d.cs,rs:d.rs});
+      tempUsed.push({col:dest.col,row:dest.row,cs:d.cs,rs:d.rs});
+    });
+    return moves;
+  }
+
+  function render(){
+    canvas.innerHTML='';
+    state.forEach(function(w){
+      var def=DEFS.find(function(d){return d.type===w.type;});
+      var el=document.createElement('div');
+      el.className='dash-widget';el.dataset.uid=w.uid;
+      el.style.gridColumn=w.col+' / span '+w.cs;
+      el.style.gridRow=w.row+' / span '+w.rs;
+      el.innerHTML='<div class="dw-header"><span class="dw-icon">'+(def?def.icon:'')+
+        '</span><span class="dw-title">'+(def?def.name:'')+
+        '</span><button class="dw-remove">\xD7</button></div>'+
+        '<div class="dw-body">'+widgetBody(w.type)+'</div>'+
+        '<div class="dw-resize"></div>';
+      canvas.appendChild(el);
+    });
+    if(empty)empty.style.display=state.length?'none':'flex';
+    canvas.querySelectorAll('.dw-header').forEach(bindDrag);
+    canvas.querySelectorAll('.dw-resize').forEach(bindResize);
+    canvas.querySelectorAll('.dw-remove').forEach(function(btn){
+      btn.addEventListener('click',function(e){
+        e.stopPropagation();
+        var u=+btn.closest('.dash-widget').dataset.uid;
+        state=state.filter(function(w){return w.uid!==u;});
+        renderAnimated();
+      });
+    });
+    updateCards();
+  }
+
+  function getCellAt(ax,ay){
+    var r=canvas.getBoundingClientRect();
+    var cw=(r.width+GAP)/COLS,ch=ROW_H+GAP;
+    return {col:Math.max(1,Math.min(Math.floor((ax-r.left)/cw)+1,COLS)),row:Math.max(1,Math.floor((ay-r.top)/ch)+1)};
+  }
+
+  function bindDrag(hdr){
+    hdr.addEventListener('pointerdown',function(e){
+      if(e.button!==0)return;
+      if(e.target.closest('.dw-remove'))return;
+      var el=hdr.closest('.dash-widget'),u=+el.dataset.uid;
+      var w=state.find(function(x){return x.uid===u;});if(!w)return;
+      e.preventDefault();
+      var rect=el.getBoundingClientRect();
+      dragging={uid:u,offX:e.clientX-rect.left,offY:e.clientY-rect.top,cs:w.cs,rs:w.rs,lastCell:null};
+      el.classList.add('is-dragging');
+      ghost.style.cssText='display:block;width:'+rect.width+'px;height:'+rect.height+'px;left:'+(e.clientX-dragging.offX)+'px;top:'+(e.clientY-dragging.offY)+'px';
+      hdr.setPointerCapture(e.pointerId);
+    });
+    hdr.addEventListener('pointermove',function(e){
+      if(!dragging)return;
+      ghost.style.left=(e.clientX-dragging.offX)+'px';ghost.style.top=(e.clientY-dragging.offY)+'px';
+      var cell=getCellAt(e.clientX-dragging.offX,e.clientY-dragging.offY);
+      var col=Math.min(cell.col,COLS-dragging.cs+1),row=Math.max(1,cell.row);
+      var lc=dragging.lastCell;if(lc&&lc.col===col&&lc.row===row)return;
+      dragging.lastCell={col:col,row:row};
+      var w=state.find(function(x){return x.uid===dragging.uid;});if(!w)return;
+      canvas.querySelectorAll('.dash-widget:not(.is-dragging)').forEach(function(el){el.style.transform='';});
+      var canvasRect=canvas.getBoundingClientRect();
+      var cw=(canvasRect.width+GAP)/COLS,ch=ROW_H+GAP;
+      computeDrop(w,col,row).forEach(function(move){
+        var el=canvas.querySelector('[data-uid="'+move.uid+'"]');if(!el)return;
+        var cur=el.getBoundingClientRect();
+        el.style.transform='translate('+(canvasRect.left+(move.col-1)*cw-cur.left)+'px,'+(canvasRect.top+(move.row-1)*ch-cur.top)+'px)';
+      });
+    });
+    hdr.addEventListener('pointerup',function(e){
+      if(!dragging)return;
+      var cell=getCellAt(e.clientX-dragging.offX,e.clientY-dragging.offY);
+      var w=state.find(function(x){return x.uid===dragging.uid;});
+      if(w){
+        var newCol=Math.min(cell.col,COLS-w.cs+1),newRow=Math.max(1,cell.row);
+        computeDrop(w,newCol,newRow).forEach(function(move){var d=state.find(function(x){return x.uid===move.uid;});if(d){d.col=move.col;d.row=move.row;}});
+        w.col=newCol;w.row=newRow;
+      }
+      ghost.style.display='none';dragging=null;renderAnimated();
+    });
+  }
+
+  function bindResize(handle){
+    handle.addEventListener('pointerdown',function(e){
+      e.stopPropagation();
+      var el=handle.closest('.dash-widget'),u=+el.dataset.uid;
+      var w=state.find(function(x){return x.uid===u;});if(!w)return;
+      e.preventDefault();
+      resizing={uid:u,sx:e.clientX,sy:e.clientY,sc:w.cs,sr:w.rs};
+      handle.setPointerCapture(e.pointerId);
+    });
+    handle.addEventListener('pointermove',function(e){
+      if(!resizing)return;
+      var r=canvas.getBoundingClientRect(),cw=(r.width+GAP)/COLS,ch=ROW_H+GAP;
+      var w=state.find(function(x){return x.uid===resizing.uid;});if(!w)return;
+      var wantCs=Math.max(1,Math.min(resizing.sc+Math.round((e.clientX-resizing.sx)/cw),COLS-w.col+1));
+      var wantRs=Math.max(1,resizing.sr+Math.round((e.clientY-resizing.sy)/ch));
+      var others=state.filter(function(x){return x.uid!==w.uid;});
+      while(wantCs>1||wantRs>1){
+        var cand={col:w.col,row:w.row,cs:wantCs,rs:wantRs};
+        if(!others.some(function(x){return overlap(x,cand);}))break;
+        if(wantCs-resizing.sc>=wantRs-resizing.sr&&wantCs>1)wantCs--;
+        else if(wantRs>1)wantRs--;
+        else if(wantCs>1)wantCs--;
+        else break;
+      }
+      w.cs=wantCs;w.rs=wantRs;
+      var elW=canvas.querySelector('[data-uid="'+w.uid+'"]');
+      if(elW){elW.style.gridColumn=w.col+' / span '+w.cs;elW.style.gridRow=w.row+' / span '+w.rs;}
+    });
+    handle.addEventListener('pointerup',function(){if(resizing)renderAnimated();resizing=null;});
+  }
+
+  function openPanel(){panel.classList.add('open');overlay.classList.add('show');fab.classList.add('open');}
+  function closePanel(){panel.classList.remove('open');overlay.classList.remove('show');fab.classList.remove('open');}
+
+  function buildPicker(){
+    wpGrid.innerHTML='';
+    DEFS.forEach(function(def){
+      var card=document.createElement('div');
+      card.className='wp-card';card.dataset.type=def.type;
+      card.innerHTML='<div class="wp-icon">'+def.icon+'</div><div class="wp-name">'+def.name+'</div><div class="wp-size">'+def.cols+'\xD7'+def.rows+' \xB7 '+def.desc+'</div>';
+      card.addEventListener('click',function(){
+        if(card.classList.contains('added'))return;
+        var pos=findFree(def.cols,def.rows);
+        state.push({uid:uid++,type:def.type,col:pos.col,row:pos.row,cs:def.cols,rs:def.rows});
+        renderAnimated();
+      });
+      wpGrid.appendChild(card);
+    });
+  }
+
+  function updateCards(){
+    var active=state.map(function(w){return w.type;});
+    wpGrid.querySelectorAll('.wp-card').forEach(function(c){c.classList.toggle('added',active.indexOf(c.dataset.type)!==-1);});
+  }
+
+  fab.addEventListener('click',function(){panel.classList.contains('open')?closePanel():openPanel();});
+  overlay.addEventListener('click',closePanel);
+  document.getElementById('wpClose').addEventListener('click',closePanel);
+
+  // Show FAB only when on dashboard
+  window.addEventListener('ss-ready', function(){
+    var dashBtn=document.getElementById('psbDashboard');
+    function _syncFab(){
+      var isDash=document.getElementById('psec-dashboard')&&document.getElementById('psec-dashboard').style.display!=='none';
+      if(fab)fab.classList.toggle('visible',!!isDash);
+    }
+    if(dashBtn)dashBtn.addEventListener('click',function(){setTimeout(_syncFab,0);});
+    ['psbProfile','psbSettings','psbSubscription'].forEach(function(id){
+      var el=document.getElementById(id);
+      if(el)el.addEventListener('click',function(){if(fab)fab.classList.remove('visible');});
+    });
+    _syncFab();
+  });
+
+  buildPicker();render();
+})();
 
 
 
