@@ -1318,8 +1318,8 @@ function addBotMsg(text){
   aiMsgs.appendChild(wrap);aiMsgs.scrollTop=aiMsgs.scrollHeight;return wrap;
 }
 
-// Welcome message — user name resolved after ss-ready; use generic greeting here
-addBotMsg(_t('ai_welcome'));
+// Welcome message — deferred so _t is defined (translations live later in this file)
+setTimeout(function(){ addBotMsg(_t('ai_welcome')); }, 0);
 
 function addUserMsg(text){
   var wrap=document.createElement('div');wrap.className='ai-msg-wrap user';
