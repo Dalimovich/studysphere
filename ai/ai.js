@@ -6,7 +6,8 @@
 
 // ── CONFIG ────────────────────────────────────────────────────────────────
 var _aiUserScrolled  = false; // true when user has manually scrolled up during generation
-var _attachedImage   = null;  // { data: base64string, mediaType: 'image/png' }
+var _attachedImages  = [];    // array of { data: base64string, mediaType: string }, max AI_IMG_MAX
+var AI_IMG_MAX       = 5;     // max images per message (keeps token budget sane)
 
 var AI_MODEL   = 'claude-sonnet-4-5';
 var AI_MAX_TOK = 4096;    // was 1024 — allows long, thorough answers
@@ -42,7 +43,36 @@ askAI = function(question, skipUserBubble) {
   currentGenId++;
   var myGenId = currentGenId;
   pinAI();
-  if (!skipUserBubble) addUserMsg(question);
+
+  // Snapshot + clear images before anything else
+  var _imgs = _attachedImages.slice();
+  _attachedImages = [];
+  _renderImgPreviews();
+
+  if (!skipUserBubble) {
+    if (_imgs.length > 0) {
+      // User bubble with image thumbnails above the text
+      var userWrap = document.createElement('div');
+      userWrap.className = 'ai-msg-wrap user';
+      var _t = (typeof getTime === 'function') ? getTime() : '';
+      var _safe = question.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      var _imgsHtml = _imgs.map(function(img) {
+        return '<img class="ai-msg-img" src="data:' + img.mediaType + ';base64,' + img.data + '" alt="image">';
+      }).join('');
+      userWrap.innerHTML =
+        '<div class="msg-sender user-sender"><span class="msg-sender-dot"></span>You</div>' +
+        '<div class="msg-body">' +
+          '<div class="ai-msg-imgs">' + _imgsHtml + '</div>' +
+          '<div class="ai-bubble user">' + _safe + '</div>' +
+          '<div class="msg-meta"><span class="msg-time">' + _t + '</span></div>' +
+        '</div>';
+      aiMsgs.appendChild(userWrap);
+      aiMsgs.scrollTop = aiMsgs.scrollHeight;
+    } else {
+      addUserMsg(question);
+    }
+  }
+
   var sendBtn = document.getElementById('aiSend');
   sendBtn.disabled = false; // keep clickable so stop works
   sendBtn.classList.add('is-stop');
@@ -83,18 +113,15 @@ askAI = function(question, skipUserBubble) {
   cycleThought();
   activeThinkTimer = setInterval(cycleThought, 1100);
 
-  // Build message content — include image if one is attached
-  var _img = _attachedImage;
-  _attachedImage = null;
-  var aiImgPreviewEl = document.getElementById('aiImgPreview');
-  if (aiImgPreviewEl) aiImgPreviewEl.style.display = 'none';
-
-  var msgContent = _img
-    ? [
-        { type: 'image', source: { type: 'base64', media_type: _img.mediaType, data: _img.data } },
-        { type: 'text', text: question }
-      ]
-    : question;
+  var msgContent;
+  if (_imgs.length > 0) {
+    msgContent = _imgs.map(function(img) {
+      return { type: 'image', source: { type: 'base64', media_type: img.mediaType, data: img.data } };
+    });
+    msgContent.push({ type: 'text', text: question });
+  } else {
+    msgContent = question;
+  }
 
   fetch(BACKEND_URL + '/api/ai', {
     method: 'POST',
@@ -145,7 +172,6 @@ askAI = function(question, skipUserBubble) {
           meta   = ansWrap.querySelector('.msg-meta');
           bubble.innerHTML = renderMarkdown(rawText.slice(0, i));
           meta.style.display = 'flex';
-          _aiUserScrolled = false;
           return;
         }
         // Tab is hidden — render immediately so the answer is ready when user returns
@@ -161,7 +187,6 @@ askAI = function(question, skipUserBubble) {
         }
         bubble.innerHTML = renderMarkdown(rawText.slice(0, i + 1)) + '<span class="stream-cursor">\u258b</span>';
         i++;
-        if (!_aiUserScrolled) aiMsgs.scrollTop = aiMsgs.scrollHeight;
         activeTypeTimer = setTimeout(typeNext, 16 + (Math.random() > 0.93 ? 55 : 0));
       }
       // When user returns to tab mid-animation, flush to end instantly
@@ -372,13 +397,42 @@ window.runMultiSummary = runMultiSummary;
 })();
 
 // ── Image attachment helpers ──────────────────────────────────────────────
-function _setAttachedImage(img) {
-  _attachedImage = img;
+function _renderImgPreviews() {
   var preview = document.getElementById('aiImgPreview');
-  var thumb   = document.getElementById('aiImgThumb');
-  if (!preview || !thumb) return;
-  thumb.src = 'data:' + img.mediaType + ';base64,' + img.data;
+  if (!preview) return;
+  if (_attachedImages.length === 0) {
+    preview.style.display = 'none';
+    preview.innerHTML = '';
+    return;
+  }
   preview.style.display = 'flex';
+  preview.innerHTML = '';
+  _attachedImages.forEach(function(img, idx) {
+    var wrap  = document.createElement('div');
+    wrap.className = 'ai-img-thumb-wrap';
+    var image = document.createElement('img');
+    image.src = 'data:' + img.mediaType + ';base64,' + img.data;
+    image.alt = 'Image ' + (idx + 1);
+    var btn   = document.createElement('button');
+    btn.className = 'ai-img-remove';
+    btn.title = 'Remove';
+    btn.textContent = '\u2715';
+    btn.addEventListener('click', (function(i) {
+      return function() { _attachedImages.splice(i, 1); _renderImgPreviews(); };
+    })(idx));
+    wrap.appendChild(image);
+    wrap.appendChild(btn);
+    preview.appendChild(wrap);
+  });
+}
+
+function _addAttachedImage(img) {
+  if (_attachedImages.length >= AI_IMG_MAX) {
+    if (typeof showToast === 'function') showToast('Limit reached', 'Max ' + AI_IMG_MAX + ' images per message');
+    return;
+  }
+  _attachedImages.push(img);
+  _renderImgPreviews();
 }
 
 // Crops the selected viewport region from all visible PDF canvases
@@ -426,6 +480,7 @@ function _captureSnipRegion(x1, y1, x2, y2) {
   if (!btn) return;
 
   btn.addEventListener('click', function() {
+    if (typeof forceCloseAI === 'function') forceCloseAI();
     var overlay = document.createElement('div');
     overlay.id = 'snipOverlay';
     var hint = document.createElement('div');
@@ -456,15 +511,18 @@ function _captureSnipRegion(x1, y1, x2, y2) {
     overlay.addEventListener('mouseup', function(e) {
       if (!dragging) return;
       dragging = false;
+      var endX = e.clientX, endY = e.clientY;
       overlay.remove();
       document.removeEventListener('keydown', onKey);
-      var result = _captureSnipRegion(startX, startY, e.clientX, e.clientY);
+      // Open panel immediately so user sees the thumbnail without delay
+      if (typeof openAI  === 'function') openAI();
+      if (typeof pinAI   === 'function') pinAI();
+      var result = _captureSnipRegion(startX, startY, endX, endY);
       if (!result) {
         if (typeof showToast === 'function') showToast('Nothing captured', 'Select an area over the PDF');
         return;
       }
-      _setAttachedImage(result);
-      // Focus the textarea so the user can type their question
+      _addAttachedImage(result);
       var ta = document.getElementById('aiInput');
       if (ta) ta.focus();
     });
@@ -478,32 +536,21 @@ function _captureSnipRegion(x1, y1, x2, y2) {
 
 // ── Image file upload ─────────────────────────────────────────────────────
 (function() {
-  var input  = document.getElementById('aiFileInput');
-  var remove = document.getElementById('aiImgRemove');
-  if (input) {
-    input.addEventListener('change', function() {
-      var file = this.files[0];
-      if (!file) return;
+  var input = document.getElementById('aiFileInput');
+  if (!input) return;
+  input.addEventListener('change', function() {
+    var files = Array.prototype.slice.call(this.files);
+    this.value = ''; // reset so same file can be re-selected
+    files.forEach(function(file) {
       var reader = new FileReader();
       reader.onload = function(ev) {
-        var dataUrl = ev.target.result;
-        _setAttachedImage({ data: dataUrl.split(',')[1], mediaType: file.type || 'image/png' });
-        var ta = document.getElementById('aiInput');
-        if (ta) ta.focus();
+        _addAttachedImage({ data: ev.target.result.split(',')[1], mediaType: file.type || 'image/png' });
       };
       reader.readAsDataURL(file);
-      this.value = ''; // allow re-selecting same file
     });
-  }
-  if (remove) {
-    remove.addEventListener('click', function() {
-      _attachedImage = null;
-      var preview = document.getElementById('aiImgPreview');
-      var thumb   = document.getElementById('aiImgThumb');
-      if (preview) preview.style.display = 'none';
-      if (thumb)   thumb.src = '';
-    });
-  }
+    var ta = document.getElementById('aiInput');
+    if (ta) ta.focus();
+  });
 })();
 
 // ── AI panel resize (desktop only) ───────────────────────────────────────
@@ -554,23 +601,22 @@ function _captureSnipRegion(x1, y1, x2, y2) {
   });
 })();
 
-// ── Scroll intent detection ───────────────────────────────────────────────
-// If the user scrolls up during generation, stop auto-scrolling.
-// When they scroll back to the bottom, resume.
+// ── Scroll-to-bottom button ───────────────────────────────────────────────
 (function() {
   var msgs = document.getElementById('aiMsgs');
-  if (!msgs) return;
-  var prevScrollTop = 0;
-  msgs.addEventListener('scroll', function() {
+  var btn  = document.getElementById('aiScrollBtn');
+  if (!msgs || !btn) return;
+
+  function updateBtn() {
     var atBottom = (msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight) < 60;
-    if (atBottom) {
-      _aiUserScrolled = false;
-    } else if (msgs.scrollTop < prevScrollTop) {
-      // User actively scrolled up
-      _aiUserScrolled = true;
-    }
-    prevScrollTop = msgs.scrollTop;
-  }, { passive: true });
+    btn.classList.toggle('visible', !atBottom);
+  }
+
+  msgs.addEventListener('scroll', updateBtn, { passive: true });
+
+  btn.addEventListener('click', function() {
+    msgs.scrollTo({ top: msgs.scrollHeight, behavior: 'smooth' });
+  });
 })();
 
 console.log('\u2713 ai/ai.js loaded — model: ' + AI_MODEL + ', max_tokens: ' + AI_MAX_TOK + ', pdf_cap: ' + AI_PDF_CAP);
