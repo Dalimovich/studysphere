@@ -2179,17 +2179,11 @@ _bindIf('goPortal', 'click', function(){
     document.getElementById('pdfView').style.display = 'none';
     document.getElementById('courseOverview').style.display = 'block';
     showCourseSection(activeCourseRef, 'files');
-  } else if (_cameFromStudip) {
-    // Came from Stud.IP overlay → go back there
+  } else {
+    // In course overview (or welcome state) → go back to Stud.IP
     activeCourseId = null;
     activeCourseRef = null;
     showStudip();
-  } else {
-    // Came from portal sidebar → go back to portal
-    showPortal();
-    setNavActive('psbDashboard');
-    showPortalSection('dashboard');
-    _ssPushHistory({ view: 'portal', section: 'dashboard' }, '#portal=dashboard');
   }
 });
 
