@@ -1028,7 +1028,7 @@ function buildSbCourseNav(course,activeSection){
     var body=document.createElement('div');
     body.className='sb-acc-body';
     if(rows.length===0){
-      body.innerHTML='<div class="sb-acc-empty">Nothing here yet</div>';
+      body.innerHTML='<div class="sb-acc-empty">'+_t('nothing_yet')+'</div>';
     } else {
       rows.forEach(function(r){
         var row=document.createElement('div');
@@ -1094,7 +1094,7 @@ var msmCurrentTitle = '';
   lnRender(summaries);
   window.postMessage({ type: 'SS_DELETE_SUMMARY', summaries: summaries }, '*');
   document.getElementById('multiSumModal').classList.remove('show');
-  showToast('💾 Saved to Lecture Notes', msmCurrentTitle.slice(0,50));
+  showToast(_t('toast_saved'), msmCurrentTitle.slice(0,50));
   // Persist to Supabase
   await lnSaveNoteToSupabase(note);
 });
@@ -1173,9 +1173,9 @@ async function runMultiSummary(fnames, course) {
 
 async function downloadFile(fname){
   var pdfPath=PDF_DATA[fname];
-  if(!pdfPath){alert('This file is not available in the demo.');return;}
+  if(!pdfPath){alert(_t('not_in_demo'));return;}
   var r=await fetch(pdfPath);
-  if(!r.ok){alert('Download failed.');return;}
+  if(!r.ok){alert(_t('download_failed'));return;}
   var buf=await r.arrayBuffer();
   var blob=new Blob([buf],{type:'application/pdf'});
   var url=URL.createObjectURL(blob);
@@ -1259,14 +1259,14 @@ function showSelectionBanner(txt){
   var old=msgs.querySelector('.ai-sel-banner');if(old)old.remove();
   var banner=document.createElement('div');banner.className='ai-sel-banner';
   var explainBtn = document.createElement('button');
-  explainBtn.className='ai-sel-btn';explainBtn.textContent='Explain this';
+  explainBtn.className='ai-sel-btn';explainBtn.textContent=_t('sel_explain');
   var formulaBtn = document.createElement('button');
-  formulaBtn.className='ai-sel-btn';formulaBtn.textContent='Break down formula';
+  formulaBtn.className='ai-sel-btn';formulaBtn.textContent=_t('sel_formula');
   var dismissBtn = document.createElement('button');
-  dismissBtn.className='ai-sel-dismiss';dismissBtn.textContent='Dismiss';
+  dismissBtn.className='ai-sel-dismiss';dismissBtn.textContent=_t('sel_dismiss');
 
   var preview = document.createElement('div');
-  preview.innerHTML='<b>📌 You selected:</b><em>"'+txt.slice(0,120)+(txt.length>120?'…':'')+'"</em>';
+  preview.innerHTML='<b>'+_t('sel_preview')+'</b><em>"'+txt.slice(0,120)+(txt.length>120?'…':'')+'"</em>';
   var actions = document.createElement('div');
   actions.className='ai-sel-actions';
   actions.appendChild(explainBtn);actions.appendChild(formulaBtn);actions.appendChild(dismissBtn);
@@ -1312,20 +1312,20 @@ function addBotMsg(text){
       '<div class="ai-bubble bot">'+renderMarkdown(text)+'</div>'+
       '<div class="msg-meta">'+
         '<span class="msg-time">'+t+'</span>'+
-        '<button class="msg-action-btn" onclick="copyBubble(this)">Copy</button>'+
+        '<button class="msg-action-btn" onclick="copyBubble(this)">'+_t('copy_btn')+'</button>'+
       '</div>'+
     '</div>';
   aiMsgs.appendChild(wrap);aiMsgs.scrollTop=aiMsgs.scrollHeight;return wrap;
 }
 
 // Welcome message — user name resolved after ss-ready; use generic greeting here
-addBotMsg("Hey! 👋 Open a PDF, select any text or formula and I'll help you understand it!");
+addBotMsg(_t('ai_welcome'));
 
 function addUserMsg(text){
   var wrap=document.createElement('div');wrap.className='ai-msg-wrap user';
   var t=getTime();var safe=text.replace(/</g,'&lt;').replace(/>/g,'&gt;');
   wrap.innerHTML=
-    '<div class="msg-sender user-sender"><span class="msg-sender-dot"></span>You</div>'+
+    '<div class="msg-sender user-sender"><span class="msg-sender-dot"></span>'+_t('you_label')+'</div>'+
     '<div class="msg-body">'+
       '<div class="ai-bubble user">'+safe+'</div>'+
       '<div class="msg-meta">'+
@@ -1415,7 +1415,7 @@ askAI=function(question,skipUserBubble){
         '<div class="ai-bubble bot" id="streamBubble" style="min-height:20px"></div>'+
         '<div class="msg-meta" id="streamMeta" style="display:none">'+
           '<span class="msg-time">'+t+'</span>'+
-          '<button class="msg-action-btn" onclick="copyBubble(this)">Copy</button>'+
+          '<button class="msg-action-btn" onclick="copyBubble(this)">'+_t('copy_btn')+'</button>'+
         '</div>'+
       '</div>';
     aiMsgs.appendChild(ansWrap);
@@ -1484,7 +1484,7 @@ function chipPrompt(type, level) {
   var base = hasDoc
     ? 'Using ONLY the content of the document "'+activeFileName+'" provided in the system prompt, '
     : 'As a knowledgeable tutor, ';
-  if(!hasDoc) addBotMsg('💡 Tip: open a PDF first so I can answer from the actual document!');
+  if(!hasDoc) addBotMsg(_t('ai_tip_no_pdf'));
 
   var prompts = {
     summarise: {
@@ -1593,7 +1593,7 @@ function loadChatForFile(fileKey) {
         var safe = (m.text||'').replace(/</g,'&lt;').replace(/>/g,'&gt;');
         wrap.setAttribute('data-q', m.text || '');
         wrap.innerHTML =
-          '<div class="msg-sender user-sender"><span class="msg-sender-dot"></span>You</div>'+
+          '<div class="msg-sender user-sender"><span class="msg-sender-dot"></span>'+_t('you_label')+'</div>'+
           '<div class="msg-body">'+
             '<div class="ai-bubble user">'+safe+'</div>'+
             '<div class="msg-meta">'+
@@ -1613,7 +1613,7 @@ function loadChatForFile(fileKey) {
             '<div class="ai-bubble bot">'+(m.html||'')+'</div>'+
             '<div class="msg-meta">'+
               '<span class="msg-time">'+t+'</span>'+
-              '<button class="msg-action-btn" onclick="copyBubble(this)">Copy</button>'+
+              '<button class="msg-action-btn" onclick="copyBubble(this)">'+_t('copy_btn')+'</button>'+
             '</div>'+
           '</div>';
         aiMsgs.appendChild(wrap);
@@ -1653,13 +1653,13 @@ openFile = function(f, c) {
   aiMsgs.innerHTML = '';
   var hadHistory = loadChatForFile(newKey);
   if (!hadHistory) {
-    addBotMsg('📄 <strong>' + f.name + '</strong> loaded! Ask me anything about it — I\'ll answer based on the document content. 🎓');
+    addBotMsg('📄 <strong>' + f.name + '</strong> ' + _t('ai_file_loaded_post'));
   } else {
     // Subtle "restored" separator
     var note = document.createElement('div');
     note.className = 'chat-restore-note';
     note.style.cssText = 'text-align:center;font-size:.67rem;color:rgba(155,93,229,.45);padding:6px 0 2px;font-style:italic;letter-spacing:.02em';
-    note.textContent = '— chat history restored —';
+    note.textContent = _t('chat_restored');
     aiMsgs.appendChild(note);
     aiMsgs.scrollTop = aiMsgs.scrollHeight;
   }
@@ -1694,7 +1694,7 @@ stopGeneration = function() {
 (document.getElementById('aiClearBtn')||{addEventListener:function(){}}).addEventListener('click', function() {
   aiMsgs.innerHTML = '';
   if (_prevChatKey) deleteChatForFile(_prevChatKey);
-  addBotMsg('Chat cleared! What would you like to know? 😊');
+  addBotMsg(_t('ai_chat_cleared_msg'));
   aiPinned = false;
   forceCloseAI(); setTimeout(openAI, 100);
 });
@@ -1773,17 +1773,17 @@ var lnSyncing = false;
 (document.getElementById('lnSyncBtn')||{addEventListener:function(){}}).addEventListener('click', function() {
   if (lnSyncing) return;
   lnSyncing = true;
-  document.getElementById('lnSyncLabel').textContent = 'Syncing…';
+  document.getElementById('lnSyncLabel').textContent = _t('sync_syncing');
   document.getElementById('lnSyncDot').style.background = '#f472b6';
   window.postMessage({ type: 'SS_REQUEST_SUMMARIES' }, '*');
   // Timeout fallback
   setTimeout(function() {
     if (lnSyncing) {
       lnSyncing = false;
-      document.getElementById('lnSyncLabel').textContent = 'Extension not detected';
+      document.getElementById('lnSyncLabel').textContent = _t('sync_no_ext');
       document.getElementById('lnSyncDot').style.background = '#ff6b35';
       setTimeout(function() {
-        document.getElementById('lnSyncLabel').textContent = 'Sync from Extension';
+        document.getElementById('lnSyncLabel').textContent = _t('ln_sync_btn');
         document.getElementById('lnSyncDot').style.background = '#c084fc';
       }, 2500);
     }
@@ -1845,25 +1845,25 @@ async function lnDeleteNoteFromSupabase(id) {
 var lnPrevCount = 0;
 window.addEventListener('message', function(e) {
   if (!e.data || e.data.type !== 'SS_SUMMARIES_DATA') return;
+  var isManualSync = lnSyncing;
   lnSyncing = false;
   var summaries = e.data.summaries || [];
-  var isManualSync = document.getElementById('lnSyncLabel').textContent === 'Syncing…';
 
-  document.getElementById('lnSyncLabel').textContent = 'Synced ✓';
+  document.getElementById('lnSyncLabel').textContent = _t('sync_synced');
   document.getElementById('lnSyncDot').style.background = '#06D6A0';
   setTimeout(function() {
-    document.getElementById('lnSyncLabel').textContent = 'Sync from Extension';
+    document.getElementById('lnSyncLabel').textContent = _t('ln_sync_btn');
     document.getElementById('lnSyncDot').style.background = '#c084fc';
   }, 2000);
 
   // Show toast only when a genuinely new summary arrives (not on first load)
   if (lnPrevCount > 0 && summaries.length > lnPrevCount) {
     var newest = summaries[0];
-    showToast('📝 New summary: ' + newest.title.slice(0, 40) + (newest.title.length > 40 ? '…' : ''), 'Tap View to open your lecture notes');
+    showToast(_t('toast_new_summary_pre') + newest.title.slice(0, 40) + (newest.title.length > 40 ? '…' : ''), _t('toast_tap_view'));
   } else if (isManualSync && summaries.length > 0) {
-    showToast('✅ ' + summaries.length + ' note' + (summaries.length !== 1 ? 's' : '') + ' synced', summaries[0].title.slice(0, 50));
+    showToast('✅ ' + summaries.length + ' ' + (summaries.length !== 1 ? _t('toast_synced_p') : _t('toast_synced_s')), summaries[0].title.slice(0, 50));
   } else if (isManualSync && summaries.length === 0) {
-    showToast('⚠️ No notes found', 'Summarize a lecture in the extension first');
+    showToast(_t('toast_no_notes'), _t('toast_summarize_first'));
   }
 
   // Assign stable IDs to extension notes and save any new ones to Supabase
@@ -2357,10 +2357,10 @@ document.getElementById('authConfirm').addEventListener('input', function(){
 });
 
 authSubmit.addEventListener('click', async function(){
-  if (!_sb) { showAuthError('Connection error — please refresh the page'); return; }
+  if (!_sb) { showAuthError(_t('err_connection')); return; }
   var email = authEmail.value.trim();
   var password = authPassword.value;
-  if (!email || !password) { showAuthError('Please fill in all fields'); return; }
+  if (!email || !password) { showAuthError(_t('err_fill_fields')); return; }
 
   authSubmit.textContent = '⏳ Please wait…';
   authSubmit.disabled = true;
@@ -2370,9 +2370,9 @@ authSubmit.addEventListener('click', async function(){
     // ── SIGN UP MODE ──────────────────────────────────────────────────────
     if (_authMode === 'signup') {
       var confirmVal = document.getElementById('authConfirm').value;
-      if (!confirmVal) { showAuthError('Please confirm your password'); authSubmit.textContent='Create Account'; authSubmit.disabled=false; return; }
-      if (password !== confirmVal) { showAuthError('Passwords do not match'); authSubmit.textContent='Create Account'; authSubmit.disabled=false; return; }
-      if (password.length < 8) { showAuthError('Password must be at least 8 characters'); authSubmit.textContent='Create Account'; authSubmit.disabled=false; return; }
+      if (!confirmVal) { showAuthError(_t('err_confirm_pw')); authSubmit.textContent=_t('auth_submit_signup'); authSubmit.disabled=false; return; }
+      if (password !== confirmVal) { showAuthError(_t('err_pw_mismatch')); authSubmit.textContent=_t('auth_submit_signup'); authSubmit.disabled=false; return; }
+      if (password.length < 8) { showAuthError(_t('err_pw_length')); authSubmit.textContent=_t('auth_submit_signup'); authSubmit.disabled=false; return; }
 
       var result = await _sb.auth.signUp(email, password, 'https://studysphere-website.netlify.app/');
       
@@ -2394,7 +2394,7 @@ authSubmit.addEventListener('click', async function(){
 
       // User created but needs email confirmation
       if (result.id || (result.user && result.user.id)) {
-        showAuthError('✅ Account created! Check your email and click the confirmation link to get started.');
+        showAuthError(_t('err_account_created'));
         authSubmit.textContent = 'Create Account';
         authSubmit.disabled = false;
         return;
@@ -2412,7 +2412,7 @@ authSubmit.addEventListener('click', async function(){
 
       // Email not confirmed yet
       if (msg.includes('not confirmed') || msg.includes('email not confirmed')) {
-        showAuthError('⚠️ Please confirm your email first — check your inbox for the link.');
+        showAuthError(_t('err_confirm_email'));
         authSubmit.textContent = 'Sign In';
         authSubmit.disabled = false;
         return;
@@ -2421,7 +2421,7 @@ authSubmit.addEventListener('click', async function(){
       // Wrong password, or account was created via Google (no password set).
       // Both produce identical errors so keep the user in sign-in mode and
       // surface both possibilities with a clear hint toward the Google button.
-      showAuthError('⚠️ Incorrect password — or did you sign up with Google? Try the Google button below, or use the link to create a new account.');
+      showAuthError(_t('err_wrong_pw'));
       authSubmit.textContent = 'Sign In';
       authSubmit.disabled = false;
       return;
@@ -2431,7 +2431,7 @@ authSubmit.addEventListener('click', async function(){
   } catch(e) {
     var msg = e.message || String(e);
     if (msg.includes('fetch')) {
-      showAuthError('Network error — check your connection.');
+      showAuthError(_t('err_network'));
     } else {
       showAuthError(msg);
     }
@@ -2579,7 +2579,49 @@ var _translations = {
     chip_keyideas: '💡 Key ideas', chip_analogy: '🔗 Analogy',
     depth_label: 'Depth:', chip_brief: 'Brief', chip_standard: 'Standard', chip_thorough: 'In-depth',
     level_label: 'Level:', chip_easy: 'Easy', chip_medium: 'Medium', chip_hard: 'Hard',
-    stop_btn: '⏹ Stop generating', ai_placeholder: 'Ask anything about this document…'
+    stop_btn: '⏹ Stop generating', ai_placeholder: 'Ask anything about this document…',
+    ai_welcome: "Hey! 👋 Open a PDF, select any text or formula and I'll help you understand it!",
+    ai_tip_no_pdf: '💡 Tip: open a PDF first so I can answer from the actual document!',
+    ai_file_loaded_post: 'loaded! Ask me anything about it — I\'ll answer based on the document content. 🎓',
+    ai_chat_cleared_msg: 'Chat cleared! What would you like to know? 😊',
+    chat_restored: '— chat history restored —',
+    no_file_open: 'No file open',
+    loading_pdf: 'Loading PDF…',
+    not_in_demo: 'This file is not available in the demo.',
+    not_in_demo_multi: 'not available in demo',
+    download_failed: 'Download failed.',
+    copy_btn: 'Copy',
+    you_label: 'You',
+    nothing_yet: 'Nothing here yet',
+    studip_subtitle: 'TU Braunschweig · Your courses & materials',
+    studip_back: '← Portal',
+    sd_subjects: '📚 Subjects', sd_timetable: '🗓️ Timetable', sd_mails: '✉️ Mails',
+    sel_explain: 'Explain this', sel_formula: 'Break down formula', sel_dismiss: 'Dismiss',
+    sel_preview: '📌 You selected:',
+    sync_syncing: 'Syncing…', sync_synced: 'Synced ✓', sync_no_ext: 'Extension not detected',
+    toast_saved: '💾 Saved to Lecture Notes',
+    toast_new_summary_pre: '📝 New summary: ',
+    toast_tap_view: 'Tap View to open your lecture notes',
+    toast_synced_s: 'note synced', toast_synced_p: 'notes synced',
+    toast_no_notes: '⚠️ No notes found',
+    toast_summarize_first: 'Summarize a lecture in the extension first',
+    toast_sign_in: '⚠️ Sign in to save',
+    toast_profile_saved: '✅ Profile saved', toast_profile_saved_sub: 'Saved to your account',
+    toast_save_failed: '❌ Save failed',
+    toast_chat_cleared: '🗑️ Chat history cleared', toast_chat_cleared_sub: 'All saved chats have been removed',
+    toast_settings_saved: '✅ Settings saved', toast_settings_saved_sub: 'Your preferences have been updated',
+    toast_signed_out: '👋 Signed out', toast_signed_out_sub: 'See you next time!',
+    toast_coming_soon: '🚀 Coming soon', toast_coming_soon_sub: 'Payment integration coming soon!',
+    toast_inactivity: '⏰ Signed out due to inactivity', toast_inactivity_sub: 'Sign in again to continue',
+    err_connection: 'Connection error — please refresh the page',
+    err_fill_fields: 'Please fill in all fields',
+    err_confirm_pw: 'Please confirm your password',
+    err_pw_mismatch: 'Passwords do not match',
+    err_pw_length: 'Password must be at least 8 characters',
+    err_account_created: '✅ Account created! Check your email and click the confirmation link to get started.',
+    err_confirm_email: '⚠️ Please confirm your email first — check your inbox for the link.',
+    err_wrong_pw: '⚠️ Incorrect password — or did you sign up with Google? Try the Google button below, or use the link to create a new account.',
+    err_network: 'Network error — check your connection.'
   },
   de: {
     nav_home: 'Startseite', nav_profile: 'Profil', nav_settings: 'Einstellungen', nav_subscription: 'Abonnement',
@@ -2621,13 +2663,59 @@ var _translations = {
     chip_keyideas: '💡 Kernideen', chip_analogy: '🔗 Analogie',
     depth_label: 'Tiefe:', chip_brief: 'Kurz', chip_standard: 'Standard', chip_thorough: 'Ausführlich',
     level_label: 'Niveau:', chip_easy: 'Einfach', chip_medium: 'Mittel', chip_hard: 'Schwer',
-    stop_btn: '⏹ Stopp', ai_placeholder: 'Stelle eine Frage zu diesem Dokument…'
+    stop_btn: '⏹ Stopp', ai_placeholder: 'Stelle eine Frage zu diesem Dokument…',
+    ai_welcome: 'Hey! 👋 Öffne ein PDF, markiere Text oder eine Formel und ich helfe dir!',
+    ai_tip_no_pdf: '💡 Tipp: Öffne zuerst ein PDF, damit ich aus dem Dokument antworten kann!',
+    ai_file_loaded_post: 'geladen! Stelle mir beliebige Fragen — ich antworte anhand des Dokuments. 🎓',
+    ai_chat_cleared_msg: 'Chat gelöscht! Was möchtest du wissen? 😊',
+    chat_restored: '— Chatverlauf wiederhergestellt —',
+    no_file_open: 'Keine Datei geöffnet',
+    loading_pdf: 'PDF wird geladen…',
+    not_in_demo: 'Diese Datei ist in der Demo nicht verfügbar.',
+    not_in_demo_multi: 'in der Demo nicht verfügbar',
+    download_failed: 'Download fehlgeschlagen.',
+    copy_btn: 'Kopieren',
+    you_label: 'Du',
+    nothing_yet: 'Noch nichts hier',
+    studip_subtitle: 'TU Braunschweig · Deine Kurse & Materialien',
+    studip_back: '← Portal',
+    sd_subjects: '📚 Fächer', sd_timetable: '🗓️ Stundenplan', sd_mails: '✉️ E-Mails',
+    sel_explain: 'Erklären', sel_formula: 'Formel aufschlüsseln', sel_dismiss: 'Schließen',
+    sel_preview: '📌 Du hast ausgewählt:',
+    sync_syncing: 'Synchronisiere…', sync_synced: 'Synchronisiert ✓', sync_no_ext: 'Erweiterung nicht gefunden',
+    toast_saved: '💾 In Vorlesungsnotizen gespeichert',
+    toast_new_summary_pre: '📝 Neue Zusammenfassung: ',
+    toast_tap_view: 'Tippe auf Ansehen um deine Notizen zu öffnen',
+    toast_synced_s: 'Notiz synchronisiert', toast_synced_p: 'Notizen synchronisiert',
+    toast_no_notes: '⚠️ Keine Notizen gefunden',
+    toast_summarize_first: 'Fasse zuerst eine Vorlesung in der Erweiterung zusammen',
+    toast_sign_in: '⚠️ Anmelden zum Speichern',
+    toast_profile_saved: '✅ Profil gespeichert', toast_profile_saved_sub: 'In deinem Konto gespeichert',
+    toast_save_failed: '❌ Speichern fehlgeschlagen',
+    toast_chat_cleared: '🗑️ Chatverlauf gelöscht', toast_chat_cleared_sub: 'Alle gespeicherten Chats wurden entfernt',
+    toast_settings_saved: '✅ Einstellungen gespeichert', toast_settings_saved_sub: 'Deine Einstellungen wurden aktualisiert',
+    toast_signed_out: '👋 Abgemeldet', toast_signed_out_sub: 'Bis zum nächsten Mal!',
+    toast_coming_soon: '🚀 Demnächst', toast_coming_soon_sub: 'Zahlungsintegration kommt bald!',
+    toast_inactivity: '⏰ Wegen Inaktivität abgemeldet', toast_inactivity_sub: 'Melde dich erneut an um fortzufahren',
+    err_connection: 'Verbindungsfehler — bitte Seite neu laden',
+    err_fill_fields: 'Bitte alle Felder ausfüllen',
+    err_confirm_pw: 'Bitte Passwort bestätigen',
+    err_pw_mismatch: 'Passwörter stimmen nicht überein',
+    err_pw_length: 'Passwort muss mindestens 8 Zeichen haben',
+    err_account_created: '✅ Konto erstellt! Prüfe deine E-Mail und klicke den Bestätigungslink.',
+    err_confirm_email: '⚠️ Bitte bestätige zuerst deine E-Mail — schau in deinen Posteingang.',
+    err_wrong_pw: '⚠️ Falsches Passwort — oder hast du dich mit Google angemeldet? Versuche den Google-Button unten oder erstelle ein neues Konto.',
+    err_network: 'Netzwerkfehler — überprüfe deine Verbindung.'
   }
 };
+
+// Global translation helper — usable from any file after app.js loads
+window._t = function(key) { return (_translations[_lang] || _translations.en)[key] || key; };
 
 function applyLanguage(lang) {
   _lang = (lang === 'de') ? 'de' : 'en';
   localStorage.setItem('ss_lang', _lang);
+  window._t = function(key) { return (_translations[_lang] || _translations.en)[key] || key; };
   var t = _translations[_lang];
   document.querySelectorAll('[data-i18n]').forEach(function(el) {
     var key = el.getAttribute('data-i18n');
@@ -2647,6 +2735,32 @@ function applyLanguage(lang) {
   // Translate save settings button
   var ssb = document.getElementById('saveSettingsBtn');
   if (ssb) ssb.textContent = t.settings_save_btn || ssb.textContent;
+  // Translate AI chip "no file" label
+  var chipName = document.getElementById('aiFileChipName');
+  if (chipName && chipName.textContent === (_translations.en.no_file_open) || (chipName && chipName.textContent === (_translations.de.no_file_open))) {
+    chipName.textContent = t.no_file_open;
+  }
+  // Translate AI file label if no file is open
+  var aiFileLabel = document.getElementById('aiFileLabel');
+  if (aiFileLabel && (aiFileLabel.textContent === _translations.en.ai_ready || aiFileLabel.textContent === _translations.de.ai_ready)) {
+    aiFileLabel.textContent = t.ai_ready;
+  }
+  // Translate Stud.IP overlay elements
+  var studipSub = document.getElementById('studipSubtitle');
+  if (studipSub) studipSub.textContent = t.studip_subtitle;
+  var studipBackBtn = document.getElementById('studipBack');
+  if (studipBackBtn) studipBackBtn.textContent = t.studip_back;
+  var sdSubj = document.getElementById('sdSubjectsLabel');
+  if (sdSubj) sdSubj.textContent = t.sd_subjects;
+  var sdTT = document.getElementById('sdTimetableLabel');
+  if (sdTT) sdTT.textContent = t.sd_timetable;
+  var sdMail = document.getElementById('sdMailsLabel');
+  if (sdMail) sdMail.textContent = t.sd_mails;
+  // Sync landing page language state
+  if (typeof window._toggleLandingLang !== 'undefined') {
+    var landingBtn = document.getElementById('landingLangBtn');
+    if (landingBtn) landingBtn.textContent = _lang === 'de' ? 'EN' : 'DE';
+  }
 }
 
 function applySettings(s) {
@@ -2675,7 +2789,7 @@ function applySubscription(sub) {
 
 // ── SAVE HELPERS ─────────────────────────────────────────────────────────
 async function saveProfile() {
-  if (!_currentUser) { showToast('⚠️ Sign in to save', ''); return; }
+  if (!_currentUser) { showToast(_t('toast_sign_in'), ''); return; }
   var data = {
     id: _currentUser.id,
     full_name: (document.getElementById('profileName') || {}).value || '',
@@ -2687,14 +2801,14 @@ async function saveProfile() {
   };
   try {
     await _sb.from('profiles').upsert(data);
-    showToast('✅ Profile saved', 'Saved to your account');
+    showToast(_t('toast_profile_saved'), _t('toast_profile_saved_sub'));
     // Update local cache so data persists across page loads
     try { localStorage.setItem('profile_cache_' + _currentUser.id, JSON.stringify(data)); } catch(e) {}
     var init = document.getElementById('profileInitial');
     if (init && data.full_name) init.textContent = data.full_name.charAt(0).toUpperCase();
     updateAuthIndicator(_currentUser);
   } catch(e) {
-    showToast('❌ Save failed', String(e));
+    showToast(_t('toast_save_failed'), String(e));
   }
 }
 
@@ -2768,7 +2882,7 @@ if (dangerBtn) {
       .forEach(function(k){ localStorage.removeItem(k); });
     if (typeof aiMsgs !== 'undefined') aiMsgs.innerHTML = '';
     if (_prevChatKey) _prevChatKey = null;
-    showToast('🗑️ Chat history cleared', 'All saved chats have been removed');
+    showToast(_t('toast_chat_cleared'), _t('toast_chat_cleared_sub'));
   });
 }
 
@@ -2784,7 +2898,7 @@ if (saveSettingsBtn) {
         .forEach(function(k){ localStorage.removeItem(k); });
     }
     await saveSettings({ language: lang, auto_open_ai: autoOpen, save_chat_history: saveChat });
-    showToast('✅ Settings saved', 'Your preferences have been updated');
+    showToast(_t('toast_settings_saved'), _t('toast_settings_saved_sub'));
   });
 }
 
@@ -2818,7 +2932,7 @@ if (logoutBtn) {
     // Show login modal
     var authModal = document.getElementById('authModal');
     if (authModal) authModal.style.display = 'flex';
-    showToast('👋 Signed out', 'See you next time!');
+    showToast(_t('toast_signed_out'), _t('toast_signed_out_sub'));
   });
 }
 
@@ -2832,7 +2946,7 @@ if (profileSaveBtn) {
 var upgradeBtn = document.querySelector('.sub-btn-upgrade');
 if (upgradeBtn) {
   upgradeBtn.addEventListener('click', function(){
-    showToast('🚀 Coming soon', 'Payment integration coming soon!');
+    showToast(_t('toast_coming_soon'), _t('toast_coming_soon_sub'));
   });
 }
 

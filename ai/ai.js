@@ -27,7 +27,7 @@ function _buildSystemPrompt() {
     '- When explaining a concept, write complete sentences that build understanding from first principles.\n' +
     '- Be thorough and precise — explain *why* something works, not just *what* it is.\n' +
     '- For formulas: write out the expression, then define every variable in a sentence each, then explain in plain language what the formula computes and when it applies.\n' +
-    '- Match the language of the document (German or English).\n' +
+    '- Respond ENTIRELY in ' + (typeof _lang !== 'undefined' && _lang === 'de' ? 'German (Deutsch)' : 'English') + '. Do not switch languages mid-response.\n' +
     '- If the document does not cover a topic, say so clearly instead of inventing an answer.\n' +
     '- Use **bold** for key terms, `monospace` for code/variables, and ### headers to separate major sections.\n\n' +
     'CONTENT RULES:\n' +
@@ -340,7 +340,7 @@ async function runMultiSummary(fnames, course) {
           'You are StudySphere, an expert AI tutor for university engineering students. ' +
           'The student has selected multiple related course files and needs a single unified study guide. ' +
           'Synthesise all content into one coherent document written in explanatory prose — not bullet lists. ' +
-          'Use the same language as the documents (German or English).',
+          'Respond ENTIRELY in ' + (typeof _lang !== 'undefined' && _lang === 'de' ? 'German (Deutsch)' : 'English') + '. Do not switch languages.',
         messages: [{ role: 'user', content:
           'These are ' + fnames.length + ' related course files from ' + course.name + ':\n\n' + combined +
           '\n\n---\n' +

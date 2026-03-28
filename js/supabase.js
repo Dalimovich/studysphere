@@ -170,7 +170,7 @@ function _resetActivityTimer() {
   _activityTimer = setTimeout(function(){
     if (_currentUser) {
       // Inactivity timeout — sign out
-      showToast('⏰ Signed out due to inactivity', 'Sign in again to continue');
+      showToast(typeof _t === 'function' ? _t('toast_inactivity') : '⏰ Signed out due to inactivity', typeof _t === 'function' ? _t('toast_inactivity_sub') : 'Sign in again to continue');
       _sb.auth.signOut();
     }
   }, SESSION_TIMEOUT);
