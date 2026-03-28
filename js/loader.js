@@ -246,13 +246,14 @@
   }
 
   function loadAppScript() {
+    var _v = Date.now();
     var script = document.createElement('script');
-    script.src = 'js/app.js';
+    script.src = 'js/app.js?v=' + _v;
     script.onload = function() {
       console.log('✓ app.js loaded');
       // Load ai/ai.js after app.js so it can override AI functions
       var aiScript = document.createElement('script');
-      aiScript.src = 'ai/ai.js';
+      aiScript.src = 'ai/ai.js?v=' + _v;
       aiScript.onload = function() {
         console.log('✓ ai/ai.js loaded');
         window.dispatchEvent(new Event('ss-ready'));
