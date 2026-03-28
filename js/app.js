@@ -370,6 +370,22 @@ function openCourse(course){
   closeSB();renderCourses();
 }
 
+// Decodes a base64 string to Uint8Array in chunks via setTimeout so the
+// main thread is never blocked — works even where fetch(data:) is synchronous.
+function _b64ToBytes(b64, cb) {
+  var binary = atob(b64);
+  var len = binary.length;
+  var bytes = new Uint8Array(len);
+  var CHUNK = 65536; // 64 KB per tick
+  var i = 0;
+  function next() {
+    var end = Math.min(i + CHUNK, len);
+    while (i < end) { bytes[i] = binary.charCodeAt(i); i++; }
+    if (i < len) { setTimeout(next, 0); } else { cb(bytes); }
+  }
+  setTimeout(next, 0); // always defer first chunk so loading UI renders first
+}
+
 function openFile(f,course){
   activeFileName=f.name;currentCourseShort=course.short;
   _panelHide(document.getElementById('welcomeState'));
@@ -386,12 +402,10 @@ function openFile(f,course){
     return;
   }
   document.getElementById('pdfBody').innerHTML='<div class="pdf-loading"><div class="loading-dots"><span></span><span></span><span></span></div><p>Loading PDF…</p></div>';
-  // Decode base64 via fetch so the main thread is never blocked (fixes freeze on large PDFs)
-  fetch('data:application/pdf;base64,'+b64)
-    .then(function(r){return r.arrayBuffer();})
-    .then(function(buf){return pdfjsLib.getDocument({data:new Uint8Array(buf)}).promise;})
-    .then(function(pdf){
-      pdfDoc=pdf;pdfTotal=pdf.numPages;pdfPage=1;pdfShowAll=true;
+  // Decode base64 in 64 KB chunks via setTimeout — main thread yields between chunks
+  _b64ToBytes(b64, function(bytes){
+    pdfjsLib.getDocument({data:bytes}).promise.then(function(pdf){
+      pdfDoc=pdf;pdfTotal=pdf.numPages;pdfPage=1;pdfShowAll=false;
       pdfFullText=''; // reset text
       // Extract text from all pages for AI context
       var textPromises=[];
@@ -406,12 +420,13 @@ function openFile(f,course){
         pdfFullText=pages.join('\n\n'); // full text — cap applied in ai/ai.js
       });
       updatePageInfo();updateZoomPct();
-      document.getElementById('pdfAll').textContent='Single page';
+      document.getElementById('pdfAll').textContent='All pages';
       renderPages();
     })
     .catch(function(e){
       document.getElementById('pdfBody').innerHTML='<div style="color:#fff;padding:40px">Error: '+e.message+'</div>';
     });
+  }); // end _b64ToBytes callback
 }
 
 function showCourseSection(course,section){
@@ -1110,21 +1125,21 @@ async function runMultiSummary(fnames, course) {
     return new Promise(function(resolve) {
       var b64 = PDF_DATA[fname];
       if (!b64) { resolve('[' + fname + ': not available in demo]'); return; }
-      var binary = atob(b64), bytes = new Uint8Array(binary.length);
-      for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      pdfjsLib.getDocument({ data: bytes }).promise.then(function(pdf) {
-        var pagePromises = [];
-        for (var p = 1; p <= Math.min(pdf.numPages, 20); p++) {
-          pagePromises.push(pdf.getPage(p).then(function(page){
-            return page.getTextContent().then(function(tc){
-              return tc.items.map(function(it){ return it.str; }).join(' ');
-            });
-          }));
-        }
-        Promise.all(pagePromises).then(function(pages){
-          resolve('=== ' + fname + ' ===\n' + pages.join('\n'));
-        });
-      }).catch(function(){ resolve('[' + fname + ': error reading]'); });
+      _b64ToBytes(b64, function(bytes) {
+        pdfjsLib.getDocument({ data: bytes }).promise.then(function(pdf) {
+          var pagePromises = [];
+          for (var p = 1; p <= Math.min(pdf.numPages, 20); p++) {
+            pagePromises.push(pdf.getPage(p).then(function(page){
+              return page.getTextContent().then(function(tc){
+                return tc.items.map(function(it){ return it.str; }).join(' ');
+              });
+            }));
+          }
+          Promise.all(pagePromises).then(function(pages){
+            resolve('=== ' + fname + ' ===\n' + pages.join('\n'));
+          });
+        }).catch(function(){ resolve('[' + fname + ': error reading]'); });
+      });
     });
   });
 

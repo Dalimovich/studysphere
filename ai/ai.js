@@ -306,21 +306,21 @@ async function runMultiSummary(fnames, course) {
     return new Promise(function(resolve) {
       var b64 = PDF_DATA[fname];
       if (!b64) { resolve('[' + fname + ': not available]'); return; }
-      var binary = atob(b64), bytes = new Uint8Array(binary.length);
-      for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      pdfjsLib.getDocument({ data: bytes }).promise.then(function(pdf) {
-        var pagePromises = [];
-        for (var p = 1; p <= pdf.numPages; p++) {
-          pagePromises.push(pdf.getPage(p).then(function(page) {
-            return page.getTextContent().then(function(tc) {
-              return tc.items.map(function(it) { return it.str; }).join(' ');
-            });
-          }));
-        }
-        Promise.all(pagePromises).then(function(pages) {
-          resolve('=== ' + fname + ' ===\n' + pages.join('\n'));
-        });
-      }).catch(function() { resolve('[' + fname + ': error reading]'); });
+      _b64ToBytes(b64, function(bytes) {
+        pdfjsLib.getDocument({ data: bytes }).promise.then(function(pdf) {
+          var pagePromises = [];
+          for (var p = 1; p <= pdf.numPages; p++) {
+            pagePromises.push(pdf.getPage(p).then(function(page) {
+              return page.getTextContent().then(function(tc) {
+                return tc.items.map(function(it) { return it.str; }).join(' ');
+              });
+            }));
+          }
+          Promise.all(pagePromises).then(function(pages) {
+            resolve('=== ' + fname + ' ===\n' + pages.join('\n'));
+          });
+        }).catch(function() { resolve('[' + fname + ': error reading]'); });
+      });
     });
   });
 
