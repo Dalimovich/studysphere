@@ -383,7 +383,7 @@ function _fetchPdfBytes(path, cb, onError) {
 }
 
 function openFile(f,course){
-  activeFileName=f.name;currentCourseShort=course.short;
+  activeFileName=f.name;currentCourseShort=course.short;activeCourseRef=course;
   _panelHide(document.getElementById('welcomeState'));
   _panelHide(document.getElementById('courseOverview'));
   var pv=document.getElementById('pdfView');
@@ -402,20 +402,23 @@ function openFile(f,course){
     pdfjsLib.getDocument({data:bytes}).promise.then(function(pdf){
       pdfDoc=pdf;pdfTotal=pdf.numPages;pdfPage=1;pdfShowAll=false;
       pdfFullText='';
-      var textPromises=[];
-      for(var pi=1;pi<=pdf.numPages;pi++){
-        textPromises.push(pdf.getPage(pi).then(function(pg){
-          return pg.getTextContent().then(function(tc){
-            return tc.items.map(function(it){return it.str;}).join(' ');
-          });
-        }));
-      }
-      Promise.all(textPromises).then(function(pages){
-        pdfFullText=pages.join('\n\n');
-      });
       updatePageInfo();updateZoomPct();
       document.getElementById('pdfAll').textContent='All pages';
       renderPages();
+      // Defer text extraction until after page 1 renders to avoid overloading the pdf.js worker simultaneously
+      setTimeout(function(){
+        var textPromises=[];
+        for(var pi=1;pi<=pdf.numPages;pi++){
+          textPromises.push(pdf.getPage(pi).then(function(pg){
+            return pg.getTextContent().then(function(tc){
+              return tc.items.map(function(it){return it.str;}).join(' ');
+            });
+          }));
+        }
+        Promise.all(textPromises).then(function(pages){
+          pdfFullText=pages.join('\n\n');
+        });
+      },800);
     })
     .catch(function(e){
       document.getElementById('pdfBody').innerHTML='<div style="color:#fff;padding:40px">Error: '+e.message+'</div>';
