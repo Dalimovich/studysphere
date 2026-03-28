@@ -6,17 +6,6 @@ var PDF_DATA = {
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-// Warm up the pdf.js worker immediately so it is ready before the user opens any file.
-// Without this, the first getDocument() call triggers a ~600 KB CDN download while also
-// trying to parse the PDF — if the download is slow pdf.js falls back to synchronous
-// "fake worker" mode on the main thread, freezing the tab.
-(function(){
-  try {
-    // "%PDF-" minimal header — enough to spin up the worker; the parse will fail silently.
-    var t = pdfjsLib.getDocument({ data: new Uint8Array([37,80,68,70,45]) });
-    t.promise.catch(function(){});
-  } catch(e) {}
-})();
 
 // Suppress harmless PDF.js warnings
 (function(){
