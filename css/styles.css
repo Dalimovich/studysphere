@@ -1213,11 +1213,12 @@ input::-webkit-credentials-auto-fill-button { visibility: hidden; }
 :root{--sb-w:224px;--sb-collapsed:60px;--sb-primary:#2563EB;--sb-secondary:#7C3AED;--sb-accent:#22C55E}
 
 /* Shell */
-#portal{background:var(--dp-bg);min-height:100vh}
+#portal{background:var(--dp-bg);min-height:100vh;overflow:hidden}
 #portal .shell{position:relative;z-index:1;height:100vh;display:flex;align-items:stretch}
 
 /* ── Sidebar ── */
 #portal .sidebar{
+  position:relative;transform:none;
   flex-shrink:0;width:var(--sb-collapsed);
   margin:14px 0 14px 14px;
   display:flex;flex-direction:column;
@@ -1229,6 +1230,13 @@ input::-webkit-credentials-auto-fill-button { visibility: hidden; }
 }
 #portal .sidebar:hover{width:var(--sb-w)}
 body.night #portal .sidebar{box-shadow:0 8px 40px rgba(0,0,0,.45)}
+
+/* Logo */
+.sb-logo{display:flex;align-items:center;padding:16px 0 8px;justify-content:center;gap:0;flex-shrink:0}
+#portal .sidebar:hover .sb-logo{padding:16px 14px 8px;gap:10px;justify-content:flex-start}
+.sb-logo-icon{width:30px;height:30px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.3rem}
+.sb-logo > span:last-child{opacity:0;max-width:0;overflow:hidden;white-space:nowrap;font-family:'Fredoka One',cursive;font-size:.95rem;color:var(--on-glass);font-weight:700;transition:opacity .15s,max-width .3s cubic-bezier(.4,0,.2,1)}
+#portal .sidebar:hover .sb-logo > span:last-child{opacity:1;max-width:200px}
 
 /* User block */
 .sb-user{margin:14px 5px 12px;padding:6px;background:var(--card-inner);border:1px solid var(--card-inner-border);border-radius:16px;display:flex;align-items:center;gap:0;cursor:pointer;transition:all .2s;justify-content:center}
