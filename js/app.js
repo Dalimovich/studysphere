@@ -3018,11 +3018,6 @@ window._glAsk = function(prompt, title) {
   var test  = window._germanTest  || 'German test';
   var level = window._germanLevel || 'my level';
   var skill = _glSkillNames[_glActiveSkill] || _glActiveSkill || '';
-  var docCtx = (pdfFullText && pdfFullText.trim())
-    ? '\n\nUse this document as context:\n"""\n' + pdfFullText.slice(0, 8000) + '\n"""'
-    : '';
-  var fullPrompt = prompt + ' (Context: ' + test + (level ? ', level ' + level : '') + (skill ? ', skill: ' + skill : '') + ')' + docCtx;
-  // If a PDF is already open, keep it visible — just send the prompt
   var pv = document.getElementById('pdfView');
   var pdfAlreadyOpen = pv && pv.style.display !== 'none' && pdfDoc;
   if (!pdfAlreadyOpen) {
@@ -3031,10 +3026,19 @@ window._glAsk = function(prompt, title) {
     var co = document.getElementById('courseOverview');
     if (ws) { ws.style.display = 'flex'; ws.innerHTML = '<div style="text-align:center;padding:40px 20px"><div style="font-size:3rem">🇩🇪</div><div style="font-family:\'Fredoka One\',cursive;font-size:1.3rem;color:#e2d9f3;margin-top:12px">' + (title || 'German Practice') + '</div><div style="font-size:.82rem;color:rgba(255,255,255,.4);margin-top:6px">' + test + (level ? ' · ' + level : '') + '</div></div>'; }
     if (co) co.style.display = 'none';
+    if (pv) pv.style.display = 'none';
   }
-  if (!pdfAlreadyOpen && pv) pv.style.display = 'none';
   openAI(); pinAI();
-  setTimeout(function() { askAI(fullPrompt, false); }, 100);
+  // Wait for PDF text extraction if a PDF is open but text not yet ready
+  function _sendWhenReady(attempts) {
+    if (pdfDoc && !pdfFullText && attempts > 0) {
+      setTimeout(function() { _sendWhenReady(attempts - 1); }, 300);
+      return;
+    }
+    var fullPrompt = prompt + ' (Context: ' + test + (level ? ', level ' + level : '') + (skill ? ', skill: ' + skill : '') + ')';
+    askAI(fullPrompt, false);
+  }
+  setTimeout(function() { _sendWhenReady(10); }, 100);
 };
 
 function _glAppendMsg(text, role) {
