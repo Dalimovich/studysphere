@@ -1,4 +1,23 @@
+[build]
+  publish = "."
+  functions = "netlify/functions"
+
+[functions]
+  timeout = 26
+
+[[redirects]]
+  from = "/api/ai"
+  to = "/.netlify/functions/ai"
+  status = 200
+
 [[headers]]
-  for = "/js/ss-app.js"
+  for = "/*"
   [headers.values]
-    Content-Type = "text/plain; charset=UTF-8"
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+[[headers]]
+  for = "/api/*"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
