@@ -3184,9 +3184,11 @@ function _glOpenFile(uid, fname) {
   var ext = (fname.split('.').pop() || '').toLowerCase();
   if (ext === 'pdf') {
     // Open in the full PDF viewer with AI panel — same as enrolled student course files
-    var fakeFile = { name: fname, _uploaded: true, _course: _glCourse() };
+    var course = _glCourse();
+    activeCourseId = course.id; // needed so saveState() captures the German skill
+    var fakeFile = { name: fname, _uploaded: true, _course: course };
     _showFilesView();
-    openFile(fakeFile, _glCourse());
+    openFile(fakeFile, course);
   } else {
     // Non-PDF: open in new tab
     _ufFetchBytes(uid, _glCourse(), fname).then(function(bytes) {
