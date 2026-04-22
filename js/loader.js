@@ -218,37 +218,9 @@
     'pages/files.html'
   ];
 
-  function loadSequential(index) {
-    if (index >= SECTIONS.length) {
-      loadAppScript();
-      return;
-    }
-    var filename = SECTIONS[index];
-    fetch(filename)
-      .then(function(r) {
-        if (!r.ok) throw new Error('HTTP ' + r.status + ' loading ' + filename);
-        return r.text();
-      })
-      .then(function(html) {
-        var wrapper = document.createElement('div');
-        wrapper.setAttribute('data-section', filename.replace('.html', ''));
-        wrapper.innerHTML = html;
-        while (wrapper.firstChild) {
-          root.appendChild(wrapper.firstChild);
-        }
-        console.log('✓ Section loaded: ' + filename);
-        loadSequential(index + 1);
-      })
-      .catch(function(err) {
-        console.error('✗ Error loading ' + filename + ':', err);
-        loadSequential(index + 1);
-      });
-  }
-
   function loadAppScript() {
     var _v = Date.now();
-    // Use fetch+inline injection to avoid ERR_CONNECTION_RESET on dynamic <script src>
-    fetch('js/ss-app.js')
+    fetch('js/app.js')
       .then(function(r) {
         if (!r.ok) throw new Error('HTTP ' + r.status);
         return r.text();
@@ -257,26 +229,45 @@
         var script = document.createElement('script');
         script.textContent = code;
         document.body.appendChild(script);
-        console.log('✓ app.js loaded');
-        // Load ai/ai.js after app.js so it can override AI functions
+        console.log('app.js loaded');
         var aiScript = document.createElement('script');
         aiScript.src = 'ai/ai.js?v=' + _v;
         aiScript.onload = function() {
-          console.log('✓ ai/ai.js loaded');
+          console.log('ai/ai.js loaded');
           window.dispatchEvent(new Event('ss-ready'));
         };
         aiScript.onerror = function() {
-          console.error('✗ Failed to load ai/ai.js — falling back to default AI');
+          console.error('Failed to load ai/ai.js — falling back');
           window.dispatchEvent(new Event('ss-ready'));
         };
         document.body.appendChild(aiScript);
       })
       .catch(function(err) {
-        console.error('✗ Failed to load app.js:', err);
+        console.error('Failed to load app.js:', err);
         window.dispatchEvent(new Event('ss-ready'));
       });
   }
 
-  loadSequential(0);
+  // Fetch all sections in parallel, inject in order
+  Promise.all(SECTIONS.map(function(filename) {
+    return fetch(filename)
+      .then(function(r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status + ' loading ' + filename);
+        return r.text();
+      })
+      .catch(function(err) {
+        console.error('Error loading ' + filename + ':', err);
+        return '';
+      });
+  })).then(function(htmls) {
+    htmls.forEach(function(html, i) {
+      if (!html) return;
+      var wrapper = document.createElement('div');
+      wrapper.setAttribute('data-section', SECTIONS[i].replace('.html', ''));
+      wrapper.innerHTML = html;
+      while (wrapper.firstChild) root.appendChild(wrapper.firstChild);
+    });
+    loadAppScript();
+  });
 
 })();

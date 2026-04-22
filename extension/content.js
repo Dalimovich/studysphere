@@ -18,6 +18,33 @@
   const isYouTube  = location.hostname.includes('youtube.com');
   const isOpencast = location.hostname.includes('opencast');
   const isZoom     = location.hostname.includes('zoom.us');
+  const isLecturePage = isYouTube || isOpencast || isZoom;
+
+  // ── Website postMessage bridge (runs on all pages, including StudySphere) ─
+  window.addEventListener('message', function(e) {
+    if (!e.data) return;
+    if (e.data.type === 'SS_REQUEST_SUMMARIES') {
+      chrome.storage.local.get('ss_lecture_summaries', function({ ss_lecture_summaries }) {
+        window.postMessage({ type: 'SS_SUMMARIES_DATA', summaries: ss_lecture_summaries || [] }, '*');
+      });
+    }
+    if (e.data.type === 'SS_DELETE_SUMMARY') {
+      chrome.storage.local.set({ ss_lecture_summaries: e.data.summaries || [] });
+    }
+  });
+
+  // Also push summaries whenever a new one is saved (for live updates)
+  chrome.storage.onChanged.addListener(function(changes) {
+    if (changes.ss_lecture_summaries) {
+      window.postMessage({
+        type: 'SS_SUMMARIES_DATA',
+        summaries: changes.ss_lecture_summaries.newValue || []
+      }, '*');
+    }
+  });
+
+  // Only show the capture panel on lecture video pages
+  if (!isLecturePage) return;
 
   // ── Panel ──────────────────────────────────────────────────────────────
   const panel = document.createElement('div');
@@ -444,29 +471,6 @@
     if (msg.action === 'summarize')   { summarize(); reply({ ok: true }); return true; }
     if (msg.action === 'startCapture'){ startCapture(); reply({ ok: true }); return true; }
     if (msg.action === 'stopCapture') { stopCapture(); reply({ ok: true }); return true; }
-  });
-
-  // ── Website postMessage bridge ─────────────────────────────────────────
-  window.addEventListener('message', function(e) {
-    if (!e.data) return;
-    if (e.data.type === 'SS_REQUEST_SUMMARIES') {
-      chrome.storage.local.get('ss_lecture_summaries', function({ ss_lecture_summaries }) {
-        window.postMessage({ type: 'SS_SUMMARIES_DATA', summaries: ss_lecture_summaries || [] }, '*');
-      });
-    }
-    if (e.data.type === 'SS_DELETE_SUMMARY') {
-      chrome.storage.local.set({ ss_lecture_summaries: e.data.summaries || [] });
-    }
-  });
-
-  // Also push summaries whenever a new one is saved (for live updates)
-  chrome.storage.onChanged.addListener(function(changes) {
-    if (changes.ss_lecture_summaries) {
-      window.postMessage({
-        type: 'SS_SUMMARIES_DATA',
-        summaries: changes.ss_lecture_summaries.newValue || []
-      }, '*');
-    }
   });
 
 })();

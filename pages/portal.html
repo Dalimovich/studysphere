@@ -4,21 +4,17 @@
     <div class="blob blob-1"></div><div class="blob blob-2"></div>
     <div class="blob blob-3"></div><div class="blob blob-4"></div>
   </div>
+
   <div class="shell">
 
-    <!-- SIDEBAR -->
-    <div class="sidebar">
-
-      <div class="sb-logo">
-        <span class="sb-logo-icon">&#x1F393;</span>
-        <span>StudySphere</span>
-      </div>
+    <!-- ════ SIDEBAR ════ -->
+    <nav class="sidebar">
 
       <div class="sb-user" id="authIndicator">
         <div class="sb-avatar" id="authAvatar">?</div>
         <div class="sb-user-info">
           <div class="sb-user-name" id="authName">Loading&#x2026;</div>
-          <div class="sb-user-uni">TU Braunschweig</div>
+          <div class="sb-user-uni" id="sbUserSub">TU Braunschweig</div>
         </div>
       </div>
 
@@ -29,33 +25,37 @@
         </div>
         <div class="sb-item psb" id="pcStudip">
           <div class="sb-item-icon">&#x1F4D6;</div>
-          <span>Stud.IP</span>
+          <span>Courses</span>
         </div>
-        <div class="sb-item" id="psbNotes">
+        <!-- German learner nav — hidden for enrolled students -->
+        <div class="sb-item psb" id="psbGerman" style="display:none">
+          <div class="sb-item-icon">&#x1F1E9;&#x1F1EA;</div>
+          <span>Practice</span>
+        </div>
+        <div class="sb-item psb" id="psbNotes">
           <div class="sb-item-icon">&#x1F4DD;</div>
           <span>Lecture Notes</span>
         </div>
+        <div class="sb-item psb" id="psbAIPage">
+          <div class="sb-item-icon">&#x1F916;</div>
+          <span>Chatbot</span>
+        </div>
+        <div class="sb-item psb" id="psbChat">
+          <div class="sb-item-icon">&#x1F4AC;</div>
+          <span>Chat</span>
+        </div>
         <div class="sb-divider"></div>
-        <div class="sb-item" id="pcMail">
-          <div class="sb-item-icon">&#x1F4E7;</div>
-          <span>TUMail</span>
-          <span class="sb-item-badge">3</span>
+        <div class="sb-item psb" id="psbNotifications">
+          <div class="sb-item-icon">&#x1F514;</div>
+          <span>Notifications</span>
         </div>
-        <div class="sb-item" data-coming-soon="true">
-          <div class="sb-item-icon">&#x1F393;</div>
-          <span>TUConnect</span>
+        <div class="sb-item psb" id="psbGames">
+          <div class="sb-item-icon">&#x1F3AE;</div>
+          <span>Games</span>
         </div>
-        <div class="sb-item" data-coming-soon="true">
-          <div class="sb-item-icon">&#x1F5D3;&#xFE0F;</div>
-          <span>Timetable</span>
-        </div>
-        <div class="sb-item" data-coming-soon="true">
-          <div class="sb-item-icon">&#x1F4DC;</div>
-          <span>Certificates</span>
-        </div>
-        <div class="sb-item" id="pcWeb">
-          <div class="sb-item-icon">&#x1F310;</div>
-          <span>TU Website</span>
+        <div class="sb-item psb" id="psbLounge">
+          <div class="sb-item-icon">&#x1F4CA;</div>
+          <span>Study Lounge</span>
         </div>
         <div class="sb-divider"></div>
         <div class="sb-item psb" id="psbProfile">
@@ -74,20 +74,140 @@
 
       <div class="sb-bottom">
         <button class="sb-night-btn" id="nightBtn">
-          <span class="sb-night-btn-icon" id="nightIcon">&#x2600;&#xFE0F;</span>
-          <span id="nightLabel">Light mode</span>
+          <span class="sb-night-track" id="nightTrack">
+            <span class="sb-night-track-label" id="nightLabel">Night</span>
+            <span class="sb-night-thumb" id="nightThumb">
+              <span id="nightIcon">&#x1F319;</span>
+            </span>
+          </span>
         </button>
       </div>
-    </div><!-- /sidebar -->
+    </nav><!-- /sidebar -->
+    <div class="mob-scrim" id="mobScrim"></div>
 
-    <!-- MAIN -->
+    <!-- ════ MAIN ════ -->
     <div class="main">
 
-      <div class="portal-topbar">
+      <div class="topbar">
+        <button class="ptb-back-btn" id="goPortal" style="display:none">&#x2190; Back</button>
+        <button id="portalHamburger" aria-label="Open menu">&#x2630;</button>
         <span class="tb-title" id="topTitle">Dashboard</span>
+        <span class="tb-crumb" id="breadcrumb" style="display:none"></span>
+        <div class="tb-spacer"></div>
+        <button class="st-trigger-btn" id="studyTechBtn" style="display:none" title="Study Techniques">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <span>Study</span>
+        </button>
+        <!-- Mini timer widget (shown when timer is running) -->
+        <div class="st-mini-timer" id="stMiniTimer" style="display:none">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <span id="stMiniTime">25:00</span>
+          <span class="st-mini-label" id="stMiniLabel">Focus</span>
+          <button class="st-mini-stop" id="stMiniStop" title="Stop">&#x25A0;</button>
+        </div>
       </div>
 
-      <div class="portal-main-scroll">
+      <!-- ══ STUDY TECHNIQUES POPUP ══ -->
+      <div class="st-overlay" id="stOverlay" style="display:none">
+        <div class="st-popup" id="stPopup">
+          <div class="st-popup-head">
+            <span class="st-popup-title">Study Techniques</span>
+            <button class="st-popup-close" id="stClose">&#x2715;</button>
+          </div>
+
+          <!-- Technique picker -->
+          <div class="st-techniques" id="stTechniques">
+            <button class="st-tech-card active" data-tech="pomodoro">
+              <span class="st-tech-icon">&#x1F345;</span>
+              <span class="st-tech-name">Pomodoro</span>
+              <span class="st-tech-desc">25 min focus · 5 min break</span>
+            </button>
+            <button class="st-tech-card" data-tech="5217">
+              <span class="st-tech-icon">&#x26A1;</span>
+              <span class="st-tech-name">52 / 17</span>
+              <span class="st-tech-desc">52 min focus · 17 min break</span>
+            </button>
+            <button class="st-tech-card" data-tech="9020">
+              <span class="st-tech-icon">&#x1F9E0;</span>
+              <span class="st-tech-name">90 / 20</span>
+              <span class="st-tech-desc">90 min focus · 20 min break</span>
+            </button>
+            <button class="st-tech-card" data-tech="custom">
+              <span class="st-tech-icon">&#x2699;&#xFE0F;</span>
+              <span class="st-tech-name">Custom</span>
+              <span class="st-tech-desc">Set your own intervals</span>
+            </button>
+          </div>
+
+          <!-- Settings -->
+          <div class="st-settings">
+            <div class="st-setting-row">
+              <label class="st-setting-label">Focus (min)</label>
+              <div class="st-stepper">
+                <button class="st-step-btn" data-field="focus" data-dir="-1">&#x2212;</button>
+                <span class="st-step-val" id="stFocusVal">25</span>
+                <button class="st-step-btn" data-field="focus" data-dir="1">+</button>
+              </div>
+            </div>
+            <div class="st-setting-row">
+              <label class="st-setting-label">Short break (min)</label>
+              <div class="st-stepper">
+                <button class="st-step-btn" data-field="shortBreak" data-dir="-1">&#x2212;</button>
+                <span class="st-step-val" id="stShortVal">5</span>
+                <button class="st-step-btn" data-field="shortBreak" data-dir="1">+</button>
+              </div>
+            </div>
+            <div class="st-setting-row">
+              <label class="st-setting-label">Long break (min)</label>
+              <div class="st-stepper">
+                <button class="st-step-btn" data-field="longBreak" data-dir="-1">&#x2212;</button>
+                <span class="st-step-val" id="stLongVal">15</span>
+                <button class="st-step-btn" data-field="longBreak" data-dir="1">+</button>
+              </div>
+            </div>
+            <div class="st-setting-row">
+              <label class="st-setting-label">Cycles before long break</label>
+              <div class="st-stepper">
+                <button class="st-step-btn" data-field="cycles" data-dir="-1">&#x2212;</button>
+                <span class="st-step-val" id="stCyclesVal">4</span>
+                <button class="st-step-btn" data-field="cycles" data-dir="1">+</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Music source picker -->
+          <div class="st-music-section">
+            <div class="st-setting-label" style="padding:0 16px 8px;display:block">🎵 Music during focus</div>
+            <div class="st-music-sources" id="stMusicSources">
+              <button class="st-music-src active" data-src="lofi">
+                <span class="st-music-src-icon">📻</span>
+                <span>Lo-fi</span>
+              </button>
+              <button class="st-music-src" data-src="youtube">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="#FF0000"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+                <span>YouTube</span>
+              </button>
+              <button class="st-music-src" data-src="spotify">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="#1DB954"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+                <span>Spotify</span>
+              </button>
+              <button class="st-music-src" data-src="none">
+                <span class="st-music-src-icon">🔇</span>
+                <span>None</span>
+              </button>
+            </div>
+            <div class="st-music-src-hint" id="stMusicHint">Lofi Girl radio — always available</div>
+            <!-- Playlist selector — shown when YouTube is active -->
+            <div class="st-playlist-selector" id="stPlaylistSelector" style="display:none">
+              <select class="st-playlist-select" id="stPlaylistSelect"></select>
+            </div>
+          </div>
+
+          <button class="st-start-btn" id="stStart" style="margin-top:6px">&#x25B6; Start</button>
+        </div>
+      </div>
+
+      <div class="main-scroll">
 
         <!-- DASHBOARD -->
         <div id="psec-dashboard" class="portal-section">
@@ -101,170 +221,1136 @@
 
         <!-- PROFILE -->
         <div id="psec-profile" class="portal-section" style="display:none">
-          <div class="profile-card">
-            <div class="profile-avatar">
-              <div class="profile-avatar-ring">
-                <div class="profile-initials" id="profileInitial">?</div>
-              </div>
+          <div class="dash-greeting"><h1>&#x1F464; Profile</h1><p>Manage your account information</p></div>
+          <div class="profile-hero">
+            <div class="ph-avatar" id="profileInitial">?</div>
+            <div class="ph-info">
+              <h2>Profile</h2>
+              <p>TU Braunschweig</p>
             </div>
-            <div class="profile-info">
-              <div class="profile-field">
-                <label data-i18n="profile_label_name">Full name</label>
-                <input id="profileName" type="text" value="" placeholder="Your name" />
+          </div>
+          <div class="widget-card">
+            <div class="widget-title">Personal details</div>
+            <div class="profile-fields">
+              <div class="pf-group">
+                <label class="pf-label">Full name</label>
+                <input class="pf-input" id="profileName" type="text" placeholder="Your name"/>
               </div>
-              <div class="profile-field">
-                <label data-i18n="profile_label_email">Email</label>
-                <input id="profileEmail" type="text" value="" placeholder="Email" />
+              <div class="pf-group">
+                <label class="pf-label">Email</label>
+                <input class="pf-input" id="profileEmail" type="text" placeholder="Email"/>
               </div>
-              <div class="profile-field">
-                <label data-i18n="profile_label_university">University</label>
-                <input id="profileUniversity" type="text" value="" placeholder="University" />
+              <div class="pf-group pf-enrolled-field">
+                <label class="pf-label">University</label>
+                <input class="pf-input" id="profileUniversity" type="text" placeholder="University"/>
               </div>
-              <div class="profile-field">
-                <label data-i18n="profile_label_programme">Study programme</label>
-                <input id="profileProgramme" type="text" value="" placeholder="Programme" />
+              <div class="pf-group pf-enrolled-field">
+                <label class="pf-label">Programme</label>
+                <input class="pf-input" id="profileProgramme" type="text" placeholder="Programme"/>
               </div>
-              <div class="profile-field">
-                <label data-i18n="profile_label_matrikel">Matrikel number</label>
-                <input id="profileMatrikel" type="text" value="" placeholder="Matrikel no." />
+              <div class="pf-group pf-enrolled-field" style="position:relative">
+                <label class="pf-label">Vertiefung (Fachprofil)</label>
+                <input class="pf-input" id="profileVertiefung" type="text" placeholder="e.g. Mechatronik" autocomplete="off"/>
+                <div id="pfVertDrop" style="display:none;position:absolute;top:calc(100% + 2px);left:0;right:0;border-radius:10px;border:1px solid rgba(192,132,252,.3);background:rgba(17,13,32,.97);max-height:190px;overflow-y:auto;z-index:9600;box-shadow:0 8px 32px rgba(0,0,0,.5)"></div>
               </div>
-              <button class="profile-save-btn" data-i18n="profile_save_btn">&#x1F4BE; Save changes</button>
+              <div class="pf-group pf-enrolled-field">
+                <label class="pf-label">Matrikel No.</label>
+                <input class="pf-input" id="profileMatrikel" type="text" placeholder="Matrikel no."/>
+              </div>
+              <!-- German learner profile fields (hidden for enrolled) -->
+              <div class="pf-group pf-learner-field" style="display:none">
+                <label class="pf-label">German Test</label>
+                <input class="pf-input" id="profileGermanTest" type="text" placeholder="e.g. TestDaF" readonly/>
+              </div>
+              <div class="pf-group pf-learner-field" style="display:none">
+                <label class="pf-label">Target Level</label>
+                <input class="pf-input" id="profileGermanLevel" type="text" placeholder="e.g. TDN 4" readonly/>
+              </div>
+              <div></div>
+              <button class="pf-save profile-save-btn">&#x1F4BE; Save changes</button>
             </div>
           </div>
         </div>
 
         <!-- SETTINGS -->
         <div id="psec-settings" class="portal-section" style="display:none">
-          <div class="settings-card">
-            <div class="settings-section-title" data-i18n="settings_appearance">Appearance</div>
-            <div class="settings-row">
-              <div class="settings-row-label"><span>&#x1F319;</span> <span data-i18n="settings_dark_mode">Dark mode</span></div>
-              <label class="settings-toggle">
-                <input type="checkbox" id="settingsDarkMode" />
-                <span class="settings-toggle-slider"></span>
-              </label>
+          <div class="dash-greeting"><h1>&#x2699;&#xFE0F; Settings</h1><p>Customise your experience</p></div>
+          <div class="settings-block">
+            <div class="settings-block-title">&#x2728; Appearance</div>
+            <div class="settings-row-new">
+              <div class="settings-row-lbl"><div class="settings-row-ico">&#x1F319;</div> Dark mode</div>
+              <label class="toggle"><input type="checkbox" id="settingsDarkMode"/><div class="toggle-track"></div></label>
             </div>
-            <div class="settings-row">
-              <div class="settings-row-label"><span>&#x1F310;</span> <span data-i18n="settings_language">Language</span></div>
-              <select class="settings-select" id="settingsLanguage">
-                <option value="en">English</option><option value="de">Deutsch</option>
+            <div class="settings-row-new">
+              <div class="settings-row-lbl"><div class="settings-row-ico">&#x1F310;</div> Language</div>
+              <select class="settings-select-new" id="settingsLanguage">
+                <option value="en">&#x1F1EC;&#x1F1E7; English</option>
+                <option value="de">&#x1F1E9;&#x1F1EA; Deutsch</option>
               </select>
             </div>
-            <div class="settings-section-title" style="margin-top:24px" data-i18n="settings_ai_section">AI Assistant</div>
-            <div class="settings-row">
-              <div class="settings-row-label"><span>&#x2728;</span> <span data-i18n="settings_auto_open">Auto-open on text select</span></div>
-              <label class="settings-toggle">
-                <input type="checkbox" id="settingsAutoOpen" checked />
-                <span class="settings-toggle-slider"></span>
-              </label>
+          </div>
+          <div class="settings-block">
+            <div class="settings-block-title">&#x1F916; AI Assistant</div>
+            <div class="settings-row-new">
+              <div class="settings-row-lbl"><div class="settings-row-ico">&#x2728;</div> Auto-open on text select</div>
+              <label class="toggle"><input type="checkbox" id="settingsAutoOpen" checked/><div class="toggle-track"></div></label>
             </div>
-            <div class="settings-row">
-              <div class="settings-row-label"><span>&#x1F4AC;</span> <span data-i18n="settings_save_chat">Save chat history per PDF</span></div>
-              <label class="settings-toggle">
-                <input type="checkbox" id="settingsSaveChat" checked />
-                <span class="settings-toggle-slider"></span>
-              </label>
+            <div class="settings-row-new">
+              <div class="settings-row-lbl"><div class="settings-row-ico">&#x1F4AC;</div> Save chat history per PDF</div>
+              <label class="toggle"><input type="checkbox" id="settingsSaveChat" checked/><div class="toggle-track"></div></label>
             </div>
-            <div class="settings-section-title" style="margin-top:24px" data-i18n="settings_notifications">Notifications <span style="font-size:.7rem;color:rgba(255,255,255,.25)">(coming soon)</span></div>
-            <div class="settings-row">
-              <div class="settings-row-label"><span>&#x1F514;</span> <span data-i18n="settings_sync_alerts">Lecture note sync alerts</span></div>
-              <label class="settings-toggle"><input type="checkbox" checked /><span class="settings-toggle-slider"></span></label>
+            <div style="padding-top:14px">
+              <button class="pf-save" id="saveSettingsBtn">Save Changes</button>
             </div>
-            <div class="settings-row">
-              <div class="settings-row-label"><span>&#x1F4E7;</span> <span data-i18n="settings_mail_alerts">New mail alerts</span></div>
-              <label class="settings-toggle"><input type="checkbox" /><span class="settings-toggle-slider"></span></label>
+          </div>
+          <!-- Music Services -->
+          <div class="settings-block" id="musicServicesBlock">
+            <div class="settings-block-title">🎵 Music Services</div>
+            <p style="font-size:.78rem;color:var(--muted);margin-bottom:14px;line-height:1.5">Connect a music service to play your own playlists during study sessions.</p>
+
+            <!-- Spotify -->
+            <div class="music-service-row" id="spotifyRow">
+              <div class="music-service-info">
+                <svg class="music-service-logo" viewBox="0 0 24 24" fill="#1DB954"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+                <div>
+                  <div class="music-service-name">Spotify</div>
+                  <div class="music-service-status" id="spotifyStatus">Not connected</div>
+                </div>
+              </div>
+              <button class="music-connect-btn" id="spotifyConnectBtn">Connect</button>
             </div>
-            <div class="settings-section-title" style="margin-top:24px" data-i18n="settings_data">Data</div>
-            <div class="settings-row">
-              <div class="settings-row-label"><span>&#x1F5D1;&#xFE0F;</span> <span data-i18n="settings_clear_chat">Clear all AI chat history</span></div>
-              <button class="settings-danger-btn" data-i18n="settings_clear_btn">Clear history</button>
+            <div class="music-player-mini" id="spotifyPlayer" style="display:none">
+              <div class="music-now-playing" id="spotifyNowPlaying">
+                <img class="music-thumb" id="spotifyThumb" src="" alt="">
+                <div class="music-track-info">
+                  <div class="music-track-name" id="spotifyTrackName">—</div>
+                  <div class="music-track-artist" id="spotifyArtist">—</div>
+                </div>
+              </div>
+              <div class="music-controls">
+                <button class="music-ctrl-btn" id="spotifyPrev" title="Previous">⏮</button>
+                <button class="music-ctrl-btn music-play-btn" id="spotifyPlayPause" title="Play/Pause">▶</button>
+                <button class="music-ctrl-btn" id="spotifyNext" title="Next">⏭</button>
+              </div>
+              <button class="music-disconnect-btn" id="spotifyDisconnect">Disconnect</button>
             </div>
-            <div class="settings-section-title" style="margin-top:24px" data-i18n="settings_account">Account</div>
-            <div class="settings-row">
-              <div class="settings-row-label"><span>&#x1F6AA;</span> <span data-i18n="settings_signout">Sign out of StudySphere</span></div>
-              <button class="settings-danger-btn" id="logoutBtn" data-i18n="settings_logout_btn" style="background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.3);color:rgba(239,68,68,.85)">Log out</button>
+
+            <div class="music-service-divider"></div>
+
+            <!-- YouTube -->
+            <div class="music-service-row" id="youtubeRow">
+              <div class="music-service-info">
+                <svg class="music-service-logo" viewBox="0 0 24 24" fill="#FF0000"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+                <div>
+                  <div class="music-service-name">YouTube Playlists</div>
+                  <div class="music-service-status" id="youtubeStatus">No playlists saved</div>
+                </div>
+              </div>
             </div>
-            <div style="padding:16px 0 8px">
-              <button id="saveSettingsBtn" class="settings-save-btn" data-i18n="settings_save_btn">Save Changes</button>
+            <!-- Saved playlists list -->
+            <div id="ytPlaylistList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px"></div>
+            <!-- Add playlist form -->
+            <div class="music-yt-add-row">
+              <input class="music-yt-input" id="ytPlaylistName" type="text" placeholder="Name (e.g. Lofi Study)" style="flex:.9">
+              <input class="music-yt-input" id="ytPlaylistUrl" type="text" placeholder="YouTube playlist URL" style="flex:2">
+              <button class="music-connect-btn" id="ytSaveBtn">Add</button>
+            </div>
+
+          </div>
+
+          <div class="settings-block">
+            <div class="settings-block-title">&#x1F5D1;&#xFE0F; Data</div>
+            <div class="settings-row-new">
+              <div class="settings-row-lbl"><div class="settings-row-ico">&#x1F5D1;&#xFE0F;</div> Clear all AI chat history</div>
+              <button class="settings-danger-btn">Clear history</button>
+            </div>
+          </div>
+          <div class="settings-block">
+            <div class="settings-block-title">&#x1F464; Account</div>
+            <div class="settings-row-new">
+              <div class="settings-row-lbl"><div class="settings-row-ico">&#x1F6AA;</div> Sign out of StudySphere</div>
+              <button class="settings-danger-btn" id="logoutBtn" style="background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.3);color:rgba(239,68,68,.85)">Log out</button>
             </div>
           </div>
         </div>
 
         <!-- SUBSCRIPTION -->
         <div id="psec-subscription" class="portal-section" style="display:none">
-          <div class="sub-current">
-            <div class="sub-badge">&#x1F393; Free Plan</div>
-            <div class="sub-desc">You're on the free tier &#x2014; upgrade to unlock the full power of StudySphere AI.</div>
-          </div>
+          <div class="dash-greeting"><h1>&#x2B50; Subscription</h1><p>Choose the plan that fits your studies</p></div>
           <div class="sub-grid">
-            <div class="sub-plan">
-              <div class="sub-plan-name">Free</div>
-              <div class="sub-plan-price">&#x20AC;0<span>/mo</span></div>
-              <ul class="sub-features">
-                <li class="sub-feat">&#x2713; 5 AI questions / day</li>
-                <li class="sub-feat">&#x2713; PDF viewer</li>
-                <li class="sub-feat">&#x2713; Lecture notes sync</li>
-                <li class="sub-feat dim">&#x2717; Unlimited AI chat</li>
-                <li class="sub-feat dim">&#x2717; Multi-file summaries</li>
-                <li class="sub-feat dim">&#x2717; Priority processing</li>
-              </ul>
+            <div class="sub-card">
+              <div class="sub-name">Free</div>
+              <div class="sub-price">&#x20AC;0 <span>/ month</span></div>
+              <div class="sub-features">
+                <div class="sub-feat">10 AI messages / day</div>
+                <div class="sub-feat">PDF reader</div>
+                <div class="sub-feat">3 lecture note summaries</div>
+                <div class="sub-feat off">Unlimited AI messages</div>
+                <div class="sub-feat off">Multi-PDF summaries</div>
+              </div>
               <button class="sub-btn sub-btn-current">Current plan</button>
             </div>
-            <div class="sub-plan sub-plan-pro">
-              <div class="sub-plan-badge">&#x2B50; Popular</div>
-              <div class="sub-plan-name">Pro</div>
-              <div class="sub-plan-price">&#x20AC;4.99<span>/mo</span></div>
-              <ul class="sub-features">
-                <li class="sub-feat">&#x2713; Unlimited AI chat</li>
-                <li class="sub-feat">&#x2713; PDF viewer</li>
-                <li class="sub-feat">&#x2713; Lecture notes sync</li>
-                <li class="sub-feat">&#x2713; Multi-file summaries</li>
-                <li class="sub-feat">&#x2713; Priority processing</li>
-                <li class="sub-feat">&#x2713; Early access features</li>
-              </ul>
-              <button class="sub-btn sub-btn-upgrade">Upgrade to Pro</button>
+            <div class="sub-card featured">
+              <div class="sub-badge">Popular</div>
+              <div class="sub-name">Pro</div>
+              <div class="sub-price">&#x20AC;4.99 <span>/ month</span></div>
+              <div class="sub-features">
+                <div class="sub-feat">Unlimited AI messages</div>
+                <div class="sub-feat">PDF reader</div>
+                <div class="sub-feat">Unlimited lecture notes</div>
+                <div class="sub-feat">Multi-PDF summaries</div>
+                <div class="sub-feat">Priority support</div>
+              </div>
+              <button class="sub-btn sub-btn-upgrade">&#x1F680; Upgrade &#x2014; Coming soon</button>
             </div>
           </div>
         </div>
 
-        <!-- LECTURE NOTES (shown only when dashboard active) -->
-        <div class="ln-section" id="lnSection">
-          <div class="ln-header">
-            <div class="ln-title" data-i18n="ln_title">&#x1F3AC; Lecture Notes</div>
-            <button class="ln-sync-btn" id="lnSyncBtn">
-              <span class="ln-sync-dot" id="lnSyncDot"></span>
-              <span id="lnSyncLabel" data-i18n="ln_sync_btn">Sync from Extension</span>
-            </button>
+        <!-- COURSES -->
+        <div id="psec-studip" class="portal-section" style="display:none">
+          <div style="max-width:820px;margin:0 auto;padding:0 0 80px">
+            <div class="dash-greeting">
+              <h1>&#x1F4DA; My Courses</h1>
+              <p>Add the subjects you&apos;re taking this semester</p>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;flex-wrap:wrap">
+              <div style="position:relative;flex-shrink:0">
+                <button class="sem-btn sd-sem-btn" id="sdSemBtn">
+                  <span class="sem-btn-l"><span class="sem-dot" id="sdSemDot" style="background:#06D6A0"></span><span id="sdSemLabel">WS 2025/26</span></span>
+                  <span class="sem-chev" id="sdSemChev">&#x25BC;</span>
+                </button>
+                <div class="sem-dd sd-sem-dd" id="sdSemDD">
+                  <div class="sem-opt sel" data-sid="ws2526" data-col="#06D6A0">&#x1F7E2; WS 2025/26</div>
+                  <div class="sem-opt" data-sid="ss25" data-col="#9B5DE5">&#x1F4C1; SS 2025</div>
+                  <div class="sem-opt" data-sid="ws2425" data-col="#FF6FB7">&#x1F4C1; WS 2024/25</div>
+                  <div class="sem-opt" data-sid="ss24" data-col="#4CC9F0">&#x1F4C1; SS 2024</div>
+                  <div class="sem-opt" data-sid="ws2324" data-col="#FF6B35">&#x1F4C1; WS 2023/24</div>
+                </div>
+              </div>
+              <div style="flex:1;display:flex;align-items:center;gap:8px;justify-content:center;min-width:200px">
+                <div style="position:relative;flex:1;max-width:380px">
+                  <input id="courseSearchInput" type="text" placeholder="&#x1F50D; Search subjects..." autocomplete="off"
+                    style="width:100%;box-sizing:border-box;padding:10px 14px;border-radius:12px;border:1px solid rgba(37,99,235,.25);background:rgba(37,99,235,.07);color:inherit;font-size:.9rem;outline:none">
+                  <div id="courseSearchDrop" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;border-radius:12px;border:1px solid rgba(37,99,235,.25);max-height:210px;overflow-y:auto;z-index:300;box-shadow:0 8px 32px rgba(0,0,0,.4)"></div>
+                </div>
+                <button id="courseAddBtn" style="padding:10px 18px;border-radius:12px;border:none;background:linear-gradient(135deg,#2563EB,#1D4ED8);color:#fff;font-size:.88rem;font-weight:600;cursor:pointer;white-space:nowrap;box-shadow:0 4px 14px rgba(37,99,235,.35)">+ Add Subject</button>
+              </div>
+            </div>
+            <div id="sdCourseList" class="sd-course-grid"></div>
           </div>
-          <div id="lnContent">
-            <div class="ln-empty">
-              <span class="ln-empty-icon">&#x1F393;</span>
-              No lecture summaries yet.<br>
-              Install the <strong style="color:rgba(192,132,252,.7)">StudySphere Extension</strong>, watch a lecture on YouTube or Opencast,<br>
-              then press <strong style="color:rgba(192,132,252,.7)">&#x2728; Summarize</strong> &#x2014; your notes will appear here automatically.
+        </div>
+
+        <!-- LECTURE NOTES -->
+        <div id="psec-notes" class="portal-section" style="display:none">
+          <div class="dash-greeting"><h1>&#x1F4DD; Lecture Notes</h1><p>Auto-generated summaries from your lectures</p></div>
+          <div class="ln-section" id="lnSection">
+            <div class="ln-header">
+              <div class="ln-title">&#x1F3AC; Your Summaries</div>
+              <button class="ln-sync-btn" id="lnSyncBtn">
+                <span class="ln-sync-dot" id="lnSyncDot"></span>
+                <span id="lnSyncLabel">Sync from Extension</span>
+              </button>
+            </div>
+            <div id="lnContent">
+              <div class="ln-empty">
+                <span class="ln-empty-icon">&#x1F393;</span>
+                No lecture summaries yet.<br>
+                Install the <strong>StudySphere Extension</strong>, watch a lecture on YouTube or Opencast,<br>
+                then press <strong>&#x2728; Summarize</strong> &#x2014; your notes will appear here automatically.
+              </div>
             </div>
           </div>
         </div>
 
-        <!-- EXTENSION DOWNLOAD BANNER -->
-        <div class="ext-banner" id="extBanner">
-          <div class="ext-banner-left">
-            <div class="ext-banner-icon">&#x1F9E9;</div>
-            <div class="ext-banner-text">
-              <h3>StudySphere Extension</h3>
-              <p>Capture &amp; summarize lectures on YouTube, Opencast &amp; Zoom</p>
+
+        <!-- CHAT -->
+        <!-- CHATBOT PAGE -->
+        <div id="psec-aipage" class="portal-section" style="display:none;padding:0;height:100%">
+          <div class="aip-outer" id="aipOuter">
+
+            <!-- ── HISTORY SIDEBAR ── -->
+            <div class="aip-sidebar" id="aipSidebar">
+              <div class="aip-sidebar-top">
+                <button class="aip-new-chat-btn" id="aipNewChatBtn">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  <span data-i18n="aip_new_chat">New chat</span>
+                </button>
+              </div>
+              <div class="aip-sidebar-section-label" data-i18n="aip_chats_label">Chats</div>
+              <div class="aip-history-list" id="aipHistoryList">
+                <div class="aip-history-empty" data-i18n="aip_no_chats">No chats yet</div>
+              </div>
+            </div>
+
+            <!-- ── MAIN AREA ── -->
+            <div class="aip-wrap" id="aipWrap">
+
+              <!-- LANDING VIEW -->
+              <div class="aip-landing" id="aipLanding">
+                <div class="aip-landing-hero">
+                  <div class="aip-greeting" id="aipGreeting">Hi there</div>
+                  <div class="aip-subtitle" data-i18n="aip_subtitle">Where should we start?</div>
+                </div>
+                <div class="aip-center-box">
+                  <textarea class="aip-center-input" id="aipLandingInput" placeholder="Ask me anything…" data-i18n-ph="aip_landing_ph" rows="2" maxlength="4000"></textarea>
+                  <div class="aip-file-preview" id="aipLandingFilePreview"></div>
+                  <div class="aip-center-bottom">
+                    <input type="file" id="aipLandingFileInput" accept="image/*,application/pdf,.doc,.docx,.txt" multiple style="display:none">
+                    <label class="aip-upload-btn" for="aipLandingFileInput">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+                      <span data-i18n="aip_upload_btn">Upload photos &amp; files</span>
+                    </label>
+                    <button class="aip-center-send" id="aipLandingSend">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                    </button>
+                  </div>
+                </div>
+                <div class="aip-chips-row" id="aipSuggestions">
+                  <button class="aip-chip" data-prompt="Explain the difference between integrals and derivatives">📐 Calculus basics</button>
+                  <button class="aip-chip" data-prompt="How do I manage my time better as a university student?">⏰ Time management</button>
+                  <button class="aip-chip" data-prompt="Give me 5 tips for writing a good academic paper">📝 Academic writing</button>
+                  <button class="aip-chip" data-prompt="What is the Pomodoro technique and how do I use it?">🍅 Pomodoro method</button>
+                  <button class="aip-chip" data-prompt="Explain Newton's three laws of motion">⚙️ Newton's laws</button>
+                </div>
+              </div>
+
+              <!-- CHAT VIEW -->
+              <div class="aip-chat-view" id="aipChatView" style="display:none">
+                <div class="aip-chat-topbar">
+                  <button class="aip-sb-toggle" id="aipSbToggle" title="Toggle history">&#x2630;</button>
+                  <span class="aip-chat-topbar-title" id="aipChatTitle">Chat</span>
+                  <button class="aip-clear-btn" id="aipClearBtn">&#x2715; <span data-i18n="aip_new_chat">New chat</span></button>
+                </div>
+                <div class="aip-msgs" id="aipMsgs"></div>
+                <div class="aip-input-bar">
+                  <div class="aip-input-inner">
+                    <div class="aip-file-preview" id="aipChatFilePreview"></div>
+                    <textarea class="aip-input" id="aipInput" placeholder="Ask a follow-up…" data-i18n-ph="aip_followup_ph" rows="1" maxlength="4000"></textarea>
+                    <div class="aip-input-actions">
+                      <input type="file" id="aipChatFileInput" accept="image/*,application/pdf,.doc,.docx,.txt" multiple style="display:none">
+                      <label class="aip-upload-btn" for="aipChatFileInput">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+                        <span data-i18n="aip_upload_btn">Upload photos &amp; files</span>
+                      </label>
+                      <button class="aip-send-btn" id="aipSend">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div><!-- /aip-wrap -->
+          </div><!-- /aip-outer -->
+        </div>
+
+        <div id="psec-chat" class="portal-section" style="display:none">
+          <div class="chat-wrap">
+            <!-- Room list -->
+            <div class="chat-rooms-panel">
+              <div class="chat-rooms-hdr">
+                <span>&#x1F4AC; Rooms</span>
+                <button class="chat-add-friend-btn" id="chatAddFriendBtn" title="Add Friend">&#x1F464;+</button>
+              </div>
+              <div class="chat-rooms-list" id="chatRoomsList"></div>
+            </div>
+            <!-- Main chat area -->
+            <div class="chat-main">
+              <div class="chat-main-hdr">
+                <span class="chat-room-title" id="chatRoomName">Select a room</span>
+              </div>
+              <div class="chat-msgs" id="chatMsgs">
+                <div class="chat-empty">Select a room to start chatting &#x1F4AC;</div>
+              </div>
+              <div class="chat-input-row">
+                <input class="chat-input" id="chatInput" type="text" placeholder="Select a room first..." maxlength="500" autocomplete="off" disabled />
+                <button class="chat-send-btn" id="chatSendBtn" disabled>&#x2191;</button>
+              </div>
             </div>
           </div>
-          <a class="ext-download-btn" href="data:application/zip;base64,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" download="StudySphere-Extension.zip">⬇ Download Extension</a>
-          <div class="ext-steps">
-            <div class="ext-step"><div class="ext-step-num">1</div><div class="ext-step-text"><b>Download &amp; unzip</b>Save the ZIP and extract it</div></div>
-            <div class="ext-step"><div class="ext-step-num">2</div><div class="ext-step-text"><b>Open Chrome</b>Go to chrome://extensions</div></div>
-            <div class="ext-step"><div class="ext-step-num">3</div><div class="ext-step-text"><b>Enable Dev Mode</b>Toggle top-right switch</div></div>
-            <div class="ext-step"><div class="ext-step-num">4</div><div class="ext-step-text"><b>Load Unpacked</b>Select the unzipped folder</div></div>
+          <!-- Username Setup Modal -->
+          <div id="chatUsernameModal" style="display:none;position:absolute;inset:0;z-index:210;background:rgba(0,0,0,.65);backdrop-filter:blur(8px);align-items:center;justify-content:center">
+            <div class="chat-friend-box" style="max-width:360px;width:100%">
+              <div class="chat-friend-box-hdr" style="margin-bottom:6px">
+                <span>&#x1F464; Choose a Username</span>
+              </div>
+              <p style="font-size:.78rem;color:rgba(255,255,255,.5);margin:0 0 14px;line-height:1.5">Pick a unique username so other students can find and add you in Chat.</p>
+              <input class="chat-friend-search" id="chatUsernameInput" type="text" placeholder="e.g. mohamed_ali" autocomplete="off" maxlength="32" style="margin-bottom:8px" />
+              <div id="chatUsernameErr" style="display:none;color:#ef4444;font-size:.75rem;font-weight:700;margin-bottom:8px"></div>
+              <button id="chatUsernameSaveBtn" style="width:100%;padding:12px;background:linear-gradient(135deg,#c084fc,#f472b6);border:none;border-radius:30px;font-family:'Nunito',sans-serif;font-weight:800;font-size:.9rem;color:#fff;cursor:pointer">Save Username &#x2192;</button>
+            </div>
+          </div>
+          <!-- Add Friend Modal -->
+          <div id="chatFriendModal" style="display:none;position:absolute;inset:0;z-index:200;background:rgba(0,0,0,.55);backdrop-filter:blur(6px);align-items:center;justify-content:center">
+            <div class="chat-friend-box">
+              <div class="chat-friend-box-hdr">
+                <span>&#x1F50D; Find Students</span>
+                <button class="chat-friend-box-close" id="chatFriendModalClose">&#x2715;</button>
+              </div>
+              <input class="chat-friend-search" id="chatFriendSearchInput" type="text" placeholder="Search by name or email&#x2026;" autocomplete="off" />
+              <div class="chat-friend-results" id="chatFriendResults">
+                <div class="chat-friend-hint">Type a name to search for students</div>
+              </div>
+            </div>
           </div>
         </div>
 
-      </div><!-- /portal-main-scroll -->
+        <!-- NOTIFICATIONS -->
+        <div id="psec-notifications" class="portal-section" style="display:none">
+          <div class="notif-wrap">
+            <div class="notif-header">
+              <div class="notif-header-left">
+                <div class="notif-title-icon">&#x1F514;</div>
+                <div>
+                  <div class="notif-title">Notifications</div>
+                  <div class="notif-subtitle" id="notifCount">All caught up</div>
+                </div>
+              </div>
+              <button class="notif-mark-all" id="notifMarkAll">Mark all read</button>
+            </div>
+            <div class="notif-tabs">
+              <button class="notif-tab active" data-tab="all">All</button>
+              <button class="notif-tab" data-tab="unread">Unread</button>
+            </div>
+            <div class="notif-list" id="notifList">
+              <div class="notif-empty">
+                <div class="notif-empty-icon">&#x1F514;</div>
+                <div class="notif-empty-title">You're all caught up!</div>
+                <div class="notif-empty-sub">New notifications will appear here</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- GAMES -->
+        <div id="psec-games" class="portal-section" style="display:none;padding:0">
+
+          <!-- ── HUB ── -->
+          <div id="gamesHub" class="games-hub">
+            <div class="games-hub-hero">
+              <div class="games-hub-hero-title">&#x1F3AE; Game Room</div>
+              <div class="games-hub-hero-sub">Take a break &amp; play</div>
+            </div>
+            <div class="games-hub-grid">
+              <div class="gh-card" id="gameCardTetris">
+                <div class="gh-card-preview gh-card-preview-tetris">
+                  <div class="gh-tetris-preview">
+                    <div style="background:#c084fc;width:8px;height:8px;border-radius:2px"></div>
+                    <div style="background:#f472b6;width:8px;height:8px;border-radius:2px"></div>
+                    <div style="background:#a78bfa;width:8px;height:8px;border-radius:2px"></div>
+                    <div style="background:#34d399;width:8px;height:8px;border-radius:2px"></div>
+                    <div style="background:#60a5fa;width:8px;height:8px;border-radius:2px"></div>
+                    <div style="background:#fb923c;width:8px;height:8px;border-radius:2px"></div>
+                  </div>
+                </div>
+                <div class="gh-card-body">
+                  <div class="gh-card-name">Tetris</div>
+                  <div class="gh-card-desc">Stack blocks &amp; clear lines. Choose your starting level.</div>
+                  <div class="gh-card-meta"><span class="gh-badge">Puzzle</span><span class="gh-badge">10 Levels</span></div>
+                </div>
+                <div class="gh-card-play">Play &#x25B6;</div>
+              </div>
+              <div class="gh-card" id="gameCardBird">
+                <div class="gh-card-preview" style="background:linear-gradient(180deg,#0a0520 0%,#1a0a3e 60%,#0d1a3a 100%)">
+                  <div style="display:flex;align-items:center;gap:10px">
+                    <div style="width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,#c084fc,#f472b6);box-shadow:0 0 12px rgba(192,132,252,.6)"></div>
+                    <div style="display:flex;flex-direction:column;gap:18px">
+                      <div style="width:14px;height:40px;background:linear-gradient(135deg,rgba(52,211,153,.4),rgba(52,211,153,.2));border-radius:3px;border:1px solid rgba(52,211,153,.4)"></div>
+                      <div style="width:14px;height:30px;background:linear-gradient(135deg,rgba(52,211,153,.4),rgba(52,211,153,.2));border-radius:3px;border:1px solid rgba(52,211,153,.4)"></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="gh-card-body">
+                  <div class="gh-card-name">Flappy Bird</div>
+                  <div class="gh-card-desc">Tap to fly, dodge the pipes. How far can you go?</div>
+                  <div class="gh-card-meta"><span class="gh-badge">Arcade</span><span class="gh-badge">Endless</span></div>
+                </div>
+                <div class="gh-card-play">Play &#x25B6;</div>
+              </div>
+              <div class="gh-card" id="gameCardSolitaire">
+                <div class="gh-card-preview gh-card-preview-solitaire">
+                  <div style="display:flex;gap:4px;align-items:flex-end">
+                    <div style="width:20px;height:28px;background:linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.05));border:1px solid rgba(255,255,255,.15);border-radius:4px"></div>
+                    <div style="width:20px;height:34px;background:linear-gradient(135deg,rgba(244,114,182,.3),rgba(192,132,252,.2));border:1px solid rgba(244,114,182,.4);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px">&#x2665;</div>
+                    <div style="width:20px;height:40px;background:linear-gradient(135deg,rgba(192,132,252,.3),rgba(167,139,250,.2));border:1px solid rgba(192,132,252,.4);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px">&#x2660;</div>
+                    <div style="width:20px;height:34px;background:linear-gradient(135deg,rgba(244,114,182,.3),rgba(192,132,252,.2));border:1px solid rgba(244,114,182,.4);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px">&#x2666;</div>
+                    <div style="width:20px;height:28px;background:linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.05));border:1px solid rgba(255,255,255,.15);border-radius:4px"></div>
+                  </div>
+                </div>
+                <div class="gh-card-body">
+                  <div class="gh-card-name">Solitaire</div>
+                  <div class="gh-card-desc">Classic Klondike. Sort all cards to the foundations.</div>
+                  <div class="gh-card-meta"><span class="gh-badge">Cards</span><span class="gh-badge">Classic</span></div>
+                </div>
+                <div class="gh-card-play">Play &#x25B6;</div>
+              </div>
+              <!-- ── GD GAME CARD ── -->
+              <div class="gh-card" id="gameCardGD">
+                <div class="gh-card-preview" style="background:linear-gradient(135deg,#0f0a1e,#1a0a3e);align-items:center;justify-content:center">
+                  <div style="font-size:2.6rem">&#x1F3AE;</div>
+                </div>
+                <div class="gh-card-body">
+                  <div class="gh-card-name">Arcade Game</div>
+                  <div class="gh-card-desc">Play a featured arcade game powered by GameDistribution.</div>
+                  <div class="gh-card-meta"><span class="gh-badge">Arcade</span><span class="gh-badge">Online</span></div>
+                </div>
+                <div class="gh-card-play">Play &#x25B6;</div>
+              </div>
+              <!-- ── CHESS CARD ── -->
+              <div class="gh-card" id="gameCardChess">
+                <div class="gh-card-preview" style="background:linear-gradient(135deg,#0f0a1e,#1a1040);align-items:center;justify-content:center">
+                  <div style="display:grid;grid-template-columns:repeat(5,12px);grid-template-rows:repeat(5,12px);gap:1px;border-radius:3px;overflow:hidden">
+                    <div style="background:#f0d9b5"></div><div style="background:#b58863"></div><div style="background:#f0d9b5;display:flex;align-items:center;justify-content:center;font-size:9px">&#x265A;</div><div style="background:#b58863"></div><div style="background:#f0d9b5"></div>
+                    <div style="background:#b58863;display:flex;align-items:center;justify-content:center;font-size:9px">&#x265F;</div><div style="background:#f0d9b5"></div><div style="background:#b58863"></div><div style="background:#f0d9b5;display:flex;align-items:center;justify-content:center;font-size:9px">&#x265F;</div><div style="background:#b58863"></div>
+                    <div style="background:#f0d9b5"></div><div style="background:#b58863"></div><div style="background:#f0d9b5"></div><div style="background:#b58863"></div><div style="background:#f0d9b5"></div>
+                    <div style="background:#b58863"></div><div style="background:#f0d9b5;display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff">&#x2659;</div><div style="background:#b58863"></div><div style="background:#f0d9b5;display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff">&#x2654;</div><div style="background:#b58863"></div>
+                    <div style="background:#f0d9b5"></div><div style="background:#b58863"></div><div style="background:#f0d9b5"></div><div style="background:#b58863"></div><div style="background:#f0d9b5"></div>
+                  </div>
+                </div>
+                <div class="gh-card-body">
+                  <div class="gh-card-name">Chess</div>
+                  <div class="gh-card-desc">Classic chess vs AI. Outsmart the engine in a battle of wits.</div>
+                  <div class="gh-card-meta"><span class="gh-badge">Strategy</span><span class="gh-badge">vs AI</span></div>
+                </div>
+                <div class="gh-card-play">Play &#x25B6;</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ── TETRIS LEVEL SELECT ── -->
+          <div id="gamesTetrisLevels" style="display:none" class="games-level-screen">
+            <div class="lvl-hero">
+              <button class="game-back-btn" id="tetrisLevelBack">&#x2190; Games</button>
+              <div class="lvl-hero-body">
+                <div class="lvl-hero-title">&#x1F3AE; Choose Your Challenge</div>
+                <div class="lvl-hero-sub">Higher levels start faster &amp; score more — can you survive?</div>
+                <div class="lvl-hero-stats">
+                  <div class="lvl-hero-stat"><span class="lvl-hero-stat-val" id="lvlBestScore">—</span><span class="lvl-hero-stat-label">Best Score</span></div>
+                  <div class="lvl-hero-stat"><span class="lvl-hero-stat-val" id="lvlBestLevel">—</span><span class="lvl-hero-stat-label">Best Level</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="lvl-tiers" id="tetrisLevelGrid"></div>
+          </div>
+
+          <!-- ── TETRIS PLAY ── -->
+          <div id="gamesPlayTetris" style="display:none" class="games-play-screen">
+            <div class="game-play-hdr">
+              <button class="game-back-btn" id="tetrisBack">&#x2190; Levels</button>
+              <span class="game-play-title">Tetris</span>
+              <span class="game-play-level-badge" id="tetrisLevelBadge">Level 1</span>
+            </div>
+            <div class="tetris-layout">
+              <div class="tetris-stats-col">
+                <div class="tstat"><div class="tstat-label">Score</div><div class="tstat-val" id="tetrisScore">0</div></div>
+                <div class="tstat"><div class="tstat-label">Level</div><div class="tstat-val" id="tetrisLevel">1</div></div>
+                <div class="tstat"><div class="tstat-label">Lines</div><div class="tstat-val" id="tetrisLines">0</div></div>
+                <div class="tstat"><div class="tstat-label">Best</div><div class="tstat-val" id="tetrisBest">0</div></div>
+              </div>
+              <div class="tetris-center-col">
+                <div class="tetris-board-wrap">
+                  <canvas id="tetrisCanvas" width="220" height="440"></canvas>
+                  <div id="tetrisOverlay" class="tetris-overlay">
+                    <div class="tetris-overlay-title" id="tetrisOverlayTitle">Ready?</div>
+                    <div class="tetris-overlay-sub" id="tetrisOverlaySub">Arrow keys to move &bull; Up to rotate &bull; Space to drop</div>
+                    <button class="tetris-start-btn" id="tetrisStartBtn">Start</button>
+                  </div>
+                </div>
+                <div class="tetris-controls">
+                  <div class="tetris-ctrl-row"><button class="tetris-ctrl-btn" id="tCtrlUp">&#x1F504; Rotate</button></div>
+                  <div class="tetris-ctrl-row">
+                    <button class="tetris-ctrl-btn" id="tCtrlLeft">&#x2190;</button>
+                    <button class="tetris-ctrl-btn" id="tCtrlDown">&#x2193;</button>
+                    <button class="tetris-ctrl-btn" id="tCtrlRight">&#x2192;</button>
+                  </div>
+                  <div class="tetris-ctrl-row"><button class="tetris-ctrl-btn tetris-ctrl-drop" id="tCtrlDrop">&#x23EC; Hard Drop</button></div>
+                </div>
+              </div>
+              <div class="tetris-next-col">
+                <div class="tstat">
+                  <div class="tstat-label">Next</div>
+                  <canvas id="tetrisNext" width="88" height="88"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ── SOLITAIRE PLAY ── -->
+          <div id="gamesPlaySolitaire" style="display:none" class="games-play-screen">
+
+            <!-- Variant picker -->
+            <div id="solVariantPicker">
+              <div class="game-play-hdr">
+                <button class="game-back-btn" id="solPickerBack">&#x2190; Games</button>
+                <span class="game-play-title">Solitaire</span>
+              </div>
+              <div class="sol-variant-grid">
+                <div class="sol-vc" data-variant="klondike">
+                  <div class="sol-vc-icon">&#x1F0A1;</div>
+                  <div class="sol-vc-name">Klondike</div>
+                  <div class="sol-vc-desc">The classic</div>
+                </div>
+                <div class="sol-vc" id="solSpiderMenuBtn">
+                  <div class="sol-vc-icon">&#x1F577;&#xFE0F;</div>
+                  <div class="sol-vc-name">Spider</div>
+                  <div class="sol-vc-desc">4 variants</div>
+                </div>
+                <div class="sol-vc" data-variant="freecell">
+                  <div class="sol-vc-icon">&#x1F513;</div>
+                  <div class="sol-vc-name">FreeCell</div>
+                  <div class="sol-vc-desc">All cards face up</div>
+                </div>
+                <div class="sol-vc" data-variant="pyramid">
+                  <div class="sol-vc-icon">&#x1F53A;</div>
+                  <div class="sol-vc-name">Pyramid</div>
+                  <div class="sol-vc-desc">Pairs summing to 13</div>
+                </div>
+                <div class="sol-vc" data-variant="tripeaks">
+                  <div class="sol-vc-icon">&#x26F0;&#xFE0F;</div>
+                  <div class="sol-vc-name">Tri-Peaks</div>
+                  <div class="sol-vc-desc">Three peaks &middot; sequential</div>
+                </div>
+                <div class="sol-vc" data-variant="vegas">
+                  <div class="sol-vc-icon">&#x1F3B0;</div>
+                  <div class="sol-vc-name">Vegas</div>
+                  <div class="sol-vc-desc">Draw 3 &middot; 2 redeals</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Spider sub-picker -->
+            <div id="solSpiderPicker" style="display:none">
+              <div class="game-play-hdr">
+                <button class="game-back-btn" id="solSpiderPickerBack">&#x2190; Solitaire</button>
+                <span class="game-play-title">Spider</span>
+              </div>
+              <div class="sol-spider-grid">
+                <div class="sol-spc" data-variant="scorpion">
+                  <div class="sol-spc-preview">
+                    <div class="sol-spc-cols">
+                      <div class="sol-spc-col"><div class="sol-spc-fd"></div><div class="sol-spc-fd"></div><div class="sol-spc-fd"></div><div class="sol-spc-fu red">A&#x2665;</div></div>
+                      <div class="sol-spc-col"><div class="sol-spc-fd"></div><div class="sol-spc-fd"></div><div class="sol-spc-fd"></div><div class="sol-spc-fu">K&#x2660;</div></div>
+                      <div class="sol-spc-col"><div class="sol-spc-fd"></div><div class="sol-spc-fd"></div><div class="sol-spc-fu red">Q&#x2666;</div><div class="sol-spc-fu">J&#x2660;</div></div>
+                      <div class="sol-spc-col"><div class="sol-spc-fd"></div><div class="sol-spc-fu">10&#x2663;</div><div class="sol-spc-fu red">9&#x2665;</div><div class="sol-spc-fu">8&#x2660;</div></div>
+                      <div class="sol-spc-col"><div class="sol-spc-fu red">7&#x2666;</div><div class="sol-spc-fu">6&#x2663;</div><div class="sol-spc-fu red">5&#x2665;</div><div class="sol-spc-fu">4&#x2660;</div></div>
+                    </div>
+                  </div>
+                  <div class="sol-spc-name">Scorpion</div>
+                  <div class="sol-spc-desc">1 deck &middot; 7 columns &middot; same suit</div>
+                </div>
+                <div class="sol-spc" data-variant="spider4">
+                  <div class="sol-spc-preview">
+                    <div class="sol-spc-cols">
+                      <div class="sol-spc-col"><div class="sol-spc-fd"></div><div class="sol-spc-fd"></div><div class="sol-spc-fu">K&#x2660;</div><div class="sol-spc-fu red">Q&#x2665;</div></div>
+                      <div class="sol-spc-col"><div class="sol-spc-fd"></div><div class="sol-spc-fd"></div><div class="sol-spc-fu red">J&#x2666;</div><div class="sol-spc-fu">10&#x2663;</div></div>
+                      <div class="sol-spc-col"><div class="sol-spc-fd"></div><div class="sol-spc-fu red">9&#x2665;</div><div class="sol-spc-fu">8&#x2660;</div><div class="sol-spc-fu red">7&#x2666;</div></div>
+                      <div class="sol-spc-col"><div class="sol-spc-fu">6&#x2663;</div><div class="sol-spc-fu red">5&#x2665;</div><div class="sol-spc-fu">4&#x2660;</div><div class="sol-spc-fu red">3&#x2666;</div></div>
+                      <div class="sol-spc-col"><div class="sol-spc-fu red">2&#x2665;</div><div class="sol-spc-fu">A&#x2660;</div><div class="sol-spc-fu red">K&#x2666;</div><div class="sol-spc-fu">Q&#x2663;</div></div>
+                    </div>
+                  </div>
+                  <div class="sol-spc-name">Spider Four Suits</div>
+                  <div class="sol-spc-desc">2 decks &middot; 10 columns &middot; expert</div>
+                </div>
+                <div class="sol-spc" data-variant="spider1">
+                  <div class="sol-spc-preview">
+                    <div class="sol-spc-cols">
+                      <div class="sol-spc-col"><div class="sol-spc-fd"></div><div class="sol-spc-fd"></div><div class="sol-spc-fu">K&#x2660;</div><div class="sol-spc-fu">Q&#x2660;</div></div>
+                      <div class="sol-spc-col"><div class="sol-spc-fd"></div><div class="sol-spc-fd"></div><div class="sol-spc-fu">J&#x2660;</div><div class="sol-spc-fu">10&#x2660;</div></div>
+                      <div class="sol-spc-col"><div class="sol-spc-fd"></div><div class="sol-spc-fu">9&#x2660;</div><div class="sol-spc-fu">8&#x2660;</div><div class="sol-spc-fu">7&#x2660;</div></div>
+                      <div class="sol-spc-col"><div class="sol-spc-fu">6&#x2660;</div><div class="sol-spc-fu">5&#x2660;</div><div class="sol-spc-fu">4&#x2660;</div><div class="sol-spc-fu">3&#x2660;</div></div>
+                      <div class="sol-spc-col"><div class="sol-spc-fu">2&#x2660;</div><div class="sol-spc-fu">A&#x2660;</div><div class="sol-spc-fd"></div><div class="sol-spc-fd"></div></div>
+                    </div>
+                  </div>
+                  <div class="sol-spc-name">Spider One Suit</div>
+                  <div class="sol-spc-desc">2 decks &middot; spades only &middot; easy</div>
+                </div>
+                <div class="sol-spc" data-variant="spider2">
+                  <div class="sol-spc-preview">
+                    <div class="sol-spc-cols">
+                      <div class="sol-spc-col"><div class="sol-spc-fd"></div><div class="sol-spc-fd"></div><div class="sol-spc-fu">K&#x2660;</div><div class="sol-spc-fu red">Q&#x2665;</div></div>
+                      <div class="sol-spc-col"><div class="sol-spc-fd"></div><div class="sol-spc-fd"></div><div class="sol-spc-fu">J&#x2660;</div><div class="sol-spc-fu red">10&#x2665;</div></div>
+                      <div class="sol-spc-col"><div class="sol-spc-fd"></div><div class="sol-spc-fu">9&#x2660;</div><div class="sol-spc-fu red">8&#x2665;</div><div class="sol-spc-fu">7&#x2660;</div></div>
+                      <div class="sol-spc-col"><div class="sol-spc-fu red">6&#x2665;</div><div class="sol-spc-fu">5&#x2660;</div><div class="sol-spc-fu red">4&#x2665;</div><div class="sol-spc-fu">3&#x2660;</div></div>
+                      <div class="sol-spc-col"><div class="sol-spc-fu red">2&#x2665;</div><div class="sol-spc-fu">A&#x2660;</div><div class="sol-spc-fd"></div><div class="sol-spc-fd"></div></div>
+                    </div>
+                  </div>
+                  <div class="sol-spc-name">Spider Two Suits</div>
+                  <div class="sol-spc-desc">2 decks &middot; spades &amp; hearts &middot; medium</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Game area (shown after variant selected) -->
+            <div id="solGameArea" style="display:none">
+              <div class="game-play-hdr">
+                <button class="game-back-btn" id="solitaireBack">&#x2190; Solitaire</button>
+                <span class="game-play-title" id="solGameTitle">Klondike</span>
+                <div class="sol-hdr-stats">
+                  <span class="tstat" style="flex-direction:row;align-items:center;gap:6px;padding:6px 14px"><span class="tstat-label" style="margin:0">Moves</span><span class="tstat-val" style="font-size:1rem" id="solMoves">0</span></span>
+                  <span class="tstat" style="flex-direction:row;align-items:center;gap:6px;padding:6px 14px"><span class="tstat-label" style="margin:0">Time</span><span class="tstat-val" style="font-size:1rem" id="solTime">0:00</span></span>
+                  <button class="tetris-start-btn" id="solitaireUndo" style="padding:7px 18px;font-size:.78rem;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15)">&#x21A9; Undo</button>
+                  <button class="tetris-start-btn sol-hint-btn" id="solitaireHint" style="padding:7px 18px;font-size:.78rem;background:linear-gradient(135deg,#a855f7,#6366f1)">&#x1F4A1; Hint</button>
+                  <button class="tetris-start-btn" id="solitaireNewGame" style="padding:7px 18px;font-size:.78rem">New Game</button>
+                </div>
+              </div>
+              <div class="sol-table" id="solTable"></div>
+              <div id="solNoMovesBanner" style="display:none;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;margin-top:18px;padding:14px 20px;background:rgba(239,68,68,.13);border:1px solid rgba(239,68,68,.35);border-radius:14px;text-align:center">
+                <span style="color:#f87171;font-weight:700;font-size:.95rem">No moves left — this deal is stuck.</span>
+                <button id="solNoMovesNewGame" class="tetris-start-btn" style="padding:7px 20px;font-size:.82rem">Deal New Game</button>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- ── CHESS ── -->
+          <!-- ── CHESS ── -->
+          <div id="gamesPlayChess" style="display:none" class="games-play-screen chess-screen">
+            <div class="game-play-hdr">
+              <button class="game-back-btn" id="chessBack">&#x2190; Games</button>
+              <span class="game-play-title">&#x265E; Chess</span>
+              <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+                <span id="chessGameStatus" style="font-size:.78rem;font-weight:700;color:rgba(255,255,255,.5)"></span>
+                <button class="tetris-start-btn" id="chessResignBtn" style="display:none;padding:6px 14px;font-size:.75rem;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);color:#f87171">Resign</button>
+              </div>
+            </div>
+            <div class="chess-main">
+              <!-- LEFT: board column -->
+              <div class="chess-board-col">
+                <!-- Opponent bar -->
+                <div class="chess-player-bar" id="chessBarTop">
+                  <div class="chess-player-avatar" id="chessAvTop">?</div>
+                  <div class="chess-player-meta">
+                    <div class="chess-player-name" id="chessNameTop">—</div>
+                    <div class="chess-player-elo" id="chessEloTop"></div>
+                  </div>
+                  <div class="chess-caps-row" id="chessCapsTop"></div>
+                  <div class="chess-clock" id="chessClockTop" style="display:none">10:00</div>
+                </div>
+                <!-- Board -->
+                <div class="chess-board-wrap">
+                  <canvas id="chessBoard" width="480" height="480"></canvas>
+                  <div class="chess-board-overlay" id="chessBoardOverlay" style="display:none">
+                    <div class="chess-overlay-box">
+                      <div class="chess-overlay-title" id="chessOverlayTitle">Game Over</div>
+                      <div class="chess-overlay-sub" id="chessOverlaySub"></div>
+                      <button class="tetris-start-btn" id="chessOverlayNewGame" style="margin-top:12px;padding:10px 28px">Play Again</button>
+                    </div>
+                  </div>
+                </div>
+                <!-- Your bar -->
+                <div class="chess-player-bar" id="chessBarBottom">
+                  <div class="chess-player-avatar" id="chessAvBottom">&#x265A;</div>
+                  <div class="chess-player-meta">
+                    <div class="chess-player-name" id="chessNameBottom">You</div>
+                    <div class="chess-player-elo" id="chessEloBottom"></div>
+                  </div>
+                  <div class="chess-caps-row" id="chessCapsBottom"></div>
+                  <div class="chess-clock" id="chessClockBottom" style="display:none">10:00</div>
+                </div>
+              </div>
+              <!-- RIGHT: panel -->
+              <div class="chess-panel">
+                <div class="chess-panel-tabs">
+                  <button class="chess-ptab chess-ptab-active" id="chessTabPlay">Play</button>
+                  <button class="chess-ptab" id="chessTabMoves">Moves</button>
+                  <button class="chess-ptab" id="chessTabRatings">Ratings</button>
+                </div>
+                <!-- PLAY TAB -->
+                <div class="chess-tab-body" id="chessBodyPlay">
+                  <div class="chess-mode-btns">
+                    <button class="chess-mode-btn" id="chessModeBot">
+                      <span class="chess-mode-icon">&#x1F916;</span>
+                      <div class="chess-mode-text">
+                        <div class="chess-mode-name">Play vs Bot</div>
+                        <div class="chess-mode-sub">Challenge the AI engine</div>
+                      </div>
+                      <span class="chess-mode-arrow">&#x203A;</span>
+                    </button>
+                    <button class="chess-mode-btn" id="chessModeOnline">
+                      <span class="chess-mode-icon">&#x1F30D;</span>
+                      <div class="chess-mode-text">
+                        <div class="chess-mode-name">Play Online</div>
+                        <div class="chess-mode-sub">vs another student</div>
+                      </div>
+                      <span class="chess-mode-arrow">&#x203A;</span>
+                    </button>
+                  </div>
+                  <!-- Bot difficulty -->
+                  <div id="chessBotPanel" style="display:none">
+                    <div class="chess-section-hdr">
+                      <button class="chess-back-sm" id="chessBotBack">&#x2190;</button>
+                      <span>Choose Difficulty</span>
+                    </div>
+                    <div class="chess-diff-grid" id="chessDiffGrid"></div>
+                  </div>
+                  <!-- Online panel -->
+                  <div id="chessOnlinePanel" style="display:none">
+                    <div class="chess-section-hdr">
+                      <button class="chess-back-sm" id="chessOnlineBack">&#x2190;</button>
+                      <span>Play Online</span>
+                    </div>
+                    <button class="chess-big-btn" id="chessCreateBtn">&#x2795; Create Game</button>
+                    <div class="chess-or-divider">— or —</div>
+                    <div style="display:flex;gap:8px">
+                      <input id="chessJoinInput" class="chess-room-input" placeholder="Enter room code" maxlength="6" style="flex:1" />
+                      <button class="chess-big-btn" id="chessJoinBtn" style="flex:0 0 auto;padding:10px 16px">Join</button>
+                    </div>
+                  </div>
+                  <!-- Waiting for opponent -->
+                  <div id="chessWaitingPanel" style="display:none">
+                    <div class="chess-waiting-box">
+                      <div class="chess-waiting-spinner"></div>
+                      <div class="chess-waiting-label">Waiting for opponent…</div>
+                      <div class="chess-room-code-display" id="chessRoomCodeDisplay"></div>
+                      <div style="font-size:.72rem;color:rgba(255,255,255,.4);margin-top:4px">Share this code with a friend</div>
+                      <button class="chess-cancel-btn" id="chessCancelWait" style="margin-top:12px">Cancel</button>
+                    </div>
+                  </div>
+                </div>
+                <!-- MOVES TAB -->
+                <div class="chess-tab-body" id="chessBodyMoves" style="display:none">
+                  <div class="chess-moves-list" id="chessMovesList"></div>
+                </div>
+                <!-- RATINGS TAB -->
+                <div class="chess-tab-body" id="chessBodyRatings" style="display:none">
+                  <div class="chess-rating-hero">
+                    <div class="chess-rating-big" id="chessRatingBig">1200</div>
+                    <div style="font-size:.72rem;color:rgba(255,255,255,.4);font-weight:700;text-transform:uppercase;letter-spacing:.06em">Your Rating</div>
+                  </div>
+                  <div class="chess-wld-row">
+                    <div class="chess-wld-box chess-wld-w"><div class="chess-wld-num" id="chessWins">0</div><div>Wins</div></div>
+                    <div class="chess-wld-box chess-wld-d"><div class="chess-wld-num" id="chessDraws">0</div><div>Draws</div></div>
+                    <div class="chess-wld-box chess-wld-l"><div class="chess-wld-num" id="chessLosses">0</div><div>Losses</div></div>
+                  </div>
+                  <div class="chess-section-label" style="margin-top:14px">Bot Records</div>
+                  <div id="chessBotRecords"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ── GD ARCADE GAME ── -->
+          <div id="gamesPlayGD" style="display:none" class="games-play-screen">
+            <div class="game-play-hdr">
+              <button class="game-back-btn" id="gdBack">&#x2190; Games</button>
+              <span class="game-play-title">&#x1F3AE; Arcade Game</span>
+            </div>
+            <div class="gd-game-wrap">
+              <iframe id="gdGameFrame"
+                scrolling="none" frameborder="0"
+                allow="autoplay; fullscreen *; encrypted-media; picture-in-picture"
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-pointer-lock allow-orientation-lock allow-modals"></iframe>
+            </div>
+          </div>
+
+          <!-- ── FLAPPY BIRD ── -->
+          <div id="gamesPlayBird" style="display:none" class="games-play-screen">
+            <div class="game-play-hdr">
+              <button class="game-back-btn" id="birdBack">&#x2190; Games</button>
+              <span class="game-play-title">Flappy Bird</span>
+              <div style="display:flex;gap:10px;margin-left:auto">
+                <div class="tstat" style="flex-direction:row;align-items:center;gap:8px;padding:6px 14px">
+                  <span class="tstat-label" style="margin:0">Score</span>
+                  <span class="tstat-val" style="font-size:1rem" id="birdScore">0</span>
+                </div>
+                <div class="tstat" style="flex-direction:row;align-items:center;gap:8px;padding:6px 14px">
+                  <span class="tstat-label" style="margin:0">Best</span>
+                  <span class="tstat-val" style="font-size:1rem" id="birdBest">0</span>
+                </div>
+              </div>
+            </div>
+            <div class="bird-wrap">
+              <canvas id="birdCanvas" width="360" height="540"></canvas>
+            </div>
+            <div style="text-align:center;margin-top:10px;font-size:.75rem;font-weight:700;color:rgba(255,255,255,.3)">Press <kbd style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:4px;padding:1px 6px">Space</kbd> or tap the canvas to flap</div>
+          </div>
+
+        </div>
+
+        <!-- STUDY LOUNGE -->
+        <div id="psec-lounge" class="portal-section" style="display:none">
+          <div class="dash-greeting"><h1>&#x1F4CA; Study Lounge</h1><p>Your personal learning overview</p></div>
+
+          <!-- Streak banner -->
+          <div class="lounge-streak-banner" id="loungeStreakBanner">
+            <div class="lounge-streak-flame">&#x1F525;</div>
+            <div>
+              <div class="lounge-streak-val" id="loungeStreakVal">0</div>
+              <div class="lounge-streak-lbl">day streak</div>
+            </div>
+            <div class="lounge-streak-msg" id="loungeStreakMsg">Start studying today!</div>
+          </div>
+
+          <!-- Main stat cards -->
+          <div class="lounge-stats-grid" id="loungeStatsGrid">
+            <div class="lounge-stat-card">
+              <div class="lounge-stat-icon">&#x23F1;&#xFE0F;</div>
+              <div class="lounge-stat-val" id="lsHours">0h 0m</div>
+              <div class="lounge-stat-lbl">Study Time</div>
+              <div class="lounge-stat-sub" id="lsHoursSub">Total time with files open</div>
+            </div>
+            <div class="lounge-stat-card">
+              <div class="lounge-stat-icon">&#x1F4C2;</div>
+              <div class="lounge-stat-val" id="lsFiles">0</div>
+              <div class="lounge-stat-lbl">Files Opened</div>
+              <div class="lounge-stat-sub" id="lsFilesSub">Unique PDFs studied</div>
+            </div>
+            <div class="lounge-stat-card">
+              <div class="lounge-stat-icon">&#x1F393;</div>
+              <div class="lounge-stat-val" id="lsCourses">0</div>
+              <div class="lounge-stat-lbl">Courses</div>
+              <div class="lounge-stat-sub" id="lsCoursesSub">Subjects you've explored</div>
+            </div>
+            <div class="lounge-stat-card">
+              <div class="lounge-stat-icon">&#x1F916;</div>
+              <div class="lounge-stat-val" id="lsAI">0</div>
+              <div class="lounge-stat-lbl">AI Messages</div>
+              <div class="lounge-stat-sub">Questions asked to AI</div>
+            </div>
+            <div class="lounge-stat-card">
+              <div class="lounge-stat-icon">&#x1F4DD;</div>
+              <div class="lounge-stat-val" id="lsNotes">0</div>
+              <div class="lounge-stat-lbl">Lecture Notes</div>
+              <div class="lounge-stat-sub">Auto-summaries created</div>
+            </div>
+            <div class="lounge-stat-card">
+              <div class="lounge-stat-icon">&#x1F3AE;</div>
+              <div class="lounge-stat-val" id="lsGames">0</div>
+              <div class="lounge-stat-lbl">Games Played</div>
+              <div class="lounge-stat-sub">Break sessions</div>
+            </div>
+          </div>
+
+          <!-- Courses list -->
+          <div class="lounge-section-hdr">&#x1F4DA; Courses Studied</div>
+          <div class="lounge-course-chips" id="loungeCourseChips">
+            <div class="lounge-empty-msg">No courses yet — open a subject to get started</div>
+          </div>
+
+          <!-- Recent files -->
+          <div class="lounge-section-hdr">&#x1F4C4; Recently Opened Files</div>
+          <div class="lounge-recent-list" id="loungeRecentList">
+            <div class="lounge-empty-msg">No files opened yet</div>
+          </div>
+
+          <!-- Reset -->
+          <div style="margin-top:32px;text-align:center">
+            <button class="settings-danger-btn" id="loungeResetBtn" style="font-size:.75rem;padding:7px 18px">Reset Stats</button>
+          </div>
+        </div>
+
+        <!-- GERMAN LEARNER PRACTICE -->
+        <div id="psec-german" class="portal-section" style="display:none">
+
+          <!-- ── HOME VIEW ── -->
+          <div id="glHome">
+            <!-- Hero banner -->
+            <div class="gl-hero">
+              <div class="gl-hero-flag">&#x1F1E9;&#x1F1EA;</div>
+              <div class="gl-hero-text">
+                <div class="gl-hero-title">Deutsch lernen</div>
+                <div class="gl-hero-sub" id="glTestBadge">Your test · Your level</div>
+              </div>
+              <div class="gl-hero-chip" id="glLevelChip">–</div>
+            </div>
+
+            <!-- Skill cards -->
+            <div class="gl-skill-grid">
+              <button class="gl-skill-card" onclick="window._glOpenSkill('reading')">
+                <span class="gl-skill-icon">&#x1F4D6;</span>
+                <span class="gl-skill-name">Leseverstehen</span>
+                <span class="gl-skill-sub">Reading comprehension</span>
+              </button>
+              <button class="gl-skill-card" onclick="window._glOpenSkill('listening')">
+                <span class="gl-skill-icon">&#x1F3A7;</span>
+                <span class="gl-skill-name">Hörverstehen</span>
+                <span class="gl-skill-sub">Listening comprehension</span>
+              </button>
+              <button class="gl-skill-card" onclick="window._glOpenSkill('writing')">
+                <span class="gl-skill-icon">&#x270F;&#xFE0F;</span>
+                <span class="gl-skill-name">Schreiben</span>
+                <span class="gl-skill-sub">Writing tasks</span>
+              </button>
+              <button class="gl-skill-card" onclick="window._glOpenSkill('speaking')">
+                <span class="gl-skill-icon">&#x1F5E3;&#xFE0F;</span>
+                <span class="gl-skill-name">Sprechen</span>
+                <span class="gl-skill-sub">Speaking exercises</span>
+              </button>
+              <button class="gl-skill-card" onclick="window._glOpenSkill('vocab')">
+                <span class="gl-skill-icon">&#x1F4CA;</span>
+                <span class="gl-skill-name">Wortschatz</span>
+                <span class="gl-skill-sub">Vocabulary builder</span>
+              </button>
+              <button class="gl-skill-card" onclick="window._glOpenSkill('grammar')">
+                <span class="gl-skill-icon">&#x1F9E9;</span>
+                <span class="gl-skill-name">Grammatik</span>
+                <span class="gl-skill-sub">Grammar practice</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- ── SKILL DETAIL VIEW ── -->
+          <div id="glSkillView" style="display:none">
+            <!-- Back + title -->
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+              <button onclick="window._glBackToHome()" style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:20px;padding:7px 16px;font-family:'Nunito',sans-serif;font-weight:800;font-size:.82rem;color:rgba(255,255,255,.7);cursor:pointer">&#x2190; Back</button>
+              <div>
+                <div id="glSkillTitle" style="font-family:'Fredoka One',cursive;font-size:1.3rem;background:linear-gradient(135deg,#c084fc,#f472b6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text"></div>
+                <div id="glSkillSub" style="font-size:.72rem;font-weight:700;color:rgba(255,255,255,.35);margin-top:2px"></div>
+              </div>
+            </div>
+
+            <!-- AI practice chips -->
+            <div class="widget-card" style="margin-bottom:12px">
+              <div class="widget-title">&#x1F916; AI Practice</div>
+              <div id="glSkillChips" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px"></div>
+            </div>
+
+            <!-- Files for this skill -->
+            <div class="widget-card">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+                <div class="widget-title" style="margin:0">&#x1F4CE; Study Materials</div>
+                <label class="gl-upload-btn" id="glUploadLabel" style="margin:0">
+                  <input type="file" id="glFileInput" accept=".pdf,.txt" multiple style="display:none" onchange="window._glUploadFiles(this.files)"/>
+                  &#x2B06; Upload
+                </label>
+              </div>
+              <div id="glUploadProgress" style="display:none;margin-bottom:8px">
+                <div style="height:4px;border-radius:4px;background:rgba(255,255,255,.08);overflow:hidden">
+                  <div id="glUploadBar" style="height:100%;border-radius:4px;background:linear-gradient(90deg,#c084fc,#f472b6);width:0%;transition:width .2s"></div>
+                </div>
+                <div id="glUploadStatus" style="font-size:.72rem;font-weight:700;color:rgba(255,255,255,.4);margin-top:4px;text-align:center">Uploading…</div>
+              </div>
+              <div id="glFileList" style="display:flex;flex-direction:column;gap:6px;min-height:32px">
+                <div class="gl-file-empty" id="glFileEmpty">No files yet — upload PDFs or text files for this skill</div>
+              </div>
+            </div>
+
+            <!-- File AI results -->
+            <div class="widget-card" id="glAIPanel" style="display:none;margin-top:8px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+                <div class="widget-title" id="glAIPanelTitle" style="margin:0">Result</div>
+                <button onclick="document.getElementById('glAIPanel').style.display='none'" style="background:none;border:none;color:rgba(255,255,255,.4);font-size:1.1rem;cursor:pointer">&#x2715;</button>
+              </div>
+              <div id="glAIMessages" style="display:flex;flex-direction:column;gap:10px;max-height:340px;overflow-y:auto;padding-right:4px"></div>
+            </div>
+          </div>
+
+        </div><!-- /psec-german -->
+
+      </div><!-- /main-scroll -->
+      <!-- FILES / PDF VIEW (inline, no separate overlay) -->
+      <div id="app" style="display:none">
+        <div class="app-body">
+
+          <!-- PDF VIEWER -->
+          <div class="pdf-viewer-wrap" id="pdfViewerWrap" style="flex-direction:row">
+            <div id="centreContent" style="flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;position:relative">
+              <div id="courseOverview" style="display:none;flex:1;overflow-y:auto;overflow-x:hidden"></div>
+              <div class="welcome-state" id="welcomeState">
+                <span class="ws-icon">&#x1F4C2;</span>
+                <div class="ws-title" data-i18n="welcome_title">Select a file to read</div>
+                <div class="ws-sub" data-i18n="welcome_sub">Open a subject in the sidebar and click any file — it loads here as a real document.</div>
+                <div class="ws-hint" data-i18n="welcome_hint">&#x1F4A1; Select any text or formula &#x2192; AI automatically asks if you need help</div>
+              </div>
+              <div id="pdfView" style="display:none;flex-direction:column;flex:1;overflow:hidden">
+                <div class="pdf-toolbar" id="pdfToolbar">
+                  <button class="pdf-tb-btn" id="pdfPrev" style="display:none">&#x25C0;</button>
+                  <span class="pdf-page-info" id="pdfPageInfo" style="display:none">1 / 1</span>
+                  <button class="pdf-tb-btn" id="pdfNext" style="display:none">&#x25B6;</button>
+                  <button class="pdf-tb-btn" id="pdfZoomOut">&#x2212;</button>
+                  <span class="pdf-zoom-pct" id="pdfZoomPct">90%</span>
+                  <button class="pdf-tb-btn" id="pdfZoomIn">+</button>
+                  <button class="pdf-tb-btn" id="pdfFit" data-i18n="pdf_fit">Fit</button>
+                  <button class="pdf-tb-btn" id="pdfAll" data-i18n="pdf_single">Single page</button>
+                  <button class="pdf-tb-btn" id="pdfDownload" title="Download PDF" data-i18n="pdf_download">&#x2B07; Download</button>
+                  <span style="flex:1"></span>
+                  <span id="pdfFileName" style="font-size:.73rem;font-weight:700;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px"></span>
+                </div>
+                <div class="pdf-body" id="pdfBody"></div>
+              </div>
+              <div id="aiTab">&#x2728;</div>
+              <div id="aiHoverZone"></div>
+            </div><!-- /centreContent -->
+            <!-- AI PANEL -->
+            <div id="aiPanel">
+              <div id="aiResizeHandle" title="Drag to resize"></div>
+              <div class="ai-hdr">
+                <div class="ai-av-wrap">
+                  <div class="ai-av">&#x1F393;</div>
+                  <div class="ai-status-dot"></div>
+                </div>
+                <div class="ai-hdr-info">
+                  <h3>StudySphere AI</h3>
+                  <p id="aiFileLabel" data-i18n="ai_ready">Ready to help</p>
+                </div>
+                <div class="ai-hdr-actions">
+                  <button class="ai-icon-btn" id="aiClearBtn" title="Clear chat">&#x1F5D1;&#xFE0F;</button>
+                  <button class="ai-close" id="aiClose" title="Close">&#x2715;</button>
+                </div>
+              </div>
+              <div class="ai-file-chip-bar">
+                <div class="ai-file-chip empty" id="aiFileChip">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                  <span id="aiFileChipName" data-i18n="no_file_open">No file open</span>
+                </div>
+              </div>
+              <div class="ai-msgs" id="aiMsgs"></div>
+              <button class="ai-scroll-btn" id="aiScrollBtn" title="Scroll to bottom">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              <div class="ai-input-area">
+                <div class="ai-chips">
+                  <span class="ai-tip" id="chip-summarise" data-i18n="chip_summarise">&#x2728; Summarise</span>
+                  <span class="ai-tip" id="chip-formulas" data-i18n="chip_formulas">&#x1F522; Formulas</span>
+                  <span class="ai-tip" id="chip-quiz" data-i18n="chip_quiz">&#x1F4DD; Quiz me</span>
+                  <span class="ai-tip" id="chip-keyideas" data-i18n="chip_keyideas">&#x1F4A1; Key ideas</span>
+                  <span class="ai-tip" id="chip-analogy" data-i18n="chip_analogy">&#x1F517; Analogy</span>
+                </div>
+                <div class="chip-drawer" id="opts-summarise">
+                  <div class="chip-drawer-inner">
+                    <span class="chip-drawer-label" data-i18n="depth_label">Depth:</span>
+                    <span class="chip-sub chip-sub-s" data-type="summarise" data-level="small" data-i18n="chip_brief">Brief</span>
+                    <span class="chip-sub chip-sub-m" data-type="summarise" data-level="medium" data-i18n="chip_standard">Standard</span>
+                    <span class="chip-sub chip-sub-t" data-type="summarise" data-level="thorough" data-i18n="chip_thorough">In-depth</span>
+                  </div>
+                </div>
+                <div class="chip-drawer" id="opts-quiz">
+                  <div class="chip-drawer-inner">
+                    <span class="chip-drawer-label" data-i18n="level_label">Level:</span>
+                    <span class="chip-sub chip-sub-e" data-type="quiz" data-level="easy" data-i18n="chip_easy">Easy</span>
+                    <span class="chip-sub chip-sub-m" data-type="quiz" data-level="medium" data-i18n="chip_medium">Medium</span>
+                    <span class="chip-sub chip-sub-h" data-type="quiz" data-level="hard" data-i18n="chip_hard">Hard</span>
+                  </div>
+                </div>
+                <div class="ai-input-box">
+                  <div class="ai-img-preview" id="aiImgPreview"></div>
+                  <textarea class="ai-textarea" id="aiInput" data-i18n-ph="ai_placeholder" placeholder="Ask anything about this document…" rows="2"></textarea>
+                  <div class="ai-bottom-row">
+                    <span class="ai-char-count" id="aiCharCount">0 / 2000</span>
+                    <button class="ai-attach-btn ai-snip-btn" id="aiSnipBtn" title="Snip from PDF">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>
+                    </button>
+                    <input type="file" id="aiFileInput" accept="image/*" multiple style="display:none">
+                    <label class="ai-attach-btn" for="aiFileInput" title="Attach image">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+                    </label>
+                    <button class="ai-send" id="aiSend" title="Send">
+                      <span class="ai-btn-icon ai-icon-plane">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5"/></svg>
+                      </span>
+                      <span class="ai-btn-icon ai-icon-stop">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="3"/></svg>
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div><!-- /aiPanel -->
+          </div><!-- /pdfViewerWrap -->
+        </div><!-- /app-body -->
+      </div><!-- /app -->
+
     </div><!-- /main -->
   </div><!-- /shell -->
 </div><!-- /portal -->
@@ -273,7 +1359,7 @@
 <div id="wpOverlay" class="wp-overlay"></div>
 <div id="widgetPanel" class="widget-panel">
   <div class="wp-header">
-    <span class="wp-title">Add Widgets</span>
+    <span class="wp-title">&#x2736; Add Widgets</span>
     <button class="wp-close" id="wpClose">&#xD7;</button>
   </div>
   <div class="wp-body"><div class="wp-grid" id="wpGrid"></div></div>

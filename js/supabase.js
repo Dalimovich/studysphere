@@ -157,9 +157,9 @@ var _sb = {
 
 console.log('Supabase REST client ready ✓');
 // Quick connectivity test
-fetch('https://wprfkjeiawxlcnitsfdr.supabase.co/auth/v1/health')
+fetch('https://wprfkjeiawxlcnitsfdr.supabase.co/auth/v1/health', {headers:{'apikey':_SAKEY}})
   .then(function(r){ console.log('Supabase reachable ✓ status:', r.status); })
-  .catch(function(e){ console.error('Supabase NOT reachable:', e.message, '— Check your internet connection or Supabase project status.'); });
+  .catch(function(e){ console.error('Supabase NOT reachable:', e.message); });
 
 // ── SESSION PERSISTENCE ──────────────────────────────────────────────────
 var _activityTimer = null;
@@ -247,13 +247,19 @@ function _enterApp(user) {
         }
       }, 500);
     };
+    // Fast guard: if onboarding was completed this browser, skip fetch
+    if (localStorage.getItem('ob_done_' + user.id) === '1') return;
     // Use maybeSingle approach: fetch with limit=1, no error on empty
-    fetch(SUPA_URL + '/rest/v1/profiles?select=full_name&id=eq.' + encodeURIComponent(user.id) + '&limit=1', {
+    fetch(SUPA_URL + '/rest/v1/profiles?select=id&id=eq.' + encodeURIComponent(user.id) + '&limit=1', {
       headers: Object.assign({'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+_sbToken})
     }).then(function(r){ return r.json(); }).then(function(rows){
-      var hasProfile = Array.isArray(rows) && rows.length > 0 && rows[0].full_name;
-      if (!hasProfile) _showOb();
-    }).catch(function(){ _showOb(); });
+      var hasProfile = Array.isArray(rows) && rows.length > 0;
+      if (hasProfile) {
+        localStorage.setItem('ob_done_' + user.id, '1');
+      } else {
+        _showOb();
+      }
+    }).catch(function(){ /* on fetch error, don't force onboarding */ });
   }
 }
 
