@@ -273,6 +273,21 @@ function restoreState(){
       renderCourses();
     }
 
+    // German learner skill restore
+    if(st.courseId && st.courseId.indexOf('german-') === 0){
+      var skill = st.courseId.replace('german-', '');
+      showPortal(); setNavActive('psbGerman'); showPortalSection('german');
+      if(typeof window._glOpenSkill === 'function') {
+        window._glOpenSkill(skill);
+        if(st.fileName && window._uid) {
+          setTimeout(function(){
+            window._glOpenFile(window._uid, st.fileName);
+          }, 500);
+        }
+      }
+      return;
+    }
+
     // Course
     if(st.courseId){
       var sem=SEMS[activeSemId];
