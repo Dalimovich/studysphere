@@ -4795,17 +4795,52 @@ async function _chatAcceptFriend(friendshipId) {
 // ── Custom rooms ───────────────────────────────────────────────────────────
 var _customRooms = [];
 var _editingRoomId = null;
+var _editingRoomData = null;
+var _selectedVisibility = 'public';
+var _roomMembers = {}; // roomId -> true if current user is member
 
 async function _chatLoadCustomRooms() {
+  if (!_currentUser) return;
   try {
     var res = await fetch(SUPA_URL + '/rest/v1/custom_rooms?order=created_at.asc', { headers: _sbHeaders() });
-    var data = await res.json();
-    if (Array.isArray(data)) { _customRooms = data; _chatRenderRooms(); }
+    var all = await res.json();
+    if (!Array.isArray(all)) return;
+
+    // Load user's memberships
+    var memRes = await fetch(SUPA_URL + '/rest/v1/room_members?user_id=eq.' + encodeURIComponent(_currentUser.id) + '&select=room_id', { headers: _sbHeaders() });
+    var memData = await memRes.json();
+    _roomMembers = {};
+    if (Array.isArray(memData)) memData.forEach(function(m) { _roomMembers[m.room_id] = true; });
+
+    // Filter rooms by visibility
+    var friendIds = _chatFriends.filter(function(f) { return f.status === 'accepted'; }).map(function(f) { return f.otherId; });
+    _customRooms = all.filter(function(r) {
+      if (r.created_by === _currentUser.id) return true; // creator always sees own rooms
+      if (r.visibility === 'public') return true;
+      if (r.visibility === 'friends') return friendIds.indexOf(r.created_by) !== -1;
+      if (r.visibility === 'invite') return !!_roomMembers[r.id];
+      return false;
+    });
+    _chatRenderRooms();
   } catch(e) { console.warn('Load custom rooms error:', e); }
 }
 
+function _chatSetVisibility(vis) {
+  _selectedVisibility = vis;
+  document.querySelectorAll('.chat-vis-btn').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.vis === vis);
+  });
+  var invRow = document.getElementById('chatRoomInviteRow');
+  if (invRow) invRow.style.display = (vis === 'invite' && _editingRoomId) ? '' : 'none';
+}
+
+document.querySelectorAll('.chat-vis-btn').forEach(function(b) {
+  b.addEventListener('click', function() { _chatSetVisibility(b.dataset.vis); });
+});
+
 function _chatShowRoomModal(room) {
   _editingRoomId = room ? room.id : null;
+  _editingRoomData = room || null;
   var modal = document.getElementById('chatRoomModal');
   var title = document.getElementById('chatRoomModalTitle');
   var nameInp = document.getElementById('chatRoomNameInput');
@@ -4820,6 +4855,7 @@ function _chatShowRoomModal(room) {
   saveBtn.textContent = room ? 'Save →' : 'Create →';
   if (delBtn) delBtn.style.display = room && room.created_by === (_currentUser && _currentUser.id) ? '' : 'none';
   if (err) err.style.display = 'none';
+  _chatSetVisibility(room ? (room.visibility || 'public') : 'public');
   modal.style.display = 'flex';
   nameInp.focus();
 }
@@ -4844,18 +4880,36 @@ function _chatHideRoomModal() {
       await fetch(SUPA_URL + '/rest/v1/custom_rooms?id=eq.' + encodeURIComponent(_editingRoomId), {
         method: 'PATCH',
         headers: Object.assign(_sbHeaders(), { 'Prefer': 'return=minimal' }),
-        body: JSON.stringify({ name: name, description: desc })
+        body: JSON.stringify({ name: name, description: desc, visibility: _selectedVisibility })
       });
     } else {
-      await fetch(SUPA_URL + '/rest/v1/custom_rooms', {
+      var createRes = await fetch(SUPA_URL + '/rest/v1/custom_rooms', {
         method: 'POST',
-        headers: Object.assign(_sbHeaders(), { 'Prefer': 'return=minimal' }),
-        body: JSON.stringify({ name: name, description: desc, created_by: _currentUser.id })
+        headers: Object.assign(_sbHeaders(), { 'Prefer': 'return=representation', 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ name: name, description: desc, created_by: _currentUser.id, visibility: _selectedVisibility })
       });
+      var created = await createRes.json();
+      // Auto-add creator as member
+      if (Array.isArray(created) && created[0]) {
+        await fetch(SUPA_URL + '/rest/v1/room_members', {
+          method: 'POST',
+          headers: Object.assign(_sbHeaders(), { 'Prefer': 'return=minimal' }),
+          body: JSON.stringify({ room_id: created[0].id, user_id: _currentUser.id })
+        });
+      }
     }
     _chatHideRoomModal();
     await _chatLoadCustomRooms();
   } catch(e) { if (err) { err.textContent = 'Error saving room.'; err.style.display = ''; } }
+});
+
+(document.getElementById('chatCopyInviteBtn') || {addEventListener:function(){}}).addEventListener('click', function() {
+  if (!_editingRoomData || !_editingRoomData.invite_code) return;
+  var link = location.origin + location.pathname + '?join=' + _editingRoomData.invite_code;
+  navigator.clipboard.writeText(link).then(function() {
+    var btn = document.getElementById('chatCopyInviteBtn');
+    if (btn) { btn.textContent = '✅ Copied!'; setTimeout(function() { btn.textContent = '🔗 Copy invite link'; }, 2000); }
+  });
 });
 
 (document.getElementById('chatRoomDeleteBtn') || {addEventListener:function(){}}).addEventListener('click', async function() {
@@ -5262,6 +5316,35 @@ async function _chatSaveUsername() {
     var modal = document.getElementById('chatUsernameModal');
     if (modal && modal.style.display === 'flex' && e.key === 'Enter') _chatSaveUsername();
   });
+})();
+
+// ── Invite link handler ────────────────────────────────────────────────────
+(function() {
+  var joinCode = new URLSearchParams(location.search).get('join');
+  if (!joinCode) return;
+  // Remove param from URL without reload
+  var url = new URL(location.href);
+  url.searchParams.delete('join');
+  history.replaceState({}, '', url.toString());
+  // Wait for user session then join the room
+  function _tryJoinRoom() {
+    if (!_currentUser) { setTimeout(_tryJoinRoom, 500); return; }
+    fetch(SUPA_URL + '/rest/v1/custom_rooms?invite_code=eq.' + encodeURIComponent(joinCode) + '&select=id,name,visibility', { headers: _sbHeaders() })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (!Array.isArray(data) || !data[0]) { showToast('Invalid invite link', 'This invite link is not valid.'); return; }
+        var room = data[0];
+        return fetch(SUPA_URL + '/rest/v1/room_members', {
+          method: 'POST',
+          headers: Object.assign(_sbHeaders(), { 'Prefer': 'return=minimal' }),
+          body: JSON.stringify({ room_id: room.id, user_id: _currentUser.id })
+        }).then(function() {
+          showToast('Joined ' + room.name, 'You can now access this room in Chat.');
+          _chatLoadCustomRooms();
+        });
+      }).catch(function(e) { console.warn('Join room error:', e); });
+  }
+  _tryJoinRoom();
 })();
 
 // ── Init ───────────────────────────────────────────────────────────────────
