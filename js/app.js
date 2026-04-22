@@ -2495,19 +2495,35 @@ _bindIf('psbSubscription', 'click', function(){
 });
 _bindIf('goPortal', 'click', function(){
   if (activeFileName && activeCourseRef) {
-    // Inside a PDF → go back to course overview
-    activeFileName = null;
-    pdfDoc = null;
-    pdfFullText = '';
-    _setAiChipsVisible(false);
-    document.getElementById('pdfView').style.display = 'none';
-    document.getElementById('courseOverview').style.display = 'block';
-    showCourseSection(activeCourseRef, 'files');
+    // Inside a PDF — check if this is a German learner skill file
+    if (window._userType === 'learner' && activeCourseRef.id && activeCourseRef.id.startsWith('german-')) {
+      activeFileName = null;
+      pdfDoc = null;
+      pdfFullText = '';
+      _setAiChipsVisible(false);
+      showPortal();
+      setNavActive('psbGerman');
+      showPortalSection('german');
+      window._glOpenSkill(_glActiveSkill || activeCourseRef.id.replace('german-', ''));
+    } else {
+      // Inside a PDF → go back to course overview
+      activeFileName = null;
+      pdfDoc = null;
+      pdfFullText = '';
+      _setAiChipsVisible(false);
+      document.getElementById('pdfView').style.display = 'none';
+      document.getElementById('courseOverview').style.display = 'block';
+      showCourseSection(activeCourseRef, 'files');
+    }
   } else {
     // In course overview (or welcome state) → go back to Stud.IP
     activeCourseId = null;
     activeCourseRef = null;
-    showStudip();
+    if (window._userType === 'learner') {
+      showPortal(); setNavActive('psbGerman'); showPortalSection('german');
+    } else {
+      showStudip();
+    }
   }
 });
 
