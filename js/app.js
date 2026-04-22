@@ -4920,11 +4920,9 @@ function _chatRenderRooms() {
       row.style.justifyContent = 'space-between';
       row.innerHTML = '<span style="display:flex;align-items:center;gap:6px;overflow:hidden"><span class="chat-room-icon">&#x1F4AC;</span><span class="chat-room-label" title="' + _chatEsc(r.description || r.name) + '">' + _chatEsc(r.name) + '</span></span>' +
         (isCreator ? '<button style="background:none;border:none;color:rgba(192,132,252,.5);cursor:pointer;font-size:.8rem;padding:2px 4px;flex-shrink:0" title="Edit">&#x270E;</button>' : '');
-      row.querySelector('span').addEventListener('click', function() { _chatOpenRoom(rid, r.name); });
+      row.addEventListener('click', function() { _chatOpenRoom(rid, r.name); });
       if (isCreator) {
         row.querySelector('button').addEventListener('click', function(e) { e.stopPropagation(); _chatShowRoomModal(r); });
-      } else {
-        row.addEventListener('click', function() { _chatOpenRoom(rid, r.name); });
       }
       list.appendChild(row);
     });
