@@ -565,7 +565,15 @@
                 <button class="chat-friend-box-close" id="chatRoomModalClose">&#x2715;</button>
               </div>
               <input class="chat-friend-search" id="chatRoomNameInput" type="text" placeholder="Room name..." maxlength="40" autocomplete="off" style="margin-bottom:8px"/>
-              <input class="chat-friend-search" id="chatRoomDescInput" type="text" placeholder="Description (optional)..." maxlength="100" autocomplete="off" style="margin-bottom:12px"/>
+              <input class="chat-friend-search" id="chatRoomDescInput" type="text" placeholder="Description (optional)..." maxlength="100" autocomplete="off" style="margin-bottom:8px"/>
+              <div style="display:flex;gap:6px;margin-bottom:12px">
+                <button class="chat-vis-btn active" data-vis="public" id="visPublic" type="button">&#x1F310; Public</button>
+                <button class="chat-vis-btn" data-vis="friends" id="visFriends" type="button">&#x1F465; Friends</button>
+                <button class="chat-vis-btn" data-vis="invite" id="visInvite" type="button">&#x1F517; Invite only</button>
+              </div>
+              <div id="chatRoomInviteRow" style="display:none;margin-bottom:12px">
+                <button id="chatCopyInviteBtn" style="width:100%;padding:9px;background:rgba(192,132,252,.1);border:1px solid rgba(192,132,252,.3);border-radius:20px;font-family:'Nunito',sans-serif;font-weight:800;font-size:.78rem;color:#c084fc;cursor:pointer">&#x1F517; Copy invite link</button>
+              </div>
               <div id="chatRoomModalErr" style="display:none;color:#ef4444;font-size:.75rem;font-weight:700;margin-bottom:8px"></div>
               <div style="display:flex;gap:8px">
                 <button id="chatRoomSaveBtn" style="flex:1;padding:12px;background:linear-gradient(135deg,#c084fc,#f472b6);border:none;border-radius:30px;font-family:'Nunito',sans-serif;font-weight:800;font-size:.9rem;color:#fff;cursor:pointer">Create &#x2192;</button>
