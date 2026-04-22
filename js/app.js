@@ -2980,16 +2980,17 @@ window._glOpenSkill = function(skill) {
   if (t) t.textContent = _glSkillNames[skill] || skill;
   if (s) s.textContent = _glSkillSubs[skill] || '';
 
-  // Build AI chips
-  var chipsEl = document.getElementById('glSkillChips');
-  if (chipsEl) {
-    chipsEl.innerHTML = '';
+  // Inject skill chips into the AI panel's .ai-chips div
+  var aiChipsEl = document.querySelector('.ai-chips');
+  if (aiChipsEl) {
+    if (!aiChipsEl._originalHTML) aiChipsEl._originalHTML = aiChipsEl.innerHTML;
+    aiChipsEl.innerHTML = '';
     (_glSkillChips[skill] || []).forEach(function(label) {
-      var btn = document.createElement('button');
-      btn.className = 'gl-ai-chip';
+      var btn = document.createElement('span');
+      btn.className = 'ai-tip';
       btn.textContent = label;
       btn.addEventListener('click', function() { window._glAsk(label, _glSkillNames[skill]); });
-      chipsEl.appendChild(btn);
+      aiChipsEl.appendChild(btn);
     });
   }
 
@@ -3005,14 +3006,22 @@ window._glBackToHome = function() {
   var detail = document.getElementById('glSkillView');
   if (home) home.style.display = '';
   if (detail) detail.style.display = 'none';
+  // Restore original AI panel chips
+  var aiChipsEl = document.querySelector('.ai-chips');
+  if (aiChipsEl && aiChipsEl._originalHTML) {
+    aiChipsEl.innerHTML = aiChipsEl._originalHTML;
+    aiChipsEl._originalHTML = null;
+  }
 };
 
 window._glAsk = function(prompt, title) {
   var test  = window._germanTest  || 'German test';
   var level = window._germanLevel || 'my level';
   var skill = _glSkillNames[_glActiveSkill] || _glActiveSkill || '';
-  // Build a context-aware prompt
-  var fullPrompt = prompt + ' (Context: ' + test + (level ? ', level ' + level : '') + (skill ? ', skill: ' + skill : '') + ')';
+  var docCtx = (pdfFullText && pdfFullText.trim())
+    ? '\n\nUse this document as context:\n"""\n' + pdfFullText.slice(0, 8000) + '\n"""'
+    : '';
+  var fullPrompt = prompt + ' (Context: ' + test + (level ? ', level ' + level : '') + (skill ? ', skill: ' + skill : '') + ')' + docCtx;
   _showFilesView();
   var ws = document.getElementById('welcomeState');
   var co = document.getElementById('courseOverview');
