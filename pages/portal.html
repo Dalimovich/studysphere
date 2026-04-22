@@ -550,10 +550,29 @@
             <div class="chat-rooms-panel">
               <div class="chat-rooms-hdr">
                 <span>&#x1F4AC; Rooms</span>
-                <button class="chat-add-friend-btn" id="chatAddFriendBtn" title="Add Friend">&#x1F464;+</button>
+                <div style="display:flex;gap:6px">
+                  <button class="chat-add-friend-btn" id="chatCreateRoomBtn" title="Create Room" style="font-size:.85rem">&#x2B; Room</button>
+                  <button class="chat-add-friend-btn" id="chatAddFriendBtn" title="Add Friend">&#x1F464;+</button>
+                </div>
               </div>
               <div class="chat-rooms-list" id="chatRoomsList"></div>
             </div>
+          <!-- Create/Edit Room Modal -->
+          <div id="chatRoomModal" style="display:none;position:absolute;inset:0;z-index:210;background:rgba(0,0,0,.65);backdrop-filter:blur(8px);align-items:center;justify-content:center">
+            <div class="chat-friend-box" style="max-width:380px;width:100%">
+              <div class="chat-friend-box-hdr">
+                <span id="chatRoomModalTitle">&#x2B; Create Room</span>
+                <button class="chat-friend-box-close" id="chatRoomModalClose">&#x2715;</button>
+              </div>
+              <input class="chat-friend-search" id="chatRoomNameInput" type="text" placeholder="Room name..." maxlength="40" autocomplete="off" style="margin-bottom:8px"/>
+              <input class="chat-friend-search" id="chatRoomDescInput" type="text" placeholder="Description (optional)..." maxlength="100" autocomplete="off" style="margin-bottom:12px"/>
+              <div id="chatRoomModalErr" style="display:none;color:#ef4444;font-size:.75rem;font-weight:700;margin-bottom:8px"></div>
+              <div style="display:flex;gap:8px">
+                <button id="chatRoomSaveBtn" style="flex:1;padding:12px;background:linear-gradient(135deg,#c084fc,#f472b6);border:none;border-radius:30px;font-family:'Nunito',sans-serif;font-weight:800;font-size:.9rem;color:#fff;cursor:pointer">Create &#x2192;</button>
+                <button id="chatRoomDeleteBtn" style="display:none;padding:12px 18px;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);border-radius:30px;font-family:'Nunito',sans-serif;font-weight:800;font-size:.9rem;color:#ef4444;cursor:pointer">Delete</button>
+              </div>
+            </div>
+          </div>
             <!-- Main chat area -->
             <div class="chat-main">
               <div class="chat-main-hdr">
