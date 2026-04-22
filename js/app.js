@@ -4792,6 +4792,84 @@ async function _chatAcceptFriend(friendshipId) {
   } catch(e) { console.warn('Accept friend error:', e); }
 }
 
+// ── Custom rooms ───────────────────────────────────────────────────────────
+var _customRooms = [];
+var _editingRoomId = null;
+
+async function _chatLoadCustomRooms() {
+  try {
+    var res = await fetch(SUPA_URL + '/rest/v1/custom_rooms?order=created_at.asc', { headers: _sbHeaders() });
+    var data = await res.json();
+    if (Array.isArray(data)) { _customRooms = data; _chatRenderRooms(); }
+  } catch(e) { console.warn('Load custom rooms error:', e); }
+}
+
+function _chatShowRoomModal(room) {
+  _editingRoomId = room ? room.id : null;
+  var modal = document.getElementById('chatRoomModal');
+  var title = document.getElementById('chatRoomModalTitle');
+  var nameInp = document.getElementById('chatRoomNameInput');
+  var descInp = document.getElementById('chatRoomDescInput');
+  var saveBtn = document.getElementById('chatRoomSaveBtn');
+  var delBtn  = document.getElementById('chatRoomDeleteBtn');
+  var err     = document.getElementById('chatRoomModalErr');
+  if (!modal) return;
+  title.textContent = room ? '✏️ Edit Room' : '+ Create Room';
+  nameInp.value = room ? room.name : '';
+  descInp.value = room ? (room.description || '') : '';
+  saveBtn.textContent = room ? 'Save →' : 'Create →';
+  if (delBtn) delBtn.style.display = room && room.created_by === (_currentUser && _currentUser.id) ? '' : 'none';
+  if (err) err.style.display = 'none';
+  modal.style.display = 'flex';
+  nameInp.focus();
+}
+
+function _chatHideRoomModal() {
+  var modal = document.getElementById('chatRoomModal');
+  if (modal) modal.style.display = 'none';
+  _editingRoomId = null;
+}
+
+(document.getElementById('chatCreateRoomBtn') || {addEventListener:function(){}}).addEventListener('click', function() { _chatShowRoomModal(null); });
+(document.getElementById('chatRoomModalClose') || {addEventListener:function(){}}).addEventListener('click', _chatHideRoomModal);
+
+(document.getElementById('chatRoomSaveBtn') || {addEventListener:function(){}}).addEventListener('click', async function() {
+  var name = (document.getElementById('chatRoomNameInput') || {}).value.trim();
+  var desc = (document.getElementById('chatRoomDescInput') || {}).value.trim();
+  var err  = document.getElementById('chatRoomModalErr');
+  if (!name) { if (err) { err.textContent = 'Room name is required.'; err.style.display = ''; } return; }
+  if (!_currentUser) return;
+  try {
+    if (_editingRoomId) {
+      await fetch(SUPA_URL + '/rest/v1/custom_rooms?id=eq.' + encodeURIComponent(_editingRoomId), {
+        method: 'PATCH',
+        headers: Object.assign(_sbHeaders(), { 'Prefer': 'return=minimal' }),
+        body: JSON.stringify({ name: name, description: desc })
+      });
+    } else {
+      await fetch(SUPA_URL + '/rest/v1/custom_rooms', {
+        method: 'POST',
+        headers: Object.assign(_sbHeaders(), { 'Prefer': 'return=minimal' }),
+        body: JSON.stringify({ name: name, description: desc, created_by: _currentUser.id })
+      });
+    }
+    _chatHideRoomModal();
+    await _chatLoadCustomRooms();
+  } catch(e) { if (err) { err.textContent = 'Error saving room.'; err.style.display = ''; } }
+});
+
+(document.getElementById('chatRoomDeleteBtn') || {addEventListener:function(){}}).addEventListener('click', async function() {
+  if (!_editingRoomId || !confirm('Delete this room and all its messages?')) return;
+  try {
+    await fetch(SUPA_URL + '/rest/v1/custom_rooms?id=eq.' + encodeURIComponent(_editingRoomId), {
+      method: 'DELETE', headers: _sbHeaders()
+    });
+    _chatHideRoomModal();
+    if (_chatRoomId === 'custom_' + _editingRoomId) { _chatRoomId = null; document.getElementById('chatRoomName').textContent = 'Select a room'; document.getElementById('chatMsgs').innerHTML = '<div class="chat-empty">Select a room to start chatting 💬</div>'; }
+    await _chatLoadCustomRooms();
+  } catch(e) { console.warn('Delete room error:', e); }
+});
+
 // ── Rooms + friends render ─────────────────────────────────────────────────
 function _chatGetRooms() {
   var rooms = [{ id: 'general', name: '# General', icon: '&#x1F310;' }];
@@ -4814,32 +4892,64 @@ function _chatRenderRooms() {
   var rooms = _chatGetRooms();
   list.innerHTML = '';
 
-  // ── Rooms section ──
+  // ── General section ──
   var genLabel = document.createElement('div');
   genLabel.className = 'chat-rooms-section-label';
   genLabel.textContent = 'General';
   list.appendChild(genLabel);
 
-  rooms.forEach(function(r, i) {
-    if (i === 1) {
-      var courseLabel = document.createElement('div');
-      courseLabel.className = 'chat-rooms-section-label';
-      courseLabel.textContent = 'Courses';
-      list.appendChild(courseLabel);
-    }
-    var div = document.createElement('div');
-    div.className = 'chat-room-item' + (r.id === _chatRoomId ? ' active' : '');
-    div.dataset.rid = r.id;
-    div.innerHTML = '<span class="chat-room-icon">' + r.icon + '</span><span class="chat-room-label" title="' + _chatEsc(r.fullName || r.name) + '">' + _chatEsc(r.name) + '</span>';
-    div.addEventListener('click', function() { _chatOpenRoom(r.id, r.fullName || r.name); });
-    list.appendChild(div);
-  });
+  var genDiv = document.createElement('div');
+  genDiv.className = 'chat-room-item' + ('general' === _chatRoomId ? ' active' : '');
+  genDiv.innerHTML = '<span class="chat-room-icon">&#x1F310;</span><span class="chat-room-label"># General</span>';
+  genDiv.addEventListener('click', function() { _chatOpenRoom('general', '# General'); });
+  list.appendChild(genDiv);
 
-  if (rooms.length === 1) {
-    var hint = document.createElement('div');
-    hint.style.cssText = 'font-size:.72rem;color:var(--on-glass-faint);padding:8px 10px;font-weight:700';
-    hint.textContent = 'Add courses to see course rooms';
-    list.appendChild(hint);
+  // ── Custom Rooms section ──
+  var crLabel = document.createElement('div');
+  crLabel.className = 'chat-rooms-section-label';
+  crLabel.style.marginTop = '8px';
+  crLabel.textContent = 'Rooms';
+  list.appendChild(crLabel);
+
+  if (_customRooms.length) {
+    _customRooms.forEach(function(r) {
+      var rid = 'custom_' + r.id;
+      var isCreator = r.created_by === (_currentUser && _currentUser.id);
+      var row = document.createElement('div');
+      row.className = 'chat-room-item' + (rid === _chatRoomId ? ' active' : '');
+      row.style.justifyContent = 'space-between';
+      row.innerHTML = '<span style="display:flex;align-items:center;gap:6px;overflow:hidden"><span class="chat-room-icon">&#x1F4AC;</span><span class="chat-room-label" title="' + _chatEsc(r.description || r.name) + '">' + _chatEsc(r.name) + '</span></span>' +
+        (isCreator ? '<button style="background:none;border:none;color:rgba(192,132,252,.5);cursor:pointer;font-size:.8rem;padding:2px 4px;flex-shrink:0" title="Edit">&#x270E;</button>' : '');
+      row.querySelector('span').addEventListener('click', function() { _chatOpenRoom(rid, r.name); });
+      if (isCreator) {
+        row.querySelector('button').addEventListener('click', function(e) { e.stopPropagation(); _chatShowRoomModal(r); });
+      } else {
+        row.addEventListener('click', function() { _chatOpenRoom(rid, r.name); });
+      }
+      list.appendChild(row);
+    });
+  } else {
+    var noRooms = document.createElement('div');
+    noRooms.style.cssText = 'font-size:.72rem;color:var(--on-glass-faint);padding:6px 10px;font-weight:700';
+    noRooms.textContent = 'No rooms yet — create one!';
+    list.appendChild(noRooms);
+  }
+
+  // ── Course Rooms section ──
+  var courseRooms = rooms.slice(1);
+  if (courseRooms.length) {
+    var courseLabel = document.createElement('div');
+    courseLabel.className = 'chat-rooms-section-label';
+    courseLabel.style.marginTop = '8px';
+    courseLabel.textContent = 'Courses';
+    list.appendChild(courseLabel);
+    courseRooms.forEach(function(r) {
+      var div = document.createElement('div');
+      div.className = 'chat-room-item' + (r.id === _chatRoomId ? ' active' : '');
+      div.innerHTML = '<span class="chat-room-icon">' + r.icon + '</span><span class="chat-room-label" title="' + _chatEsc(r.fullName || r.name) + '">' + _chatEsc(r.name) + '</span>';
+      div.addEventListener('click', function() { _chatOpenRoom(r.id, r.fullName || r.name); });
+      list.appendChild(div);
+    });
   }
 
   // ── Direct Messages section ──
@@ -5138,7 +5248,7 @@ async function _chatSaveUsername() {
     _chatUsername = val;
     _chatHideUsernameModal();
     _chatRenderRooms();
-    _chatLoadFriends().then(function() { _chatRenderRooms(); });
+    _chatLoadFriends().then(function() { _chatRenderRooms(); }); _chatLoadCustomRooms();
     if (!_chatRoomId) _chatOpenRoom('general', '# General');
   } catch(e) {
     if(err){err.textContent='Something went wrong. Try again.';err.style.display='block';}
@@ -5167,7 +5277,7 @@ function _chatInit() {
           if (Array.isArray(d) && d[0] && d[0].chat_username) {
             _chatUsername = d[0].chat_username;
             _chatRenderRooms();
-            _chatLoadFriends().then(function() { _chatRenderRooms(); });
+            _chatLoadFriends().then(function() { _chatRenderRooms(); }); _chatLoadCustomRooms();
             if (!_chatRoomId) _chatOpenRoom('general', '# General');
           } else {
             _chatShowUsernameModal();
@@ -5176,7 +5286,7 @@ function _chatInit() {
     }
   } else {
     _chatRenderRooms();
-    _chatLoadFriends().then(function() { _chatRenderRooms(); });
+    _chatLoadFriends().then(function() { _chatRenderRooms(); }); _chatLoadCustomRooms();
     if (!_chatRoomId) _chatOpenRoom('general', '# General');
   }
 }
