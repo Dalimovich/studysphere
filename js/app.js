@@ -874,7 +874,7 @@ function showCourseSection(course,section){
   co.style.display='block';
   co.innerHTML='<div class="co-inner">'+
     '<div class="co-logo">📚 StudySphere</div>'+
-    '<p class="co-tag">'+course.name+' · '+course.meta+'</p>'+
+    (course.meta?'<p class="co-tag">'+course.name+' · '+course.meta+'</p>':'')+
     '<div class="co-card" style="margin-top:0">'+buildContent()+'</div>'+
     '</div>';
   // Trigger CSS animation on inner card — no JS style juggling
@@ -4448,16 +4448,6 @@ var _glActiveSkill = '';
 
 window._glOpenSkill = function(skill) {
   _glActiveSkill = skill;
-  var home = document.getElementById('glHome');
-  var detail = document.getElementById('glSkillView');
-  if (home) home.style.display = 'none';
-  if (detail) detail.style.display = '';
-
-  // Set title/sub
-  var t = document.getElementById('glSkillTitle');
-  var s = document.getElementById('glSkillSub');
-  if (t) t.textContent = _glSkillNames[skill] || skill;
-  if (s) s.textContent = _glSkillSubs[skill] || '';
 
   // Inject skill chips into the AI panel's .ai-chips div
   var aiChipsEl = document.querySelector('.ai-chips');
@@ -4473,9 +4463,7 @@ window._glOpenSkill = function(skill) {
     });
   }
 
-  // Reset AI panel and load files for this skill
-  var panel = document.getElementById('glAIPanel');
-  if (panel) panel.style.display = 'none';
+  // Go straight to the files view — skip the intermediate glSkillView entirely
   _glLoadFiles();
 };
 
@@ -4609,6 +4597,8 @@ async function _glLoadFiles() {
   activeCourseId = course.id;
   activeCourseRef = course;
   _showFilesView();
+  var crumb = document.getElementById('breadcrumb');
+  if (crumb) crumb.innerHTML = '<b>' + (course.name || course.id) + '</b>';
   showCourseSection(course, 'files');
 }
 
