@@ -36,6 +36,10 @@
           <div class="sb-item-icon">&#x1F4DD;</div>
           <span>Lecture Notes</span>
         </div>
+        <div class="sb-item psb" id="psbEditor">
+          <div class="sb-item-icon">&#x270F;&#xFE0F;</div>
+          <span>Editor</span>
+        </div>
         <div class="sb-item psb" id="psbAIPage">
           <div class="sb-item-icon">&#x1F916;</div>
           <span>Chatbot</span>
@@ -479,6 +483,66 @@
               </div>
             </div>
             <div id="sdCourseList" class="sd-course-grid"></div>
+          </div>
+        </div>
+
+        <!-- EDITOR -->
+        <div id="psec-editor" class="portal-section" style="display:none">
+          <div class="editor-page">
+            <div class="editor-doclist" id="editorDocList">
+              <div class="editor-doclist-hdr">
+                <span>My Documents</span>
+                <button class="editor-new-btn" id="editorNewBtn">+ New</button>
+              </div>
+              <div class="editor-doc-items" id="editorDocItems"></div>
+            </div>
+            <div class="editor-main" id="editorMain">
+              <div class="editor-empty-state" id="editorEmptyState">
+                <div style="font-size:3rem">&#x270F;&#xFE0F;</div>
+                <div style="font-family:'Fredoka One',cursive;font-size:1.2rem;color:var(--on-glass);margin-top:10px">No document open</div>
+                <div style="font-size:.82rem;color:var(--on-glass-muted);margin-top:6px">Create a new document or select one from the list</div>
+              </div>
+              <div class="editor-workspace" id="editorWorkspace" style="display:none">
+                <div class="editor-topbar">
+                  <input class="editor-title-input" id="editorTitleInput" type="text" placeholder="Untitled document" maxlength="120">
+                  <div class="editor-topbar-actions">
+                    <button class="editor-action-btn editor-save-btn" id="editorSaveBtn">&#x1F4BE; Save</button>
+                    <button class="editor-action-btn editor-export-btn" id="editorExportBtn">&#x2B07; Export PDF</button>
+                    <button class="editor-action-btn editor-delete-btn" id="editorDeleteBtn">&#x1F5D1;</button>
+                  </div>
+                </div>
+                <div class="editor-toolbar" id="editorToolbar">
+                  <button class="ed-tb-btn" data-cmd="bold" title="Bold"><b>B</b></button>
+                  <button class="ed-tb-btn" data-cmd="italic" title="Italic"><i>I</i></button>
+                  <button class="ed-tb-btn" data-cmd="underline" title="Underline"><u>U</u></button>
+                  <div class="ed-tb-sep"></div>
+                  <button class="ed-tb-btn" data-cmd="formatBlock" data-val="h1" title="Heading 1">H1</button>
+                  <button class="ed-tb-btn" data-cmd="formatBlock" data-val="h2" title="Heading 2">H2</button>
+                  <button class="ed-tb-btn" data-cmd="formatBlock" data-val="h3" title="Heading 3">H3</button>
+                  <button class="ed-tb-btn" data-cmd="formatBlock" data-val="p" title="Paragraph">P</button>
+                  <div class="ed-tb-sep"></div>
+                  <button class="ed-tb-btn" data-cmd="insertUnorderedList" title="Bullet list">&#x2022; List</button>
+                  <button class="ed-tb-btn" data-cmd="insertOrderedList" title="Numbered list">1. List</button>
+                  <div class="ed-tb-sep"></div>
+                  <button class="ed-tb-btn" data-cmd="justifyLeft" title="Align left">&#x2190;</button>
+                  <button class="ed-tb-btn" data-cmd="justifyCenter" title="Center">&#x2194;</button>
+                  <button class="ed-tb-btn" data-cmd="justifyRight" title="Align right">&#x2192;</button>
+                  <div class="ed-tb-sep"></div>
+                  <select class="ed-tb-select" id="edFontSize" title="Font size">
+                    <option value="1">Small</option>
+                    <option value="3" selected>Normal</option>
+                    <option value="5">Large</option>
+                    <option value="7">XL</option>
+                  </select>
+                  <input class="ed-tb-color" id="edFontColor" type="color" value="#ffffff" title="Text colour">
+                  <div class="ed-tb-sep"></div>
+                  <button class="ed-tb-btn" data-cmd="undo" title="Undo">&#x21B6;</button>
+                  <button class="ed-tb-btn" data-cmd="redo" title="Redo">&#x21B7;</button>
+                </div>
+                <div class="editor-body" id="editorBody" contenteditable="true" spellcheck="true"></div>
+                <div class="editor-wordcount" id="editorWordCount">0 words</div>
+              </div>
+            </div>
           </div>
         </div>
 

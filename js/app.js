@@ -217,7 +217,7 @@ function showPortalSection(sec) {
   var target = document.getElementById('psec-'+sec);
   if (target) target.style.display = 'block';
   // Update topbar title
-  var _titles = {dashboard:'Dashboard',notes:'Lecture Notes',profile:'Profile',settings:'Settings',subscription:'Subscription',studip:'Courses',chat:'Chat',notifications:'Notifications',games:'Games',lounge:'Study Lounge',aipage:'Chatbot',german:'Practice'};
+  var _titles = {dashboard:'Dashboard',notes:'Lecture Notes',editor:'Editor',profile:'Profile',settings:'Settings',subscription:'Subscription',studip:'Courses',chat:'Chat',notifications:'Notifications',games:'Games',lounge:'Study Lounge',aipage:'Chatbot',german:'Practice'};
   var tt = document.getElementById('topTitle');
   if (tt) tt.textContent = _titles[sec] || sec;
   // FAB only visible on dashboard
@@ -5803,6 +5803,12 @@ window._obFinishLearner = async function() {
       showPortal();
       setNavActive('psbNotes');
       showPortalSection('notes');
+    }
+    if (item.id === 'psbEditor') {
+      showPortal();
+      setNavActive('psbEditor');
+      showPortalSection('editor');
+      _editorInit();
     }
     if (item.id === 'psbAIPage') {
       showPortal();
@@ -12634,3 +12640,195 @@ function _stStop(){
     }
   });
 })();
+
+// ── DOCUMENT EDITOR ──────────────────────────────────────────────────────────
+
+var _editorCurrentId = null;
+var _editorInited = false;
+
+function _editorStorageKey() {
+  var uid = _currentUser && (_currentUser.id || _currentUser.sub);
+  return 'ss_editor_docs_' + (uid || 'guest');
+}
+
+function _editorLoadAll() {
+  try { return JSON.parse(localStorage.getItem(_editorStorageKey()) || '[]'); } catch(e) { return []; }
+}
+
+function _editorSaveAll(docs) {
+  try { localStorage.setItem(_editorStorageKey(), JSON.stringify(docs)); } catch(e) {}
+}
+
+function _editorInit() {
+  if (_editorInited) { _editorRenderList(); return; }
+  _editorInited = true;
+
+  var newBtn    = document.getElementById('editorNewBtn');
+  var saveBtn   = document.getElementById('editorSaveBtn');
+  var exportBtn = document.getElementById('editorExportBtn');
+  var deleteBtn = document.getElementById('editorDeleteBtn');
+  var body      = document.getElementById('editorBody');
+  var titleIn   = document.getElementById('editorTitleInput');
+  var fontSel   = document.getElementById('edFontSize');
+  var colorIn   = document.getElementById('edFontColor');
+
+  // Toolbar commands
+  document.getElementById('editorToolbar').addEventListener('click', function(e) {
+    var btn = e.target.closest('.ed-tb-btn');
+    if (!btn) return;
+    var cmd = btn.getAttribute('data-cmd');
+    var val = btn.getAttribute('data-val') || null;
+    document.execCommand(cmd, false, val);
+    body.focus();
+    _editorUpdateToolbarState();
+  });
+
+  fontSel && fontSel.addEventListener('change', function() {
+    document.execCommand('fontSize', false, fontSel.value);
+    body.focus();
+  });
+
+  colorIn && colorIn.addEventListener('input', function() {
+    document.execCommand('foreColor', false, colorIn.value);
+    body.focus();
+  });
+
+  // Word count
+  body && body.addEventListener('input', function() {
+    var text = body.innerText || '';
+    var words = text.trim() ? text.trim().split(/\s+/).length : 0;
+    var wc = document.getElementById('editorWordCount');
+    if (wc) wc.textContent = words + ' word' + (words !== 1 ? 's' : '');
+  });
+
+  // Update toolbar active states on selection change
+  document.addEventListener('selectionchange', _editorUpdateToolbarState);
+
+  newBtn && newBtn.addEventListener('click', function() {
+    _editorOpen(null);
+  });
+
+  saveBtn && saveBtn.addEventListener('click', function() {
+    _editorSaveCurrent();
+  });
+
+  deleteBtn && deleteBtn.addEventListener('click', function() {
+    if (!_editorCurrentId) return;
+    if (!confirm('Delete this document?')) return;
+    var docs = _editorLoadAll().filter(function(d) { return d.id !== _editorCurrentId; });
+    _editorSaveAll(docs);
+    _editorCurrentId = null;
+    document.getElementById('editorWorkspace').style.display = 'none';
+    document.getElementById('editorEmptyState').style.display = '';
+    _editorRenderList();
+  });
+
+  exportBtn && exportBtn.addEventListener('click', function() {
+    _editorExportPdf();
+  });
+
+  // Keyboard shortcut: Ctrl+S to save
+  document.getElementById('editorBody') && document.getElementById('editorBody').addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); _editorSaveCurrent(); }
+  });
+
+  _editorRenderList();
+}
+
+function _editorRenderList() {
+  var list = document.getElementById('editorDocItems');
+  if (!list) return;
+  var docs = _editorLoadAll();
+  if (!docs.length) {
+    list.innerHTML = '<div style="padding:20px 16px;font-size:.8rem;color:var(--on-glass-muted);text-align:center">No documents yet.<br>Click <b>+ New</b> to create one.</div>';
+    return;
+  }
+  list.innerHTML = docs.sort(function(a,b){ return b.updated - a.updated; }).map(function(d) {
+    var date = new Date(d.updated).toLocaleDateString('de-DE', {day:'2-digit',month:'2-digit',year:'numeric'});
+    var active = d.id === _editorCurrentId;
+    return '<div class="editor-doc-item'+(active?' active':'')+'" data-id="'+d.id+'">'+
+      '<div class="editor-doc-item-title">'+(d.title||'Untitled')+'</div>'+
+      '<div class="editor-doc-item-date">'+date+'</div>'+
+    '</div>';
+  }).join('');
+  list.querySelectorAll('.editor-doc-item').forEach(function(el) {
+    el.addEventListener('click', function() { _editorOpen(el.getAttribute('data-id')); });
+  });
+}
+
+function _editorOpen(id) {
+  var docs = _editorLoadAll();
+  var doc;
+  if (id) {
+    doc = docs.find(function(d) { return d.id === id; });
+    if (!doc) return;
+  } else {
+    doc = { id: 'ed_' + Date.now(), title: '', content: '', updated: Date.now() };
+    docs.unshift(doc);
+    _editorSaveAll(docs);
+  }
+  _editorCurrentId = doc.id;
+  var workspace = document.getElementById('editorWorkspace');
+  var emptyState = document.getElementById('editorEmptyState');
+  if (workspace) workspace.style.display = '';
+  if (emptyState) emptyState.style.display = 'none';
+  var titleIn = document.getElementById('editorTitleInput');
+  var body = document.getElementById('editorBody');
+  if (titleIn) titleIn.value = doc.title || '';
+  if (body) body.innerHTML = doc.content || '<p><br></p>';
+  var wc = document.getElementById('editorWordCount');
+  if (wc) {
+    var text = (body && body.innerText) || '';
+    var words = text.trim() ? text.trim().split(/\s+/).length : 0;
+    wc.textContent = words + ' word' + (words !== 1 ? 's' : '');
+  }
+  if (body) body.focus();
+  _editorRenderList();
+}
+
+function _editorSaveCurrent() {
+  if (!_editorCurrentId) return;
+  var docs = _editorLoadAll();
+  var idx = docs.findIndex(function(d) { return d.id === _editorCurrentId; });
+  if (idx === -1) return;
+  var titleIn = document.getElementById('editorTitleInput');
+  var body = document.getElementById('editorBody');
+  docs[idx].title = (titleIn && titleIn.value.trim()) || 'Untitled';
+  docs[idx].content = body ? body.innerHTML : '';
+  docs[idx].updated = Date.now();
+  _editorSaveAll(docs);
+  _editorRenderList();
+  showToast('Saved', docs[idx].title);
+}
+
+function _editorExportPdf() {
+  var docs = _editorLoadAll();
+  var doc = docs.find(function(d) { return d.id === _editorCurrentId; });
+  if (!doc) return;
+  var title = doc.title || 'Untitled';
+  var content = doc.content || '';
+  var win = window.open('', '_blank');
+  win.document.write('<!DOCTYPE html><html><head><meta charset="utf-8">'+
+    '<title>'+title+'</title>'+
+    '<style>'+
+      'body{font-family:Georgia,serif;font-size:13pt;line-height:1.7;max-width:750px;margin:40px auto;color:#111;padding:0 30px}'+
+      'h1{font-size:2rem;margin-bottom:.3em}h2{font-size:1.5rem}h3{font-size:1.2rem}'+
+      'ul,ol{padding-left:1.5em}'+
+      '@media print{body{margin:0;padding:20px}}'+
+    '</style>'+
+    '</head><body>'+
+    '<h1>'+title+'</h1>'+content+
+    '<script>window.onload=function(){window.print();}<\/script>'+
+    '</body></html>');
+  win.document.close();
+}
+
+function _editorUpdateToolbarState() {
+  var toolbar = document.getElementById('editorToolbar');
+  if (!toolbar) return;
+  var cmds = ['bold','italic','underline','insertUnorderedList','insertOrderedList'];
+  cmds.forEach(function(cmd) {
+    var btn = toolbar.querySelector('[data-cmd="'+cmd+'"]');
+    if (btn) btn.classList.toggle('active', document.queryCommandState(cmd));
+  });
+}
