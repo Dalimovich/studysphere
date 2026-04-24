@@ -518,6 +518,8 @@ async function _ufMerge(course){
     var date=item.updated_at?new Date(item.updated_at).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}):'';
     return {name:displayName,storageName:fname,size:size,date:date};
   }
+  // Clear previously uploaded files so stale entries don't persist after moves/deletes
+  course.files=(course.files||[]).filter(function(f){return !f._uploaded;});
   // Root listing — files have an id, folder entries have id: null
   var items=await _ufList(uid,course);
   var discoveredFolders=[];
