@@ -496,8 +496,15 @@ async function _ufFetchBytes(uid,course,name,folder){
 }
 
 // Delete one file from Supabase Storage
-async function _ufDeleteRemote(uid,course,name,folder){
-  var path=_ufStoragePath(uid,course,name,folder||null);
+async function _ufDeleteRemote(uid,course,name,folder,storageName){
+  var path;
+  if(storageName){
+    // Use exact storage key to avoid re-sanitizing display names of old files
+    var base=uid+'/'+_ufKey(course)+'/'+(folder?_ufSanitizeName(folder)+'/':'');
+    path=base+storageName;
+  }else{
+    path=_ufStoragePath(uid,course,name,folder||null);
+  }
   await fetch(SUPA_URL+'/storage/v1/object/'+_UF_BUCKET+'/'+path,{
     method:'DELETE',
     headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+(_sbToken||SUPA_KEY)}
@@ -557,9 +564,9 @@ async function _ufMerge(course){
 }
 
 // Delete — removes from Supabase and from course.files / course.userFolders in memory
-function _ufDelete(course,name,folder){
+function _ufDelete(course,name,folder,storageName){
   var uid=_currentUser&&(_currentUser.id||_currentUser.sub);
-  if(uid)_ufDeleteRemote(uid,course,name,folder||null);
+  if(uid)_ufDeleteRemote(uid,course,name,folder||null,storageName||null);
   if(folder){
     (course.userFolders||[]).forEach(function(fd){
       if(fd.name===folder)fd.files=fd.files.filter(function(f){return f.name!==name;});
@@ -739,7 +746,8 @@ function showCourseSection(course,section){
       function _fileRow(f,inFolder){
         var icon=f._uploaded?'📎':f.name.includes('Lösung')?'✅':f.name.includes('Aufgabe')?'📋':'📊';
         var fa=inFolder?' data-folder="'+inFolder+'"':'';
-        var delBtn=f._uploaded?'<span class="co-del-btn" data-fname="'+f.name+'"'+fa+' title="Delete" style="margin-left:6px;font-size:.69rem;font-weight:800;padding:3px 10px;border-radius:20px;background:rgba(239,68,68,.12);color:rgba(239,68,68,.85);border:1px solid rgba(239,68,68,.25);cursor:pointer;flex-shrink:0">🗑</span>':'';
+        var sna=f._storageName?' data-sname="'+f._storageName+'"':'';
+        var delBtn=f._uploaded?'<span class="co-del-btn" data-fname="'+f.name+'"'+sna+fa+' title="Delete" style="margin-left:6px;font-size:.69rem;font-weight:800;padding:3px 10px;border-radius:20px;background:rgba(239,68,68,.12);color:rgba(239,68,68,.85);border:1px solid rgba(239,68,68,.25);cursor:pointer;flex-shrink:0">🗑</span>':'';
         return '<div class="co-file'+(f._uploaded?' co-file-uploaded':'')+'" data-fname="'+f.name+'"'+fa+'>'+
           '<div class="co-file-cb" data-fname="'+f.name+'"></div>'+
           '<span class="co-file-icon">'+icon+'</span>'+
@@ -917,7 +925,7 @@ function showCourseSection(course,section){
       if (!toDelete.length) return;
       if (!confirm('Delete ' + toDelete.length + ' file' + (toDelete.length !== 1 ? 's' : '') + '?')) return;
       var uid = _currentUser && (_currentUser.id || _currentUser.sub); if (!uid) return;
-      toDelete.forEach(function(s) { _ufDelete(course, s.name, s.folder||null); });
+      toDelete.forEach(function(s) { _ufDelete(course, s.name, s.folder||null, s.sname||null); });
       selectedFiles = [];
       showCourseSection(course, 'files');
       showToast('Deleted', toDelete.length + ' file' + (toDelete.length !== 1 ? 's' : '') + ' removed');
@@ -954,10 +962,11 @@ function showCourseSection(course,section){
       if(e.target.closest('.co-dl-btn')||e.target.closest('.co-del-btn')) return;
       var fname = el.getAttribute('data-fname');
       var folderAttr = el.getAttribute('data-folder') || null;
+      var snameAttr = el.querySelector('.co-del-btn') ? el.querySelector('.co-del-btn').getAttribute('data-sname') : null;
       var inFolder = !!folderAttr;
       if (selectMode) {
         var idx = selectedFiles.findIndex(function(s){return s.name===fname&&s.folder===folderAttr;});
-        if (idx === -1) { selectedFiles.push({name:fname,folder:folderAttr}); el.classList.add('selected'); el.querySelector('.co-file-cb').classList.add('checked'); }
+        if (idx === -1) { selectedFiles.push({name:fname,folder:folderAttr,sname:snameAttr}); el.classList.add('selected'); el.querySelector('.co-file-cb').classList.add('checked'); }
         else { selectedFiles.splice(idx,1); el.classList.remove('selected'); el.querySelector('.co-file-cb').classList.remove('checked'); }
         updateMultiBar();
         return;
@@ -987,10 +996,11 @@ function showCourseSection(course,section){
     btn.addEventListener('click',function(e){
       e.stopPropagation();
       var fname=btn.getAttribute('data-fname');
+      var sname=btn.getAttribute('data-sname')||null;
       var folder=btn.getAttribute('data-folder')||null;
       var where=folder?'from folder "'+folder+'"':'from this course';
       if(!confirm('Delete "'+fname+'" '+where+'?'))return;
-      _ufDelete(course,fname,folder);
+      _ufDelete(course,fname,folder,sname);
       showCourseSection(course,'files');
     });
   });
@@ -1023,9 +1033,10 @@ function showCourseSection(course,section){
       sec.querySelectorAll('.co-file[data-fname]').forEach(function(el){
         var fname=el.getAttribute('data-fname');
         var folderAttr=el.getAttribute('data-folder')||null;
+        var snameA=el.querySelector('.co-del-btn')?el.querySelector('.co-del-btn').getAttribute('data-sname'):null;
         var already=selectedFiles.findIndex(function(s){return s.name===fname&&s.folder===folderAttr;});
         if(already===-1){
-          selectedFiles.push({name:fname,folder:folderAttr});
+          selectedFiles.push({name:fname,folder:folderAttr,sname:snameA});
           el.classList.add('selected');
           el.querySelector('.co-file-cb').classList.add('checked');
         }
