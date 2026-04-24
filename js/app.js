@@ -877,6 +877,7 @@ function showCourseSection(course,section){
       selectToggle.textContent = selectMode ? '✕ Cancel selection' : '☑ Select multiple';
       var filesList = co.querySelector('#coFilesList');
       if (filesList) filesList.classList.toggle('co-select-mode', selectMode);
+      co.querySelectorAll('.co-folder-files').forEach(function(fl){fl.classList.toggle('co-select-mode',selectMode);});
       if (!selectMode) {
         selectedFiles = [];
         co.querySelectorAll('.co-file').forEach(function(el){el.classList.remove('selected');});
