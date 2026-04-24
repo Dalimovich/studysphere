@@ -763,7 +763,6 @@ function showCourseSection(course,section){
       var filesHtml=course.files.slice().sort(function(a,b){return a.name.localeCompare(b.name);}).map(function(f){return _fileRow(f,null);}).join('');
       return '<div class="co-files-toolbar">'+
         '<button class="co-select-toggle" id="coSelectToggle">☑ Select multiple</button>'+
-        '<button class="co-select-all-btn" id="coSelectAllBtn" style="display:none">Select all</button>'+
         '<button class="co-new-folder-btn" id="coNewFolderBtn">📁 New folder</button>'+
         '<input type="file" id="coUploadInput" accept=".pdf,.doc,.docx,.txt,image/*" multiple style="display:none">'+
         '<input type="file" id="coFolderUploadInput" accept=".pdf,.doc,.docx,.txt,image/*" multiple style="display:none">'+
@@ -776,6 +775,7 @@ function showCourseSection(course,section){
         '<div id="coFilesList">'+filesHtml+'</div>'+
         '<div class="co-multi-bar" id="coMultiBar">'+
           '<span class="co-multi-count"><b id="coSelCount">0</b> files selected</span>'+
+          '<button class="co-multi-select-all" id="coSelectAllBtn">Select all</button>'+
           '<span class="co-multi-clear" id="coMultiClear">Clear</span>'+
           '<button class="co-multi-delete" id="coMultiDeleteBtn">🗑 Delete</button>'+
           '<button class="co-multi-move" id="coMultiMoveBtn">📁 Move</button>'+
@@ -877,7 +877,6 @@ function showCourseSection(course,section){
       selectMode = !selectMode;
       selectToggle.classList.toggle('active', selectMode);
       selectToggle.textContent = selectMode ? '✕ Cancel selection' : '☑ Select multiple';
-      if (selectAllBtn) selectAllBtn.style.display = selectMode ? '' : 'none';
       var filesList = co.querySelector('#coFilesList');
       if (filesList) filesList.classList.toggle('co-select-mode', selectMode);
       co.querySelectorAll('.co-folder-files').forEach(function(fl){fl.classList.toggle('co-select-mode',selectMode);});
