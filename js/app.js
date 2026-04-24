@@ -577,6 +577,27 @@ function _ufDelete(course,name,folder,storageName){
 }
 
 // Move a file via server-side copy then delete (no download needed)
+async function _ufMoveFileTo(uid, fromCourse, toCourse, fname, fromFolder, toFolder, storageName) {
+  var srcKey;
+  if(storageName){
+    var srcBase=uid+'/'+_ufKey(fromCourse)+'/'+(fromFolder?_ufSanitizeName(fromFolder)+'/':'');
+    srcKey=srcBase+storageName;
+  }else{
+    srcKey=_ufStoragePath(uid,fromCourse,fname,fromFolder||null);
+  }
+  var dstKey=_ufStoragePath(uid,toCourse,fname,toFolder||null);
+  if(srcKey===dstKey)return;
+  var r=await fetch(SUPA_URL+'/storage/v1/object/copy',{
+    method:'POST',
+    headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+(_sbToken||SUPA_KEY),'Content-Type':'application/json'},
+    body:JSON.stringify({bucketId:_UF_BUCKET,sourceKey:srcKey,destinationKey:dstKey})
+  });
+  if(!r.ok)throw new Error('Copy failed: '+r.status);
+  await fetch(SUPA_URL+'/storage/v1/object/'+_UF_BUCKET+'/'+srcKey,{
+    method:'DELETE',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+(_sbToken||SUPA_KEY)}
+  });
+}
+
 async function _ufMoveFile(uid, course, fname, fromFolder, toFolder) {
   if ((fromFolder||null) === (toFolder||null)) return;
   var srcKey = _ufStoragePath(uid, course, fname, fromFolder||null);
@@ -937,20 +958,22 @@ function showCourseSection(course,section){
     multiMoveBtn.addEventListener('click', function() {
       if (!selectedFiles.length) return;
       var uid = _currentUser && (_currentUser.id || _currentUser.sub); if (!uid) return;
-      _ufDestPicker(uid, course, async function(toFolder) {
+      _glMoveDestPicker(uid, course, async function(toCourse, toFolder) {
         multiMoveBtn.textContent = 'Moving…'; multiMoveBtn.disabled = true;
         var toMove = selectedFiles.slice();
         try {
           await Promise.all(toMove.map(function(s){
-            return _ufMoveFile(uid, course, s.name, s.folder||null, toFolder);
+            return _ufMoveFileTo(uid, course, toCourse, s.name, s.folder||null, toFolder, s.sname||null);
           }));
           course.userFolders = null;
-          course.files = course.files.filter(function(f){ return !(f._uploaded && toMove.some(function(s){return s.name===f.name&&!s.folder;})); });
+          course.files = (course.files||[]).filter(function(f){ return !(f._uploaded && toMove.some(function(s){return s.name===f.name;})); });
           selectedFiles = [];
           await _ufMerge(course);
           showCourseSection(course, 'files');
-          var dest = toFolder ? '"'+toFolder+'"' : 'course root';
-          showToast('Moved ✓', toMove.length+' file'+(toMove.length!==1?'s':'')+' moved to '+dest);
+          var destCard = toCourse.id !== course.id ? (toCourse.name||toCourse.id) : null;
+          var destFolder = toFolder ? '"'+toFolder+'"' : 'root';
+          var destLabel = destCard ? destCard + (toFolder ? ' / '+toFolder : '') : destFolder;
+          showToast('Moved ✓', toMove.length+' file'+(toMove.length!==1?'s':'')+' → '+destLabel);
         } catch(e) { showToast('Move failed', e.message); }
       });
     });
@@ -2774,6 +2797,75 @@ function _ufDestPicker(uid, course, onPick) {
     overlay.remove(); onPick(name.trim());
   });
   box.appendChild(nb);
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+}
+
+// Move destination picker for German Learner — lets user pick a different skill card AND folder
+// onPick(toCourse, toFolder) — toCourse may differ from current course
+function _glMoveDestPicker(uid, fromCourse, onPick) {
+  var isGL = fromCourse.id && fromCourse.id.startsWith('german-');
+  if (!isGL) { _ufDestPicker(uid, fromCourse, function(f){ onPick(fromCourse, f); }); return; }
+
+  function showFolderPicker(toCourse) {
+    var overlay2 = document.createElement('div');
+    overlay2.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:10002;';
+    overlay2.addEventListener('click',function(e){if(e.target===overlay2)overlay2.remove();});
+    var box2 = document.createElement('div');
+    box2.style.cssText = 'background:var(--dp-solid);border:1px solid rgba(255,255,255,.12);border-radius:18px;padding:22px 20px;max-width:340px;width:90%;max-height:75vh;overflow-y:auto;display:flex;flex-direction:column;gap:8px;';
+    var h2 = document.createElement('div');
+    h2.style.cssText = 'font-weight:800;font-size:.95rem;color:var(--on-glass);margin-bottom:2px;';
+    h2.textContent = 'Choose folder in ' + (toCourse.name || toCourse.id);
+    box2.appendChild(h2);
+    function addOpt2(icon, label, onClick) {
+      var b = document.createElement('button');
+      b.style.cssText = 'display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:10px 14px;cursor:pointer;color:var(--on-glass);font-family:Nunito,sans-serif;font-size:.85rem;font-weight:700;text-align:left;width:100%;transition:background .13s;';
+      b.innerHTML = '<span style="font-size:1.1rem">'+icon+'</span><span style="flex:1">'+label+'</span>';
+      b.addEventListener('mouseenter',function(){b.style.background='rgba(155,93,229,.2)';});
+      b.addEventListener('mouseleave',function(){b.style.background='rgba(255,255,255,.06)';});
+      b.addEventListener('click',function(){overlay2.remove();onClick();});
+      box2.appendChild(b);
+    }
+    addOpt2('📁', 'Root (no folder)', function(){ onPick(toCourse, null); });
+    _ufGetFolders(uid, toCourse).forEach(function(f){ addOpt2('📂', f, function(){ onPick(toCourse, f); }); });
+    var nb2 = document.createElement('button');
+    nb2.style.cssText = 'display:flex;align-items:center;gap:10px;background:rgba(155,93,229,.08);border:1px dashed rgba(155,93,229,.35);border-radius:12px;padding:10px 14px;cursor:pointer;color:var(--purple);font-family:Nunito,sans-serif;font-size:.85rem;font-weight:700;text-align:left;width:100%;margin-top:2px;';
+    nb2.innerHTML = '<span style="font-size:1.1rem">➕</span><span>New folder…</span>';
+    nb2.addEventListener('click',function(){
+      var name=prompt('Folder name:'); if(!name||!name.trim())return;
+      _ufCreateFolder(uid,toCourse,name.trim());
+      overlay2.remove(); onPick(toCourse,name.trim());
+    });
+    box2.appendChild(nb2);
+    overlay2.appendChild(box2);
+    document.body.appendChild(overlay2);
+  }
+
+  var overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:10001;';
+  overlay.addEventListener('click',function(e){if(e.target===overlay)overlay.remove();});
+  var box = document.createElement('div');
+  box.style.cssText = 'background:var(--dp-solid);border:1px solid rgba(255,255,255,.12);border-radius:18px;padding:22px 20px;max-width:340px;width:90%;max-height:75vh;overflow-y:auto;display:flex;flex-direction:column;gap:8px;';
+  var hdr = document.createElement('div');
+  hdr.style.cssText = 'font-weight:800;font-size:.95rem;color:var(--on-glass);margin-bottom:2px;';
+  hdr.textContent = 'Move to…';
+  box.appendChild(hdr);
+  var sub = document.createElement('div');
+  sub.style.cssText = 'font-size:.78rem;color:var(--on-glass-faint);margin-bottom:6px;';
+  sub.textContent = 'Pick a destination card';
+  box.appendChild(sub);
+  var skills = Object.keys(_glSkillNames);
+  skills.forEach(function(sk) {
+    var c = {id:'german-'+sk, short:'german-'+sk, name:'German '+_glSkillNames[sk]};
+    var isCurrent = c.id === fromCourse.id;
+    var b = document.createElement('button');
+    b.style.cssText = 'display:flex;align-items:center;gap:10px;background:'+(isCurrent?'rgba(155,93,229,.18)':'rgba(255,255,255,.06)')+';border:1px solid '+(isCurrent?'rgba(155,93,229,.4)':'rgba(255,255,255,.1)')+';border-radius:12px;padding:10px 14px;cursor:pointer;color:var(--on-glass);font-family:Nunito,sans-serif;font-size:.85rem;font-weight:700;text-align:left;width:100%;transition:background .13s;';
+    b.innerHTML = '<span style="font-size:1.1rem">📚</span><span style="flex:1">'+_glSkillNames[sk]+(isCurrent?' (current)':'')+'</span>';
+    b.addEventListener('mouseenter',function(){b.style.background='rgba(155,93,229,.25)';});
+    b.addEventListener('mouseleave',function(){b.style.background=isCurrent?'rgba(155,93,229,.18)':'rgba(255,255,255,.06)';});
+    b.addEventListener('click',function(){overlay.remove(); showFolderPicker(c);});
+    box.appendChild(b);
+  });
   overlay.appendChild(box);
   document.body.appendChild(overlay);
 }
