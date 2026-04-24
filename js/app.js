@@ -444,10 +444,6 @@ function _ufUpload(uid,course,file,onProgress,folder){
     xhr.setRequestHeader('Authorization','Bearer '+(_sbToken||SUPA_KEY));
     xhr.setRequestHeader('Content-Type',file.type||'application/octet-stream');
     xhr.setRequestHeader('x-upsert','true');
-    // Store original filename in metadata so display name survives sanitization
-    if(file.name!==_ufSanitizeName(file.name)){
-      xhr.setRequestHeader('x-metadata',JSON.stringify({originalName:file.name}));
-    }
     if(onProgress){
       xhr.upload.addEventListener('progress',function(e){
         if(e.lengthComputable)onProgress(Math.round(e.loaded/e.total*100));
