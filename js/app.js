@@ -900,7 +900,7 @@ function showCourseSection(course,section){
   if (multiSumBtn) {
     multiSumBtn.addEventListener('click', function() {
       if (selectedFiles.length === 0) return;
-      runMultiSummary(selectedFiles, course);
+      runMultiSummary(selectedFiles.map(function(s){return s.name;}), course);
     });
   }
 
@@ -911,7 +911,7 @@ function showCourseSection(course,section){
       if (!toDelete.length) return;
       if (!confirm('Delete ' + toDelete.length + ' file' + (toDelete.length !== 1 ? 's' : '') + '?')) return;
       var uid = _currentUser && (_currentUser.id || _currentUser.sub); if (!uid) return;
-      toDelete.forEach(function(fname) { _ufDelete(course, fname, null); });
+      toDelete.forEach(function(s) { _ufDelete(course, s.name, s.folder||null); });
       selectedFiles = [];
       showCourseSection(course, 'files');
       showToast('Deleted', toDelete.length + ' file' + (toDelete.length !== 1 ? 's' : '') + ' removed');
@@ -927,11 +927,11 @@ function showCourseSection(course,section){
         multiMoveBtn.textContent = 'Moving…'; multiMoveBtn.disabled = true;
         var toMove = selectedFiles.slice();
         try {
-          await Promise.all(toMove.map(function(fname){
-            return _ufMoveFile(uid, course, fname, null, toFolder);
+          await Promise.all(toMove.map(function(s){
+            return _ufMoveFile(uid, course, s.name, s.folder||null, toFolder);
           }));
           course.userFolders = null;
-          course.files = course.files.filter(function(f){ return !(f._uploaded && toMove.indexOf(f.name) !== -1); });
+          course.files = course.files.filter(function(f){ return !(f._uploaded && toMove.some(function(s){return s.name===f.name&&!s.folder;})); });
           selectedFiles = [];
           await _ufMerge(course);
           showCourseSection(course, 'files');
@@ -949,9 +949,9 @@ function showCourseSection(course,section){
       var fname = el.getAttribute('data-fname');
       var folderAttr = el.getAttribute('data-folder') || null;
       var inFolder = !!folderAttr;
-      if (selectMode && !inFolder) {
-        var idx = selectedFiles.indexOf(fname);
-        if (idx === -1) { selectedFiles.push(fname); el.classList.add('selected'); el.querySelector('.co-file-cb').classList.add('checked'); }
+      if (selectMode) {
+        var idx = selectedFiles.findIndex(function(s){return s.name===fname&&s.folder===folderAttr;});
+        if (idx === -1) { selectedFiles.push({name:fname,folder:folderAttr}); el.classList.add('selected'); el.querySelector('.co-file-cb').classList.add('checked'); }
         else { selectedFiles.splice(idx,1); el.classList.remove('selected'); el.querySelector('.co-file-cb').classList.remove('checked'); }
         updateMultiBar();
         return;
