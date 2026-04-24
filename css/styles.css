@@ -590,7 +590,9 @@ body.night .sb-acc-chev-btn{border-left-color:rgba(155,93,229,.25)}
 .co-folder-files{padding:0 8px 8px;}
 .co-folder-section.collapsed .co-folder-files{display:none;}
 .co-folder-empty{padding:14px;text-align:center;font-size:.78rem;color:var(--on-glass-faint);opacity:.7;}
-.co-folder-up-btn,.co-folder-del-btn{font-size:.7rem;font-weight:700;padding:3px 9px;border-radius:20px;cursor:pointer;border:1px solid transparent;background:transparent;flex-shrink:0;font-family:Nunito,sans-serif;transition:all .13s;}
+.co-folder-up-btn,.co-folder-del-btn,.co-folder-select-all-btn{font-size:.7rem;font-weight:700;padding:3px 9px;border-radius:20px;cursor:pointer;border:1px solid transparent;background:transparent;flex-shrink:0;font-family:Nunito,sans-serif;transition:all .13s;}
+.co-folder-select-all-btn{color:rgba(192,132,252,.9);}
+.co-folder-select-all-btn:hover{background:rgba(192,132,252,.15);border-color:rgba(192,132,252,.3);}
 .co-folder-up-btn{color:rgba(6,214,160,.9);}
 .co-folder-up-btn:hover{background:rgba(6,214,160,.15);border-color:rgba(6,214,160,.3);}
 .co-folder-del-btn{color:rgba(239,68,68,.8);}

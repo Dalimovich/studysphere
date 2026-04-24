@@ -752,6 +752,7 @@ function showCourseSection(course,section){
             '<span style="font-size:1.1rem;flex-shrink:0">📁</span>'+
             '<span class="co-folder-name-label">'+fd.name+'</span>'+
             '<span class="co-folder-count-label">'+fd.files.length+' file'+(fd.files.length!==1?'s':'')+'</span>'+
+            '<button class="co-folder-select-all-btn" data-folder="'+fd.name+'" title="Select all files in folder" style="display:none">Select all</button>'+
             '<button class="co-folder-up-btn" data-folder="'+fd.name+'" title="Upload to folder">⬆ Upload</button>'+
             '<button class="co-folder-del-btn" data-folder="'+fd.name+'" title="Delete folder">🗑</button>'+
           '</div>'+
@@ -775,7 +776,6 @@ function showCourseSection(course,section){
         '<div id="coFilesList">'+filesHtml+'</div>'+
         '<div class="co-multi-bar" id="coMultiBar">'+
           '<span class="co-multi-count"><b id="coSelCount">0</b> files selected</span>'+
-          '<button class="co-multi-select-all" id="coSelectAllBtn">Select all</button>'+
           '<span class="co-multi-clear" id="coMultiClear">Clear</span>'+
           '<button class="co-multi-delete" id="coMultiDeleteBtn">🗑 Delete</button>'+
           '<button class="co-multi-move" id="coMultiMoveBtn">📁 Move</button>'+
@@ -871,7 +871,6 @@ function showCourseSection(course,section){
   }
 
   var selectToggle = co.querySelector('#coSelectToggle');
-  var selectAllBtn = co.querySelector('#coSelectAllBtn');
   if (selectToggle) {
     selectToggle.addEventListener('click', function() {
       selectMode = !selectMode;
@@ -880,6 +879,7 @@ function showCourseSection(course,section){
       var filesList = co.querySelector('#coFilesList');
       if (filesList) filesList.classList.toggle('co-select-mode', selectMode);
       co.querySelectorAll('.co-folder-files').forEach(function(fl){fl.classList.toggle('co-select-mode',selectMode);});
+      co.querySelectorAll('.co-folder-select-all-btn').forEach(function(btn){btn.style.display=selectMode?'':'none';});
       if (!selectMode) {
         selectedFiles = [];
         co.querySelectorAll('.co-file').forEach(function(el){el.classList.remove('selected');});
@@ -888,20 +888,6 @@ function showCourseSection(course,section){
       }
     });
   }
-  if (selectAllBtn) {
-    selectAllBtn.addEventListener('click', function() {
-      selectedFiles = [];
-      co.querySelectorAll('.co-file[data-fname]').forEach(function(el) {
-        var fname = el.getAttribute('data-fname');
-        var folderAttr = el.getAttribute('data-folder') || null;
-        selectedFiles.push({name: fname, folder: folderAttr});
-        el.classList.add('selected');
-        el.querySelector('.co-file-cb').classList.add('checked');
-      });
-      updateMultiBar();
-    });
-  }
-
   var multiClear = co.querySelector('#coMultiClear');
   if (multiClear) {
     multiClear.addEventListener('click', function() {
@@ -1025,9 +1011,28 @@ function showCourseSection(course,section){
     var name=sec.getAttribute('data-folder');
     if(name&&_openFolders.has(name))sec.classList.remove('collapsed');
   });
+  co.querySelectorAll('.co-folder-select-all-btn').forEach(function(btn){
+    btn.addEventListener('click',function(e){
+      e.stopPropagation();
+      var folderName=btn.getAttribute('data-folder');
+      var sec=btn.closest('.co-folder-section');
+      sec.querySelectorAll('.co-file[data-fname]').forEach(function(el){
+        var fname=el.getAttribute('data-fname');
+        var folderAttr=el.getAttribute('data-folder')||null;
+        var already=selectedFiles.findIndex(function(s){return s.name===fname&&s.folder===folderAttr;});
+        if(already===-1){
+          selectedFiles.push({name:fname,folder:folderAttr});
+          el.classList.add('selected');
+          el.querySelector('.co-file-cb').classList.add('checked');
+        }
+      });
+      updateMultiBar();
+    });
+  });
+
   co.querySelectorAll('.co-folder-header').forEach(function(hdr){
     hdr.addEventListener('click',function(e){
-      if(e.target.closest('.co-folder-up-btn')||e.target.closest('.co-folder-del-btn'))return;
+      if(e.target.closest('.co-folder-up-btn')||e.target.closest('.co-folder-del-btn')||e.target.closest('.co-folder-select-all-btn'))return;
       var sec=hdr.closest('.co-folder-section');
       sec.classList.toggle('collapsed');
       var name=sec.getAttribute('data-folder');
