@@ -763,6 +763,7 @@ function showCourseSection(course,section){
       var filesHtml=course.files.slice().sort(function(a,b){return a.name.localeCompare(b.name);}).map(function(f){return _fileRow(f,null);}).join('');
       return '<div class="co-files-toolbar">'+
         '<button class="co-select-toggle" id="coSelectToggle">☑ Select multiple</button>'+
+        '<button class="co-select-all-btn" id="coSelectAllBtn" style="display:none">Select all</button>'+
         '<button class="co-new-folder-btn" id="coNewFolderBtn">📁 New folder</button>'+
         '<input type="file" id="coUploadInput" accept=".pdf,.doc,.docx,.txt,image/*" multiple style="display:none">'+
         '<input type="file" id="coFolderUploadInput" accept=".pdf,.doc,.docx,.txt,image/*" multiple style="display:none">'+
@@ -870,11 +871,13 @@ function showCourseSection(course,section){
   }
 
   var selectToggle = co.querySelector('#coSelectToggle');
+  var selectAllBtn = co.querySelector('#coSelectAllBtn');
   if (selectToggle) {
     selectToggle.addEventListener('click', function() {
       selectMode = !selectMode;
       selectToggle.classList.toggle('active', selectMode);
       selectToggle.textContent = selectMode ? '✕ Cancel selection' : '☑ Select multiple';
+      if (selectAllBtn) selectAllBtn.style.display = selectMode ? '' : 'none';
       var filesList = co.querySelector('#coFilesList');
       if (filesList) filesList.classList.toggle('co-select-mode', selectMode);
       co.querySelectorAll('.co-folder-files').forEach(function(fl){fl.classList.toggle('co-select-mode',selectMode);});
@@ -884,6 +887,19 @@ function showCourseSection(course,section){
         co.querySelectorAll('.co-file-cb').forEach(function(cb){cb.classList.remove('checked');});
         updateMultiBar();
       }
+    });
+  }
+  if (selectAllBtn) {
+    selectAllBtn.addEventListener('click', function() {
+      selectedFiles = [];
+      co.querySelectorAll('.co-file[data-fname]').forEach(function(el) {
+        var fname = el.getAttribute('data-fname');
+        var folderAttr = el.getAttribute('data-folder') || null;
+        selectedFiles.push({name: fname, folder: folderAttr});
+        el.classList.add('selected');
+        el.querySelector('.co-file-cb').classList.add('checked');
+      });
+      updateMultiBar();
     });
   }
 
@@ -4472,49 +4488,17 @@ function _glFileIcon(name) {
 async function _glLoadFiles() {
   var uid = _currentUser && (_currentUser.id || _currentUser.sub);
   if (!uid) return;
-  var list = document.getElementById('glFileList');
-  var empty = document.getElementById('glFileEmpty');
-  if (!list) return;
+  // Use the full folder-aware system: merge remote files into course object then render
+  var course = _glCourse();
+  if (!course.files) course.files = [];
   try {
-    var items = await _ufList(uid, _glCourse());
-    // Remove old rows but keep the empty msg element
-    Array.from(list.querySelectorAll('.gl-file-row')).forEach(function(r){ r.remove(); });
-    if (!items.length) {
-      if (empty) empty.style.display = '';
-      return;
-    }
-    if (empty) empty.style.display = 'none';
-    items.forEach(function(item) {
-      var fname = decodeURIComponent(item.name || '');
-      if (!fname) return;
-      var size = (item.metadata && item.metadata.size) ? _glFmtSize(item.metadata.size) : '';
-      var row = document.createElement('div');
-      row.className = 'gl-file-row';
-      row.innerHTML =
-        '<span class="gl-file-icon">' + _glFileIcon(fname) + '</span>' +
-        '<span class="gl-file-name" title="' + fname + '">' + fname + '</span>' +
-        (size ? '<span class="gl-file-size">' + size + '</span>' : '') +
-        '<button class="gl-file-quiz">🧠 Quiz me</button>' +
-        '<button class="gl-file-explain">💡 Explain</button>' +
-        '<button class="gl-file-open">Open</button>' +
-        '<button class="gl-file-del">🗑</button>';
-      row.querySelector('.gl-file-open').addEventListener('click', function() {
-        _glOpenFile(uid, fname);
-      });
-      row.querySelector('.gl-file-quiz').addEventListener('click', function() {
-        _glAskAboutFile(uid, fname, 'quiz');
-      });
-      row.querySelector('.gl-file-explain').addEventListener('click', function() {
-        _glAskAboutFile(uid, fname, 'explain');
-      });
-      row.querySelector('.gl-file-del').addEventListener('click', function() {
-        _glDeleteFile(uid, fname, row);
-      });
-      list.appendChild(row);
-    });
-  } catch(e) {
-    console.warn('glLoadFiles error:', e);
-  }
+    await _ufMerge(course);
+  } catch(e) { console.warn('glLoadFiles merge error:', e); }
+  // Route through showCourseSection — it renders into #courseOverview inside the files view
+  activeCourseId = course.id;
+  activeCourseRef = course;
+  _showFilesView();
+  showCourseSection(course, 'files');
 }
 
 function _glOpenFile(uid, fname) {
