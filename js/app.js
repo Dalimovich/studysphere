@@ -2797,6 +2797,13 @@ function _ufDestPicker(uid, course, onPick) {
     overlay.remove(); onPick(name.trim());
   });
   box.appendChild(nb);
+  var cancel = document.createElement('button');
+  cancel.style.cssText = 'margin-top:6px;background:transparent;border:none;color:rgba(255,255,255,.35);font-family:Nunito,sans-serif;font-size:.8rem;font-weight:700;cursor:pointer;padding:6px;border-radius:8px;transition:color .13s;';
+  cancel.textContent = 'Cancel';
+  cancel.addEventListener('mouseenter',function(){cancel.style.color='rgba(255,255,255,.6)';});
+  cancel.addEventListener('mouseleave',function(){cancel.style.color='rgba(255,255,255,.35)';});
+  cancel.addEventListener('click',function(){overlay.remove();});
+  box.appendChild(cancel);
   overlay.appendChild(box);
   document.body.appendChild(overlay);
 }
@@ -2813,10 +2820,20 @@ function _glMoveDestPicker(uid, fromCourse, onPick) {
     overlay2.addEventListener('click',function(e){if(e.target===overlay2)overlay2.remove();});
     var box2 = document.createElement('div');
     box2.style.cssText = 'background:var(--dp-solid);border:1px solid rgba(255,255,255,.12);border-radius:18px;padding:22px 20px;max-width:340px;width:90%;max-height:75vh;overflow-y:auto;display:flex;flex-direction:column;gap:8px;';
+    var topRow = document.createElement('div');
+    topRow.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:2px;';
+    var backBtn = document.createElement('button');
+    backBtn.style.cssText = 'background:transparent;border:none;color:rgba(255,255,255,.5);font-family:Nunito,sans-serif;font-size:.8rem;font-weight:800;cursor:pointer;padding:4px 8px;border-radius:8px;transition:all .13s;flex-shrink:0;';
+    backBtn.textContent = '← Back';
+    backBtn.addEventListener('mouseenter',function(){backBtn.style.color='rgba(255,255,255,.85)';backBtn.style.background='rgba(255,255,255,.08)';});
+    backBtn.addEventListener('mouseleave',function(){backBtn.style.color='rgba(255,255,255,.5)';backBtn.style.background='transparent';});
+    backBtn.addEventListener('click',function(){overlay2.remove();showCardPicker();});
     var h2 = document.createElement('div');
-    h2.style.cssText = 'font-weight:800;font-size:.95rem;color:var(--on-glass);margin-bottom:2px;';
-    h2.textContent = 'Choose folder in ' + (toCourse.name || toCourse.id);
-    box2.appendChild(h2);
+    h2.style.cssText = 'font-weight:800;font-size:.95rem;color:var(--on-glass);flex:1;';
+    h2.textContent = 'Folder in ' + (toCourse.name || toCourse.id);
+    topRow.appendChild(backBtn);
+    topRow.appendChild(h2);
+    box2.appendChild(topRow);
     function addOpt2(icon, label, onClick) {
       var b = document.createElement('button');
       b.style.cssText = 'display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:10px 14px;cursor:pointer;color:var(--on-glass);font-family:Nunito,sans-serif;font-size:.85rem;font-weight:700;text-align:left;width:100%;transition:background .13s;';
@@ -2841,33 +2858,44 @@ function _glMoveDestPicker(uid, fromCourse, onPick) {
     document.body.appendChild(overlay2);
   }
 
-  var overlay = document.createElement('div');
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:10001;';
-  overlay.addEventListener('click',function(e){if(e.target===overlay)overlay.remove();});
-  var box = document.createElement('div');
-  box.style.cssText = 'background:var(--dp-solid);border:1px solid rgba(255,255,255,.12);border-radius:18px;padding:22px 20px;max-width:340px;width:90%;max-height:75vh;overflow-y:auto;display:flex;flex-direction:column;gap:8px;';
-  var hdr = document.createElement('div');
-  hdr.style.cssText = 'font-weight:800;font-size:.95rem;color:var(--on-glass);margin-bottom:2px;';
-  hdr.textContent = 'Move to…';
-  box.appendChild(hdr);
-  var sub = document.createElement('div');
-  sub.style.cssText = 'font-size:.78rem;color:var(--on-glass-faint);margin-bottom:6px;';
-  sub.textContent = 'Pick a destination card';
-  box.appendChild(sub);
-  var skills = Object.keys(_glSkillNames);
-  skills.forEach(function(sk) {
-    var c = {id:'german-'+sk, short:'german-'+sk, name:'German '+_glSkillNames[sk]};
-    var isCurrent = c.id === fromCourse.id;
-    var b = document.createElement('button');
-    b.style.cssText = 'display:flex;align-items:center;gap:10px;background:'+(isCurrent?'rgba(155,93,229,.18)':'rgba(255,255,255,.06)')+';border:1px solid '+(isCurrent?'rgba(155,93,229,.4)':'rgba(255,255,255,.1)')+';border-radius:12px;padding:10px 14px;cursor:pointer;color:var(--on-glass);font-family:Nunito,sans-serif;font-size:.85rem;font-weight:700;text-align:left;width:100%;transition:background .13s;';
-    b.innerHTML = '<span style="font-size:1.1rem">📚</span><span style="flex:1">'+_glSkillNames[sk]+(isCurrent?' (current)':'')+'</span>';
-    b.addEventListener('mouseenter',function(){b.style.background='rgba(155,93,229,.25)';});
-    b.addEventListener('mouseleave',function(){b.style.background=isCurrent?'rgba(155,93,229,.18)':'rgba(255,255,255,.06)';});
-    b.addEventListener('click',function(){overlay.remove(); showFolderPicker(c);});
-    box.appendChild(b);
-  });
-  overlay.appendChild(box);
-  document.body.appendChild(overlay);
+  function showCardPicker() {
+    var overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:10001;';
+    overlay.addEventListener('click',function(e){if(e.target===overlay)overlay.remove();});
+    var box = document.createElement('div');
+    box.style.cssText = 'background:var(--dp-solid);border:1px solid rgba(255,255,255,.12);border-radius:18px;padding:22px 20px;max-width:340px;width:90%;max-height:75vh;overflow-y:auto;display:flex;flex-direction:column;gap:8px;';
+    var hdr = document.createElement('div');
+    hdr.style.cssText = 'font-weight:800;font-size:.95rem;color:var(--on-glass);margin-bottom:2px;';
+    hdr.textContent = 'Move to…';
+    box.appendChild(hdr);
+    var sub = document.createElement('div');
+    sub.style.cssText = 'font-size:.78rem;color:var(--on-glass-faint);margin-bottom:6px;';
+    sub.textContent = 'Pick a destination card';
+    box.appendChild(sub);
+    var skills = Object.keys(_glSkillNames);
+    skills.forEach(function(sk) {
+      var c = {id:'german-'+sk, short:'german-'+sk, name:'German '+_glSkillNames[sk]};
+      var isCurrent = c.id === fromCourse.id;
+      var b = document.createElement('button');
+      b.style.cssText = 'display:flex;align-items:center;gap:10px;background:'+(isCurrent?'rgba(155,93,229,.18)':'rgba(255,255,255,.06)')+';border:1px solid '+(isCurrent?'rgba(155,93,229,.4)':'rgba(255,255,255,.1)')+';border-radius:12px;padding:10px 14px;cursor:pointer;color:var(--on-glass);font-family:Nunito,sans-serif;font-size:.85rem;font-weight:700;text-align:left;width:100%;transition:background .13s;';
+      b.innerHTML = '<span style="font-size:1.1rem">📚</span><span style="flex:1">'+_glSkillNames[sk]+(isCurrent?' (current)':'')+'</span>';
+      b.addEventListener('mouseenter',function(){b.style.background='rgba(155,93,229,.25)';});
+      b.addEventListener('mouseleave',function(){b.style.background=isCurrent?'rgba(155,93,229,.18)':'rgba(255,255,255,.06)';});
+      b.addEventListener('click',function(){overlay.remove(); showFolderPicker(c);});
+      box.appendChild(b);
+    });
+    var cancel = document.createElement('button');
+    cancel.style.cssText = 'margin-top:6px;background:transparent;border:none;color:rgba(255,255,255,.35);font-family:Nunito,sans-serif;font-size:.8rem;font-weight:700;cursor:pointer;padding:6px;border-radius:8px;transition:color .13s;';
+    cancel.textContent = 'Cancel';
+    cancel.addEventListener('mouseenter',function(){cancel.style.color='rgba(255,255,255,.6)';});
+    cancel.addEventListener('mouseleave',function(){cancel.style.color='rgba(255,255,255,.35)';});
+    cancel.addEventListener('click',function(){overlay.remove();});
+    box.appendChild(cancel);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+  }
+
+  showCardPicker();
 }
 
 // Export to a specific course (AI panel — shows folder picker first)
