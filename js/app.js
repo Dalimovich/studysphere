@@ -36,8 +36,10 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs
   }
 
   document.addEventListener('touchstart',function(e){
+    var appEl=document.getElementById('app');
+    var inPdf=appEl&&appEl.style.display==='flex';
     startY=e.touches[0].clientY;
-    active=true;
+    active=!inPdf&&(window.scrollY===0||document.documentElement.scrollTop===0);
   },{passive:true});
 
   document.addEventListener('touchmove',function(e){
@@ -396,19 +398,45 @@ var _UF_BUCKET = 'course-uploads';
 
 function _ufKey(course){return (course.id||course.short||course.name).replace(/[^a-zA-Z0-9_-]/g,'_');}
 
-function _ufStoragePath(uid,course,name){
-  var encoded=encodeURIComponent(name);
-  // For non-ASCII filenames (e.g. ü, ö), Supabase rejects the decoded key.
-  // Double-encode % so the encoded string itself becomes the storage key (all ASCII).
-  if(/[^\x00-\x7F]/.test(name)) encoded=encoded.replace(/%/g,'%25');
-  return uid+'/'+_ufKey(course)+'/'+encoded;
+function _ufSanitizeName(name){
+  // Keep only safe characters for Supabase storage keys
+  return name
+    .replace(/[^\x20-\x7E]/g,'_')   // strip non-printable and non-ASCII (Arabic, etc.)
+    .replace(/[^a-zA-Z0-9._\-() ]/g,'_') // replace remaining unsafe chars
+    .replace(/ +/g,'_')              // spaces → underscores
+    .replace(/_+/g,'_')             // collapse multiple underscores
+    .replace(/^_+|_+(?=\.[^.]+$)/g,''); // trim leading underscores and before extension
+}
+function _ufStoragePath(uid,course,name,folder){
+  var safe=_ufSanitizeName(name);
+  var base=uid+'/'+_ufKey(course)+'/';
+  if(folder){base+=_ufSanitizeName(folder)+'/';}
+  return base+safe;
+}
+
+// ── User folders (persisted in localStorage) ─────────────────────────────
+function _ufFolderKey(uid,course){return 'ss_ufolders_'+uid+'_'+_ufKey(course);}
+function _ufGetFolders(uid,course){try{return JSON.parse(localStorage.getItem(_ufFolderKey(uid,course))||'[]');}catch(e){return[];}}
+function _ufSaveFolders(uid,course,list){localStorage.setItem(_ufFolderKey(uid,course),JSON.stringify(list));}
+function _ufCreateFolder(uid,course,name){var f=_ufGetFolders(uid,course);name=name.trim();if(!name||f.includes(name))return false;f.push(name);_ufSaveFolders(uid,course,f);return true;}
+function _ufDeleteFolder(uid,course,name){_ufSaveFolders(uid,course,_ufGetFolders(uid,course).filter(function(n){return n!==name;}));}
+
+async function _ufListFolder(uid,course,folder){
+  var fe=encodeURIComponent(folder);if(/[^\x00-\x7F]/.test(folder))fe=fe.replace(/%/g,'%25');
+  var prefix=uid+'/'+_ufKey(course)+'/'+fe+'/';
+  var r=await fetch(SUPA_URL+'/storage/v1/object/list/'+_UF_BUCKET,{
+    method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+(_sbToken||SUPA_KEY),'Content-Type':'application/json'},
+    body:JSON.stringify({prefix:prefix,limit:200,offset:0})
+  });
+  if(!r.ok)return[];
+  var items=await r.json();return Array.isArray(items)?items:[];
 }
 
 // Upload one file with XHR so we get progress events
 // onProgress(pct 0-100) is called as data uploads
-function _ufUpload(uid,course,file,onProgress){
+function _ufUpload(uid,course,file,onProgress,folder){
   return new Promise(function(resolve,reject){
-    var path=_ufStoragePath(uid,course,file.name);
+    var path=_ufStoragePath(uid,course,file.name,folder||null);
     var url=SUPA_URL+'/storage/v1/object/'+_UF_BUCKET+'/'+path;
     var xhr=new XMLHttpRequest();
     xhr.open('POST',url);
@@ -416,6 +444,10 @@ function _ufUpload(uid,course,file,onProgress){
     xhr.setRequestHeader('Authorization','Bearer '+(_sbToken||SUPA_KEY));
     xhr.setRequestHeader('Content-Type',file.type||'application/octet-stream');
     xhr.setRequestHeader('x-upsert','true');
+    // Store original filename in metadata so display name survives sanitization
+    if(file.name!==_ufSanitizeName(file.name)){
+      xhr.setRequestHeader('x-metadata',JSON.stringify({originalName:file.name}));
+    }
     if(onProgress){
       xhr.upload.addEventListener('progress',function(e){
         if(e.lengthComputable)onProgress(Math.round(e.loaded/e.total*100));
@@ -444,47 +476,111 @@ async function _ufList(uid,course){
 }
 
 // Fetch an uploaded file's bytes directly using the authenticated endpoint
-async function _ufFetchBytes(uid,course,name){
-  var path=_ufStoragePath(uid,course,name);
-  var url=SUPA_URL+'/storage/v1/object/authenticated/'+_UF_BUCKET+'/'+path;
-  var r=await fetch(url,{headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+(_sbToken||SUPA_KEY)}});
+async function _ufFetchBytes(uid,course,name,folder){
+  // Build raw (un-encoded) path — Supabase storage API handles encoding internally
+  var courseKey=_ufKey(course);
+  var rawPath=uid+'/'+courseKey+'/'+(folder?folder+'/':'')+name;
+  var signUrl=SUPA_URL+'/storage/v1/object/sign/'+_UF_BUCKET+'/'+rawPath;
+  var signRes=await fetch(signUrl,{
+    method:'POST',
+    headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+(_sbToken||SUPA_KEY),'Content-Type':'application/json'},
+    body:JSON.stringify({expiresIn:300})
+  });
+  if(!signRes.ok){var t=await signRes.text();throw new Error('Sign failed '+signRes.status+': '+t);}
+  var signData=await signRes.json();
+  var signedUrl=(signData.signedURL||signData.signedUrl||signData.signed_url||'');
+  if(!signedUrl)throw new Error('No signed URL in response: '+JSON.stringify(signData));
+  if(!signedUrl.startsWith('http')){
+    if(!signedUrl.startsWith('/storage'))signedUrl='/storage/v1'+signedUrl;
+    signedUrl=SUPA_URL+signedUrl;
+  }
+  var r=await fetch(signedUrl);
   if(!r.ok)throw new Error('Storage fetch failed: '+r.status);
   return new Uint8Array(await r.arrayBuffer());
 }
 
 // Delete one file from Supabase Storage
-async function _ufDeleteRemote(uid,course,name){
-  var path=_ufStoragePath(uid,course,name);
+async function _ufDeleteRemote(uid,course,name,folder){
+  var path=_ufStoragePath(uid,course,name,folder||null);
   await fetch(SUPA_URL+'/storage/v1/object/'+_UF_BUCKET+'/'+path,{
     method:'DELETE',
     headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+(_sbToken||SUPA_KEY)}
   });
 }
 
-// Merge remote file list into course.files (called on openCourse)
+// Merge remote file list into course.files + course.userFolders (called on openCourse)
 async function _ufMerge(course){
   var uid=_currentUser&&(_currentUser.id||_currentUser.sub);
   if(!uid)return;
-  var items=await _ufList(uid,course);
-  items.forEach(function(item){
+  function _parseMeta(item){
     var fname=decodeURIComponent(item.name||'');
-    if(!fname||fname.endsWith('/'))return;
+    if(!fname||fname.endsWith('/')||!item.id)return null; // skip folder entries (id is null for folders)
     var meta=item.metadata||{};
-    var size=meta.size?
-      (meta.size>1048576?(meta.size/1048576).toFixed(1)+' MB':meta.size>1024?(meta.size/1024).toFixed(0)+' KB':meta.size+' B')
-      :'';
+    // Use original filename from metadata if the storage key was sanitized
+    var displayName=(meta.userMetadata&&meta.userMetadata.originalName)||fname;
+    var size=meta.size?(meta.size>1048576?(meta.size/1048576).toFixed(1)+' MB':meta.size>1024?(meta.size/1024).toFixed(0)+' KB':meta.size+' B'):'';
     var date=item.updated_at?new Date(item.updated_at).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}):'';
-    if(!course.files.find(function(f){return f.name===fname&&f._uploaded;})){
-      course.files.unshift({name:fname,size:size,date:date,_uploaded:true,_uid:uid,_course:course});
+    return {name:displayName,storageName:fname,size:size,date:date};
+  }
+  // Root listing — files have an id, folder entries have id: null
+  var items=await _ufList(uid,course);
+  var discoveredFolders=[];
+  items.forEach(function(item){
+    if(!item.id && item.name && !item.name.endsWith('/')){
+      // This is a subfolder entry — collect folder name
+      var fn=decodeURIComponent(item.name);
+      if(fn && !discoveredFolders.includes(fn)) discoveredFolders.push(fn);
+      return;
     }
+    var m=_parseMeta(item);if(!m)return;
+    if(!course.files.find(function(f){return f.name===m.name&&f._uploaded;}))
+      course.files.unshift({name:m.name,_storageName:m.storageName,size:m.size,date:m.date,_uploaded:true,_uid:uid,_course:course});
   });
+
+  // Merge discovered folders with localStorage list so neither source loses data
+  var savedFolders=_ufGetFolders(uid,course);
+  var allFolders=savedFolders.slice();
+  discoveredFolders.forEach(function(fn){if(!allFolders.includes(fn))allFolders.push(fn);});
+  if(allFolders.length!==savedFolders.length) _ufSaveFolders(uid,course,allFolders);
+
+  course.userFolders=[];
+  for(var i=0;i<allFolders.length;i++){
+    var folderName=allFolders[i];
+    var folderItems=await _ufListFolder(uid,course,folderName);
+    var folderFiles=[];
+    folderItems.forEach(function(item){
+      var m=_parseMeta(item);if(!m)return;
+      folderFiles.push({name:m.name,_storageName:m.storageName,size:m.size,date:m.date,_uploaded:true,_uid:uid,_course:course,_folder:folderName});
+    });
+    course.userFolders.push({name:folderName,files:folderFiles});
+  }
 }
 
-// Delete — removes from Supabase and from course.files in memory
-function _ufDelete(course,name){
+// Delete — removes from Supabase and from course.files / course.userFolders in memory
+function _ufDelete(course,name,folder){
   var uid=_currentUser&&(_currentUser.id||_currentUser.sub);
-  if(uid)_ufDeleteRemote(uid,course,name);
-  course.files=course.files.filter(function(f){return !(f.name===name&&f._uploaded);});
+  if(uid)_ufDeleteRemote(uid,course,name,folder||null);
+  if(folder){
+    (course.userFolders||[]).forEach(function(fd){
+      if(fd.name===folder)fd.files=fd.files.filter(function(f){return f.name!==name;});
+    });
+  }else{
+    course.files=course.files.filter(function(f){return !(f.name===name&&f._uploaded);});
+  }
+}
+
+// Move a file via server-side copy then delete (no download needed)
+async function _ufMoveFile(uid, course, fname, fromFolder, toFolder) {
+  if ((fromFolder||null) === (toFolder||null)) return;
+  var srcKey = _ufStoragePath(uid, course, fname, fromFolder||null);
+  var dstKey = _ufStoragePath(uid, course, fname, toFolder||null);
+  var r = await fetch(SUPA_URL+'/storage/v1/object/copy', {
+    method: 'POST',
+    headers: {'apikey':SUPA_KEY,'Authorization':'Bearer '+(_sbToken||SUPA_KEY),'Content-Type':'application/json'},
+    body: JSON.stringify({bucketId:_UF_BUCKET, sourceKey:srcKey, destinationKey:dstKey})
+  });
+  if (!r.ok) throw new Error('Copy failed: '+r.status);
+  await _ufDeleteRemote(uid, course, fname, fromFolder||null);
 }
 
 function openCourse(course){
@@ -531,16 +627,18 @@ function openFile(f,course){
   document.getElementById('breadcrumb').innerHTML=course.short+' › <b>'+f.name+'</b>';
   document.getElementById('aiFileLabel').textContent=f.name;
   _setAiChipsVisible(true);
+  if(f._folder)_openFolders.add(f._folder);
   renderCourses();
   if(f._uploaded){
     document.getElementById('pdfBody').innerHTML='<div class="pdf-loading"><div class="loading-dots"><span></span><span></span><span></span></div><p>Loading PDF…</p></div>';
     var uid=_currentUser&&(_currentUser.id||_currentUser.sub);
-    _ufFetchBytes(uid,f._course||course,f.name).then(function(bytes){
+    _ufFetchBytes(uid,f._course||course,f._storageName||f.name,f._folder||null).then(function(bytes){
       return pdfjsLib.getDocument({data:bytes,cMapUrl:'https://unpkg.com/pdfjs-dist@3.11.174/cmaps/',cMapPacked:true}).promise;
     }).then(function(pdf){
-      pdfDoc=pdf;pdfTotal=pdf.numPages;pdfPage=1;pdfShowAll=false;pdfFullText='';
+      pdfDoc=pdf;pdfTotal=pdf.numPages;pdfPage=1;pdfShowAll=true;pdfFullText='';
       updatePageInfo();updateZoomPct();
-      document.getElementById('pdfAll').textContent='All pages';
+      document.getElementById('pdfAll').textContent='Single page';
+      _annotLoad(f.name);
       renderPages();
       setTimeout(function(){
         var tp=[];
@@ -560,10 +658,11 @@ function openFile(f,course){
   document.getElementById('pdfBody').innerHTML='<div class="pdf-loading"><div class="loading-dots"><span></span><span></span><span></span></div><p>Loading PDF…</p></div>';
   _fetchPdfBytes(pdfPath, function(bytes){
     pdfjsLib.getDocument({data:bytes}).promise.then(function(pdf){
-      pdfDoc=pdf;pdfTotal=pdf.numPages;pdfPage=1;pdfShowAll=false;
+      pdfDoc=pdf;pdfTotal=pdf.numPages;pdfPage=1;pdfShowAll=true;
       pdfFullText='';
       updatePageInfo();updateZoomPct();
-      document.getElementById('pdfAll').textContent='All pages';
+      document.getElementById('pdfAll').textContent='Single page';
+      _annotLoad(f.name);
       renderPages();
       // Defer text extraction until after page 1 renders to avoid overloading the pdf.js worker simultaneously
       setTimeout(function(){
@@ -637,10 +736,11 @@ function showCourseSection(course,section){
 
   function buildContent(){
     if(section==='files'){
-      var filesHtml = course.files.map(function(f){
+      function _fileRow(f,inFolder){
         var icon=f._uploaded?'📎':f.name.includes('Lösung')?'✅':f.name.includes('Aufgabe')?'📋':'📊';
-        var delBtn=f._uploaded?'<span class="co-del-btn" data-fname="'+f.name+'" title="Delete uploaded file" style="margin-left:6px;font-size:.69rem;font-weight:800;padding:3px 10px;border-radius:20px;background:rgba(239,68,68,.12);color:rgba(239,68,68,.85);border:1px solid rgba(239,68,68,.25);cursor:pointer;flex-shrink:0">🗑</span>':'';
-        return '<div class="co-file'+(f._uploaded?' co-file-uploaded':'')+'" data-fname="'+f.name+'">'+
+        var fa=inFolder?' data-folder="'+inFolder+'"':'';
+        var delBtn=f._uploaded?'<span class="co-del-btn" data-fname="'+f.name+'"'+fa+' title="Delete" style="margin-left:6px;font-size:.69rem;font-weight:800;padding:3px 10px;border-radius:20px;background:rgba(239,68,68,.12);color:rgba(239,68,68,.85);border:1px solid rgba(239,68,68,.25);cursor:pointer;flex-shrink:0">🗑</span>':'';
+        return '<div class="co-file'+(f._uploaded?' co-file-uploaded':'')+'" data-fname="'+f.name+'"'+fa+'>'+
           '<div class="co-file-cb" data-fname="'+f.name+'"></div>'+
           '<span class="co-file-icon">'+icon+'</span>'+
           '<div style="flex:1;min-width:0"><div class="co-file-name">'+f.name+'</div>'+
@@ -648,19 +748,40 @@ function showCourseSection(course,section){
           '<span class="co-open-btn" style="font-size:.69rem;font-weight:800;padding:3px 10px;border-radius:20px;background:rgba(192,132,252,.18);color:rgba(192,132,252,.9);border:1px solid rgba(192,132,252,.3);cursor:pointer;flex-shrink:0">Open</span>'+
           (f._uploaded?delBtn:'<span class="co-dl-btn" data-fname="'+f.name+'" title="Download" style="margin-left:6px;font-size:.69rem;font-weight:800;padding:3px 10px;border-radius:20px;background:rgba(6,214,160,.15);color:rgba(6,214,160,.9);border:1px solid rgba(6,214,160,.3);cursor:pointer;flex-shrink:0">⬇</span>')+
         '</div>';
+      }
+      var foldersHtml=(course.userFolders||[]).map(function(fd){
+        return '<div class="co-folder-section collapsed" data-folder="'+fd.name+'">'+
+          '<div class="co-folder-header">'+
+            '<span class="co-folder-toggle-icon">▸</span>'+
+            '<span style="font-size:1.1rem;flex-shrink:0">📁</span>'+
+            '<span class="co-folder-name-label">'+fd.name+'</span>'+
+            '<span class="co-folder-count-label">'+fd.files.length+' file'+(fd.files.length!==1?'s':'')+'</span>'+
+            '<button class="co-folder-up-btn" data-folder="'+fd.name+'" title="Upload to folder">⬆ Upload</button>'+
+            '<button class="co-folder-del-btn" data-folder="'+fd.name+'" title="Delete folder">🗑</button>'+
+          '</div>'+
+          '<div class="co-folder-files">'+
+            (fd.files.length?fd.files.slice().sort(function(a,b){return a.name.localeCompare(b.name);}).map(function(f){return _fileRow(f,fd.name);}).join(''):'<div class="co-folder-empty">No files yet — click ⬆ Upload to add some</div>')+
+          '</div>'+
+        '</div>';
       }).join('');
+      var filesHtml=course.files.slice().sort(function(a,b){return a.name.localeCompare(b.name);}).map(function(f){return _fileRow(f,null);}).join('');
       return '<div class="co-files-toolbar">'+
         '<button class="co-select-toggle" id="coSelectToggle">☑ Select multiple</button>'+
+        '<button class="co-new-folder-btn" id="coNewFolderBtn">📁 New folder</button>'+
         '<input type="file" id="coUploadInput" accept=".pdf,.doc,.docx,.txt,image/*" multiple style="display:none">'+
+        '<input type="file" id="coFolderUploadInput" accept=".pdf,.doc,.docx,.txt,image/*" multiple style="display:none">'+
         '<label class="co-upload-btn" for="coUploadInput">'+
           '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>'+
           ' Upload files'+
         '</label>'+
         '</div>'+
+        foldersHtml+
         '<div id="coFilesList">'+filesHtml+'</div>'+
         '<div class="co-multi-bar" id="coMultiBar">'+
           '<span class="co-multi-count"><b id="coSelCount">0</b> files selected</span>'+
           '<span class="co-multi-clear" id="coMultiClear">Clear</span>'+
+          '<button class="co-multi-delete" id="coMultiDeleteBtn">🗑 Delete</button>'+
+          '<button class="co-multi-move" id="coMultiMoveBtn">📁 Move</button>'+
           '<button class="co-multi-summarise" id="coMultiSumBtn">✨ Summarise together</button>'+
         '</div>';
     }
@@ -787,12 +908,52 @@ function showCourseSection(course,section){
     });
   }
 
+  var multiDeleteBtn = co.querySelector('#coMultiDeleteBtn');
+  if (multiDeleteBtn) {
+    multiDeleteBtn.addEventListener('click', function() {
+      var toDelete = selectedFiles.slice();
+      if (!toDelete.length) return;
+      if (!confirm('Delete ' + toDelete.length + ' file' + (toDelete.length !== 1 ? 's' : '') + '?')) return;
+      var uid = _currentUser && (_currentUser.id || _currentUser.sub); if (!uid) return;
+      toDelete.forEach(function(fname) { _ufDelete(course, fname, null); });
+      selectedFiles = [];
+      showCourseSection(course, 'files');
+      showToast('Deleted', toDelete.length + ' file' + (toDelete.length !== 1 ? 's' : '') + ' removed');
+    });
+  }
+
+  var multiMoveBtn = co.querySelector('#coMultiMoveBtn');
+  if (multiMoveBtn) {
+    multiMoveBtn.addEventListener('click', function() {
+      if (!selectedFiles.length) return;
+      var uid = _currentUser && (_currentUser.id || _currentUser.sub); if (!uid) return;
+      _ufDestPicker(uid, course, async function(toFolder) {
+        multiMoveBtn.textContent = 'Moving…'; multiMoveBtn.disabled = true;
+        var toMove = selectedFiles.slice();
+        try {
+          await Promise.all(toMove.map(function(fname){
+            return _ufMoveFile(uid, course, fname, null, toFolder);
+          }));
+          course.userFolders = null;
+          course.files = course.files.filter(function(f){ return !(f._uploaded && toMove.indexOf(f.name) !== -1); });
+          selectedFiles = [];
+          await _ufMerge(course);
+          showCourseSection(course, 'files');
+          var dest = toFolder ? '"'+toFolder+'"' : 'course root';
+          showToast('Moved ✓', toMove.length+' file'+(toMove.length!==1?'s':'')+' moved to '+dest);
+        } catch(e) { showToast('Move failed', e.message); }
+      });
+    });
+  }
+
   co.querySelectorAll('.co-file[data-fname]').forEach(function(el){
     el.addEventListener('click',function(e){
-      if(e.target.closest('.co-dl-btn')) return;
+      e.stopPropagation();
+      if(e.target.closest('.co-dl-btn')||e.target.closest('.co-del-btn')) return;
       var fname = el.getAttribute('data-fname');
-      if (selectMode) {
-        // Toggle selection
+      var folderAttr = el.getAttribute('data-folder') || null;
+      var inFolder = !!folderAttr;
+      if (selectMode && !inFolder) {
         var idx = selectedFiles.indexOf(fname);
         if (idx === -1) { selectedFiles.push(fname); el.classList.add('selected'); el.querySelector('.co-file-cb').classList.add('checked'); }
         else { selectedFiles.splice(idx,1); el.classList.remove('selected'); el.querySelector('.co-file-cb').classList.remove('checked'); }
@@ -800,8 +961,15 @@ function showCourseSection(course,section){
         return;
       }
       if(e.target.closest('.co-open-btn') || !selectMode) {
-        var f=course.files.find(function(x){return x.name===fname;});
-        if(f)openFile(f,course);
+        var f = null;
+        if (folderAttr) {
+          var fd = (course.userFolders || []).find(function(x){ return x.name === folderAttr; });
+          if (fd) f = (fd.files || []).find(function(x){ return x.name === fname; });
+        } else {
+          f = (course.files || []).find(function(x){ return x.name === fname; });
+        }
+        if (f) openFile(f, course);
+        else showToast('File not found', 'Try refreshing the course');
       }
     });
   });
@@ -812,16 +980,91 @@ function showCourseSection(course,section){
     });
   });
 
-  // ── Delete uploaded file ───────────────────────────────────────────────
+  // ── Delete uploaded file (root or folder) ─────────────────────────────
   co.querySelectorAll('.co-del-btn').forEach(function(btn){
     btn.addEventListener('click',function(e){
       e.stopPropagation();
       var fname=btn.getAttribute('data-fname');
-      if(!confirm('Delete "'+fname+'" from this course?'))return;
-      _ufDelete(course,fname);
+      var folder=btn.getAttribute('data-folder')||null;
+      var where=folder?'from folder "'+folder+'"':'from this course';
+      if(!confirm('Delete "'+fname+'" '+where+'?'))return;
+      _ufDelete(course,fname,folder);
       showCourseSection(course,'files');
     });
   });
+
+  // ── New folder ─────────────────────────────────────────────────────────
+  var newFolderBtn=co.querySelector('#coNewFolderBtn');
+  if(newFolderBtn){
+    newFolderBtn.addEventListener('click',function(){
+      var name=prompt('Folder name:');
+      if(!name||!name.trim())return;
+      var uid=_currentUser&&(_currentUser.id||_currentUser.sub);
+      if(!uid)return;
+      if(!_ufCreateFolder(uid,course,name.trim())){showToast('Already exists','A folder with that name already exists.');return;}
+      if(!course.userFolders)course.userFolders=[];
+      course.userFolders.push({name:name.trim(),files:[]});
+      showCourseSection(course,'files');
+    });
+  }
+
+  // ── Folder toggle ──────────────────────────────────────────────────────
+  co.querySelectorAll('.co-folder-section').forEach(function(sec){
+    var name=sec.getAttribute('data-folder');
+    if(name&&_openFolders.has(name))sec.classList.remove('collapsed');
+  });
+  co.querySelectorAll('.co-folder-header').forEach(function(hdr){
+    hdr.addEventListener('click',function(e){
+      if(e.target.closest('.co-folder-up-btn')||e.target.closest('.co-folder-del-btn'))return;
+      var sec=hdr.closest('.co-folder-section');
+      sec.classList.toggle('collapsed');
+      var name=sec.getAttribute('data-folder');
+      if(name){if(sec.classList.contains('collapsed'))_openFolders.delete(name);else _openFolders.add(name);}
+    });
+  });
+
+  // ── Folder delete ──────────────────────────────────────────────────────
+  co.querySelectorAll('.co-folder-del-btn').forEach(function(btn){
+    btn.addEventListener('click',function(e){
+      e.stopPropagation();
+      var folderName=btn.getAttribute('data-folder');
+      var uid=_currentUser&&(_currentUser.id||_currentUser.sub);if(!uid)return;
+      var fd=(course.userFolders||[]).find(function(f){return f.name===folderName;});
+      var n=fd?fd.files.length:0;
+      if(!confirm('Delete folder "'+folderName+'"'+(n?' and its '+n+' file'+(n!==1?'s':''):'')+'?'))return;
+      if(fd)fd.files.forEach(function(f){_ufDeleteRemote(uid,course,f.name,folderName);});
+      _ufDeleteFolder(uid,course,folderName);
+      course.userFolders=(course.userFolders||[]).filter(function(f){return f.name!==folderName;});
+      showCourseSection(course,'files');
+    });
+  });
+
+  // ── Upload to folder ───────────────────────────────────────────────────
+  var folderUploadInput=co.querySelector('#coFolderUploadInput');
+  co.querySelectorAll('.co-folder-up-btn').forEach(function(btn){
+    btn.addEventListener('click',function(e){
+      e.stopPropagation();
+      if(folderUploadInput){folderUploadInput._targetFolder=btn.getAttribute('data-folder');folderUploadInput.click();}
+    });
+  });
+  if(folderUploadInput){
+    folderUploadInput.addEventListener('change',function(){
+      var targetFolder=this._targetFolder;
+      var files=Array.from(this.files||[]);
+      if(!files.length||!targetFolder)return;
+      var uid=_currentUser&&(_currentUser.id||_currentUser.sub);
+      if(!uid){showToast('Not signed in','Sign in to upload files.');return;}
+      Promise.all(files.map(function(file){return _ufUpload(uid,course,file,null,targetFolder);}))
+        .then(function(){
+          course.userFolders=null;
+          return _ufMerge(course);
+        }).then(function(){
+          showCourseSection(course,'files');
+          showToast('Files uploaded',files.length+' file'+(files.length!==1?'s':'')+' added to "'+targetFolder+'"');
+        }).catch(function(e){showToast('Upload failed',e.message||'Please try again.');});
+      this.value='';
+    });
+  }
 
   // ── Upload files ───────────────────────────────────────────────────────
   var uploadInput=co.querySelector('#coUploadInput');
@@ -954,7 +1197,22 @@ function lnRender(summaries) {
   });
 }
 
-function updatePageInfo(){document.getElementById('pdfPageInfo').textContent=pdfPage+' / '+pdfTotal;}
+function updatePageInfo(){
+  var el=document.getElementById('pdfPageInfo');
+  if(el)el.textContent=(pdfShowAll?'Page ':'')+(pdfShowAll?_pdfVisiblePage():pdfPage)+' / '+pdfTotal;
+}
+function _pdfVisiblePage(){
+  var body=document.getElementById('pdfBody');
+  if(!body)return pdfPage;
+  var wraps=body.querySelectorAll('.pdf-page-wrap');
+  var bodyTop=body.getBoundingClientRect().top;
+  var best=1;
+  wraps.forEach(function(w){
+    var r=w.getBoundingClientRect();
+    if(r.top-bodyTop<=40)best=parseInt(w.dataset.pageNum)||best;
+  });
+  return best;
+}
 
 function renderPages(){
   if(!pdfDoc)return;
@@ -962,7 +1220,7 @@ function renderPages(){
   var navStyle=pdfShowAll?'none':'inline-flex';
   document.getElementById('pdfPrev').style.display=navStyle;
   document.getElementById('pdfNext').style.display=navStyle;
-  document.getElementById('pdfPageInfo').style.display=navStyle;
+  document.getElementById('pdfPageInfo').style.display='inline-flex';
   var toRender=pdfShowAll?Array.from({length:pdfTotal},function(_,i){return i+1;}):[pdfPage];
   toRender.forEach(function(num){
     pdfDoc.getPage(num).then(function(page){
@@ -971,6 +1229,7 @@ function renderPages(){
       var scale=pdfScale*(cW/vp0.width);
       var vp=page.getViewport({scale:scale});
       var wrap=document.createElement('div');wrap.className='pdf-page-wrap';
+      wrap.dataset.pageNum=num;
       wrap.style.width=vp.width+'px';wrap.style.height=vp.height+'px';
       var canvas=document.createElement('canvas');canvas.width=vp.width;canvas.height=vp.height;
       wrap.appendChild(canvas);
@@ -994,6 +1253,685 @@ function renderPages(){
   });
 }
 
+
+// ── ANNOTATION ENGINE ────────────────────────────────────────────────────────
+// Two-canvas architecture per page:
+//   .annot-committed  — all finished strokes, pointer-events:none, z-index:5
+//   .annot-live       — receives pointer events, shows current stroke preview, z-index:6
+
+var _annotMode = 'pen';
+var _annotColor = '#000000';
+var _annotThickness = 3;
+var _annotBold = false;
+var _annotItalic = false;
+var _annotFontSize = 16;
+var _annotActive = false;
+var _annotStrokes = {};    // pageNum -> [{type,color,thickness,points}]
+var _annotUndoStack = {};  // pageNum -> [snapshot]
+var _annotCurrentFile = '';  // filename key for localStorage persistence
+
+var ANNOT_PREFIX = 'ss_annot_';
+
+function _annotSave() {
+  if (!_annotCurrentFile) return;
+  try {
+    localStorage.setItem(ANNOT_PREFIX + _annotCurrentFile, JSON.stringify({
+      strokes: _annotStrokes,
+      undo: _annotUndoStack
+    }));
+  } catch(e) {}
+}
+
+function _annotLoad(fileName) {
+  _annotCurrentFile = fileName;
+  _annotStrokes = {};
+  _annotUndoStack = {};
+  try {
+    var raw = localStorage.getItem(ANNOT_PREFIX + fileName);
+    if (!raw) return;
+    var d = JSON.parse(raw);
+    if (d.strokes) _annotStrokes = d.strokes;
+    if (d.undo)    _annotUndoStack = d.undo;
+  } catch(e) {}
+}
+
+// Draw a smooth stroke (bezier through midpoints) on any ctx
+function _annotDrawStroke(ctx, s) {
+  if (s.type === 'text') {
+    ctx.save();
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = s.color;
+    ctx.font = (s.italic?'italic ':'') + (s.bold?'bold ':'') + s.fontSize + 'px Nunito,sans-serif';
+    (s.text||'').split('\n').forEach(function(line,li){ ctx.fillText(line, s.x, s.y + s.fontSize*(li+1)); });
+    ctx.restore();
+    return;
+  }
+  if (!s.points || s.points.length < 2) return;
+  ctx.save();
+  if (s.type === 'highlight') { ctx.globalAlpha = 0.35; ctx.globalCompositeOperation = 'multiply'; }
+  else if (s.type === 'eraser') { ctx.globalCompositeOperation = 'destination-out'; ctx.globalAlpha = 1; }
+  else { ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; }
+  ctx.strokeStyle = s.type === 'eraser' ? 'rgba(0,0,0,1)' : s.color;
+  ctx.lineWidth = s.type === 'highlight' ? s.thickness * 4 : s.thickness;
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(s.points[0].x, s.points[0].y);
+  for (var i = 1; i < s.points.length - 1; i++) {
+    var mx = (s.points[i].x + s.points[i+1].x) / 2;
+    var my = (s.points[i].y + s.points[i+1].y) / 2;
+    ctx.quadraticCurveTo(s.points[i].x, s.points[i].y, mx, my);
+  }
+  ctx.lineTo(s.points[s.points.length-1].x, s.points[s.points.length-1].y);
+  ctx.stroke();
+  ctx.restore();
+  ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+}
+
+function _annotRestorePage(committedCanvas, pageNum) {
+  var ctx = committedCanvas.getContext('2d');
+  ctx.clearRect(0, 0, committedCanvas.width, committedCanvas.height);
+  var strokes = _annotStrokes[pageNum] || [];
+  strokes.forEach(function(s){ _annotDrawStroke(ctx, s); });
+}
+
+function _annotToggle() {
+  _annotActive = !_annotActive;
+  var toolbar = document.getElementById('annotToolbar');
+  var toggleBtn = document.getElementById('pdfAnnotateToggle');
+  var body = document.getElementById('pdfBody');
+  if (_annotActive) {
+    toolbar.style.display = 'flex';
+    toggleBtn.style.background = 'rgba(155,93,229,.35)';
+    body.classList.add('annot-active');
+    _annotAttachCanvases();
+  } else {
+    toolbar.style.display = 'none';
+    toggleBtn.style.background = '';
+    body.classList.remove('annot-active');
+    _annotDetachCanvases();
+  }
+}
+
+function _annotAttachCanvases() {
+  document.querySelectorAll('.pdf-page-wrap').forEach(function(wrap, i) {
+    if (wrap.querySelector('.annot-committed')) return;
+    var pn = parseInt(wrap.dataset.pageNum || (i+1));
+    var w = wrap.offsetWidth, h = wrap.offsetHeight;
+
+    // Layer 1: committed strokes — no pointer events
+    var committed = document.createElement('canvas');
+    committed.className = 'annot-committed';
+    committed.width = w; committed.height = h;
+    committed.dataset.pageNum = pn;
+    committed.style.cssText = 'position:absolute;inset:0;z-index:5;pointer-events:none;';
+    wrap.appendChild(committed);
+    _annotRestorePage(committed, pn);
+
+    // Layer 2: live drawing — receives pointer events
+    var live = document.createElement('canvas');
+    live.className = 'annot-live annot-mode-' + _annotMode;
+    live.width = w; live.height = h;
+    live.dataset.pageNum = pn;
+    live.style.cssText = 'position:absolute;inset:0;z-index:6;touch-action:none;pointer-events:all;';
+    wrap.appendChild(live);
+
+    _annotBindCanvas(live, committed);
+  });
+}
+
+function _annotDetachCanvases() {
+  document.querySelectorAll('.annot-committed, .annot-live').forEach(function(c){ c.remove(); });
+}
+
+function _annotUpdateCursor() {
+  document.querySelectorAll('.annot-live').forEach(function(c){
+    c.className = 'annot-live annot-mode-' + _annotMode;
+  });
+}
+
+// committed canvas for a page-wrap (used by text editor and undo/clear)
+function _annotGetCommitted(wrap) { return wrap.querySelector('.annot-committed'); }
+
+function _annotBindCanvas(live, committed) {
+  var lctx = live.getContext('2d');
+  var cctx = committed.getContext('2d');
+  var drawing = false, strokeMode = 'pen';
+  var points = [];
+  var rafId = null;
+
+  function pn() { return parseInt(live.dataset.pageNum); }
+
+  function _pushUndo(pageNum) {
+    if (!_annotUndoStack[pageNum]) _annotUndoStack[pageNum] = [];
+    _annotUndoStack[pageNum].push(JSON.stringify(_annotStrokes[pageNum] || []));
+    if (_annotUndoStack[pageNum].length > 40) _annotUndoStack[pageNum].shift();
+  }
+
+  function getPos(e) {
+    var rect = live.getBoundingClientRect();
+    return { x: (e.clientX - rect.left) * (live.width / rect.width),
+             y: (e.clientY - rect.top)  * (live.height / rect.height),
+             p: e.pressure > 0 ? e.pressure : 1 };
+  }
+
+  // Draw current in-progress path on the live canvas only (non-destructive preview)
+  function renderLive() {
+    rafId = null;
+    lctx.clearRect(0, 0, live.width, live.height);
+    if (points.length < 2) return;
+    var baseW = strokeMode === 'highlight' ? _annotThickness * 4 : _annotThickness;
+    // Eraser shows as semi-transparent circle cursor, no live preview needed
+    if (strokeMode === 'eraser') return;
+    lctx.save();
+    if (strokeMode === 'highlight') { lctx.globalAlpha = 0.35; lctx.globalCompositeOperation = 'multiply'; }
+    else { lctx.globalAlpha = 1; lctx.globalCompositeOperation = 'source-over'; }
+    lctx.strokeStyle = _annotColor;
+    lctx.lineCap = 'round'; lctx.lineJoin = 'round';
+    lctx.beginPath();
+    lctx.moveTo(points[0].x, points[0].y);
+    for (var i = 1; i < points.length - 1; i++) {
+      var mx = (points[i].x + points[i+1].x) / 2;
+      var my = (points[i].y + points[i+1].y) / 2;
+      lctx.lineWidth = baseW * (0.4 + points[i].p * 0.6);
+      lctx.quadraticCurveTo(points[i].x, points[i].y, mx, my);
+    }
+    lctx.lineWidth = baseW * (0.4 + points[points.length-1].p * 0.6);
+    lctx.lineTo(points[points.length-1].x, points[points.length-1].y);
+    lctx.stroke();
+    lctx.restore();
+  }
+
+  function onStart(e) {
+    if (e.pointerType === 'touch') { return; } // let finger events pass through for scrolling
+    e.preventDefault(); // prevent stylus from also scrolling the page
+    if (_annotMode === 'text') {
+      try { live.releasePointerCapture(e.pointerId); } catch(_){}
+      var wrapRect = live.parentElement.getBoundingClientRect();
+      var xDom = e.clientX - wrapRect.left, yDom = e.clientY - wrapRect.top;
+      var scaleX = live.width / wrapRect.width, scaleY = live.height / wrapRect.height;
+      var xC = xDom * scaleX, yC = yDom * scaleY;
+      var pageNum = pn();
+      var strokes = _annotStrokes[pageNum] || [];
+      var hitCtx = document.createElement('canvas').getContext('2d');
+      var hitIdx = -1;
+      for (var si = strokes.length - 1; si >= 0; si--) {
+        var s = strokes[si];
+        if (s.type !== 'text') continue;
+        hitCtx.font = (s.italic?'italic ':'')+(s.bold?'bold ':'')+s.fontSize+'px Nunito,sans-serif';
+        var lines = (s.text||'').split('\n'), maxW = 0;
+        lines.forEach(function(l){ var w=hitCtx.measureText(l).width; if(w>maxW)maxW=w; });
+        if (xC>=s.x-4 && xC<=s.x+maxW+4 && yC>=s.y-4 && yC<=s.y+s.fontSize*lines.length+4) { hitIdx=si; break; }
+      }
+      if (hitIdx >= 0) _annotEditText(committed, strokes[hitIdx], hitIdx, pageNum);
+      else _annotPlaceText(committed, live, e);
+      return;
+    }
+    drawing = true;
+    strokeMode = _annotMode;
+    points = [getPos(e)];
+    _pushUndo(pn());
+  }
+
+  function onMove(e) {
+    if (e.pointerType === 'touch') return;
+    if (!drawing) return;
+    e.preventDefault();
+    // Collect coalesced events for smoother stylus tracking
+    var evts = (e.getCoalescedEvents && e.getCoalescedEvents()) || [e];
+    for (var i = 0; i < evts.length; i++) points.push(getPos(evts[i]));
+    if (!rafId) rafId = requestAnimationFrame(renderLive);
+  }
+
+  function onEnd() {
+    if (!drawing) return;
+    drawing = false;
+    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+    lctx.clearRect(0, 0, live.width, live.height);
+    if (points.length >= 2) {
+      var stroke = { type: strokeMode, color: _annotColor, thickness: _annotThickness,
+                     points: points.map(function(p){ return {x:p.x, y:p.y}; }) };
+      _annotDrawStroke(cctx, stroke);
+      var pageNum = pn();
+      if (!_annotStrokes[pageNum]) _annotStrokes[pageNum] = [];
+      _annotStrokes[pageNum].push(stroke);
+      _annotSave();
+    }
+    points = [];
+  }
+
+  // Finger touch: manually forward scroll to .pdf-body since touch-action:none blocks browser pan
+  var _touchScrollY = 0, _touchScrollX = 0;
+  live.addEventListener('pointerdown', function(e) {
+    if (e.pointerType !== 'touch') return;
+    _touchScrollY = e.clientY;
+    _touchScrollX = e.clientX;
+  }, {passive: true});
+  live.addEventListener('pointermove', function(e) {
+    if (e.pointerType !== 'touch') return;
+    var body = live.closest('.pdf-body') || document.querySelector('.pdf-body');
+    if (!body) return;
+    body.scrollTop  -= (e.clientY - _touchScrollY);
+    body.scrollLeft -= (e.clientX - _touchScrollX);
+    _touchScrollY = e.clientY;
+    _touchScrollX = e.clientX;
+  }, {passive: true});
+
+  live.addEventListener('pointerdown', onStart, {passive: false});
+  live.addEventListener('pointermove', onMove,  {passive: false});
+  live.addEventListener('pointerup',     onEnd);
+  live.addEventListener('pointercancel', onEnd);
+  live.addEventListener('pointerleave',  onEnd);
+}
+
+function _annotUndo() {
+  var wrap = document.querySelector('.pdf-page-wrap'); if (!wrap) return;
+  var pn = parseInt(wrap.dataset.pageNum || 1);
+  if (!_annotUndoStack[pn] || !_annotUndoStack[pn].length) return;
+  _annotStrokes[pn] = JSON.parse(_annotUndoStack[pn].pop());
+  var committed = _annotGetCommitted(wrap);
+  if (committed) _annotRestorePage(committed, pn);
+  _annotSave();
+}
+
+function _annotClearPage() {
+  document.querySelectorAll('.pdf-page-wrap').forEach(function(wrap) {
+    var committed = _annotGetCommitted(wrap); if (!committed) return;
+    var pn = parseInt(committed.dataset.pageNum);
+    if (!_annotUndoStack[pn]) _annotUndoStack[pn] = [];
+    _annotUndoStack[pn].push(JSON.stringify(_annotStrokes[pn] || []));
+    _annotStrokes[pn] = [];
+    committed.getContext('2d').clearRect(0, 0, committed.width, committed.height);
+  });
+  _annotSave();
+}
+
+// Shared text editor: draggable panel with textarea.
+// existingStroke (optional) — pre-fills text and positions at stroke location for editing.
+// Coordinate contract: stroke.x/y are canvas-pixel coords of the TOP-LEFT of the text block.
+// Drawing: first line baseline = stroke.y + stroke.fontSize.
+// committed = the committed canvas; live = the live canvas (optional, used for pointer-events toggle)
+function _annotOpenTextEditor(committed, live, e, existingStroke, existingIdx, existingPn) {
+  var ac = committed; // draw target
+  var wrap = committed.parentElement;
+  var wrapRect = wrap.getBoundingClientRect();
+  var scaleX = committed.width / wrapRect.width;
+  var scaleY = committed.height / wrapRect.height;
+  var pn = existingPn !== undefined ? existingPn : parseInt(committed.dataset.pageNum);
+
+  // Starting DOM position
+  var xDom, yDom;
+  if (existingStroke) {
+    xDom = existingStroke.x / scaleX;
+    yDom = existingStroke.y / scaleY;
+    // Remove old stroke and clear canvas
+    _annotStrokes[pn].splice(existingIdx, 1);
+    _annotRestorePage(ac, pn);
+  } else {
+    var src = e.touches ? e.touches[0] : e;
+    xDom = src.clientX - wrapRect.left;
+    yDom = src.clientY - wrapRect.top;
+  }
+
+  var color  = existingStroke ? existingStroke.color   : _annotColor;
+  var fsize  = existingStroke ? existingStroke.fontSize / scaleY : _annotFontSize;
+  var bold   = existingStroke ? existingStroke.bold    : _annotBold;
+  var italic = existingStroke ? existingStroke.italic  : _annotItalic;
+
+  var liveCanvas = live || wrap.querySelector('.annot-live');
+  if (liveCanvas) liveCanvas.style.pointerEvents = 'none';
+
+  // Build draggable panel: [handle bar] + [textarea]
+  var panel = document.createElement('div');
+  panel.style.cssText = 'position:absolute;z-index:20;display:flex;flex-direction:column;min-width:120px;' +
+    'border:1.5px dashed rgba(155,93,229,.8);border-radius:6px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.3);';
+  panel.style.left = xDom + 'px';
+  panel.style.top  = yDom + 'px';
+
+  var handle = document.createElement('div');
+  handle.style.cssText = 'background:rgba(155,93,229,.85);cursor:grab;padding:3px 8px;font-size:.68rem;' +
+    'color:#fff;font-family:Nunito,sans-serif;font-weight:700;user-select:none;display:flex;justify-content:space-between;align-items:center;';
+  handle.innerHTML = '<span>⠿ drag</span><span id="_atDone" style="cursor:pointer;opacity:.85">✓ Done</span>';
+
+  var ta = document.createElement('textarea');
+  ta.style.cssText = 'background:rgba(255,255,255,.92);border:none;outline:none;resize:both;' +
+    'min-width:100px;min-height:32px;padding:4px 6px;font-family:Nunito,sans-serif;line-height:1.35;' +
+    'color:' + color + ';font-size:' + fsize + 'px;font-weight:' + (bold ? 'bold' : 'normal') + ';' +
+    'font-style:' + (italic ? 'italic' : 'normal') + ';';
+  if (existingStroke) ta.value = existingStroke.text;
+
+  panel.appendChild(handle);
+  panel.appendChild(ta);
+  wrap.appendChild(panel);
+  setTimeout(function(){ ta.focus(); if (existingStroke) ta.select(); }, 0);
+
+  // Drag logic on the handle
+  var dragStartX, dragStartY, panelStartX, panelStartY, dragging = false;
+  handle.addEventListener('pointerdown', function(ev) {
+    if (ev.target.id === '_atDone') return;
+    dragging = true;
+    handle.style.cursor = 'grabbing';
+    dragStartX = ev.clientX; dragStartY = ev.clientY;
+    panelStartX = parseFloat(panel.style.left);
+    panelStartY = parseFloat(panel.style.top);
+    handle.setPointerCapture(ev.pointerId);
+    ev.preventDefault();
+  });
+  handle.addEventListener('pointermove', function(ev) {
+    if (!dragging) return;
+    panel.style.left = (panelStartX + ev.clientX - dragStartX) + 'px';
+    panel.style.top  = (panelStartY + ev.clientY - dragStartY) + 'px';
+  });
+  handle.addEventListener('pointerup', function() { dragging = false; handle.style.cursor = 'grab'; });
+
+  var done = false;
+  function commit() {
+    if (done) return;
+    done = true;
+    if (liveCanvas) liveCanvas.style.pointerEvents = '';
+    var text = ta.value.trim();
+    panel.remove();
+    if (!text) { _annotRestorePage(ac, pn); return; }
+
+    // Final panel position in canvas pixels (top-left of text block)
+    var finalWrapRect = wrap.getBoundingClientRect();
+    var fscaleX = ac.width / finalWrapRect.width;
+    var fscaleY = ac.height / finalWrapRect.height;
+    var finalXDom = parseFloat(panel.style.left);  // already removed, use last known
+    var finalYDom = parseFloat(panel.style.top);
+    // panel was removed — read from stored vars before remove
+    var xC = _atFinalX * fscaleX;
+    var yC = _atFinalY * fscaleY;
+    var lineH = fsize * fscaleY;
+
+    var ctx = ac.getContext('2d');
+    ctx.save();
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = color;
+    ctx.font = (italic ? 'italic ' : '') + (bold ? 'bold ' : '') + lineH + 'px Nunito,sans-serif';
+    text.split('\n').forEach(function(line, li) {
+      ctx.fillText(line, xC, yC + lineH * (li + 1));
+    });
+    ctx.restore();
+
+    if (!_annotStrokes[pn]) _annotStrokes[pn] = [];
+    _annotStrokes[pn].push({type:'text', color:color, text:text, x:xC, y:yC, fontSize:lineH, bold:bold, italic:italic, points:[]});
+    _annotSave();
+  }
+
+  // Track panel position just before removal (panel.style.left/top are readable until remove())
+  var _atFinalX = xDom, _atFinalY = yDom;
+  // Update tracked position on drag
+  var _trackObs = new MutationObserver(function() {
+    _atFinalX = parseFloat(panel.style.left);
+    _atFinalY = parseFloat(panel.style.top);
+  });
+  _trackObs.observe(panel, {attributes: true, attributeFilter: ['style']});
+
+  // Done button
+  panel.querySelector('#_atDone').addEventListener('pointerdown', function(ev) {
+    ev.preventDefault();
+    _atFinalX = parseFloat(panel.style.left);
+    _atFinalY = parseFloat(panel.style.top);
+    _trackObs.disconnect();
+    commit();
+  });
+
+  ta.addEventListener('keydown', function(ev) {
+    if (ev.key === 'Escape') {
+      done = true;
+      _trackObs.disconnect();
+      if (liveCanvas) liveCanvas.style.pointerEvents = '';
+      panel.remove();
+      _annotRestorePage(ac, pn);
+    }
+    if (ev.key === 'Enter' && !ev.shiftKey) {
+      ev.preventDefault();
+      _atFinalX = parseFloat(panel.style.left);
+      _atFinalY = parseFloat(panel.style.top);
+      _trackObs.disconnect();
+      commit();
+    }
+  });
+}
+
+function _annotPlaceText(committed, live, e) { _annotOpenTextEditor(committed, live, e, null, undefined, undefined); }
+
+function _annotEditText(committed, stroke, strokeIdx, pn) { _annotOpenTextEditor(committed, null, null, stroke, strokeIdx, pn); }
+
+// Wire annotation toolbar controls
+(function() {
+  function $id(id) { return document.getElementById(id); }
+
+  $id('pdfAnnotateToggle').addEventListener('click', _annotToggle);
+
+  ['annotToolPen','annotToolHighlight','annotToolText','annotToolEraser'].forEach(function(id) {
+    var btn = $id(id);
+    // pointerdown: stop event reaching the PDF canvas below (tablet ghost-tap prevention)
+    btn.addEventListener('pointerdown', function(e) { e.stopPropagation(); });
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      document.querySelectorAll('.annot-tool-btn').forEach(function(b){ b.classList.remove('active'); b.style.background=''; });
+      this.classList.add('active');
+      this.style.background = 'rgba(155,93,229,.35)';
+      _annotMode = id.replace('annotTool','').toLowerCase();
+      _annotUpdateCursor();
+      var txtCtrl = $id('annotTextControls');
+      txtCtrl.style.display = _annotMode === 'text' ? 'flex' : 'none';
+    });
+  });
+
+  document.querySelectorAll('.annot-color-swatch').forEach(function(sw) {
+    sw.addEventListener('click', function() {
+      document.querySelectorAll('.annot-color-swatch').forEach(function(s){ s.classList.remove('active'); });
+      sw.classList.add('active');
+      _annotColor = sw.dataset.color;
+      $id('annotColorPicker').value = _annotColor;
+    });
+  });
+
+  $id('annotColorPicker').addEventListener('input', function() {
+    _annotColor = this.value;
+    document.querySelectorAll('.annot-color-swatch').forEach(function(s){ s.classList.remove('active'); });
+  });
+
+  $id('annotThickness').addEventListener('input', function() {
+    _annotThickness = parseInt(this.value);
+  });
+
+  $id('annotFontSize').addEventListener('change', function() {
+    _annotFontSize = parseInt(this.value);
+  });
+
+  $id('annotBold').addEventListener('click', function() {
+    _annotBold = !_annotBold;
+    this.classList.toggle('active', _annotBold);
+  });
+
+  $id('annotItalic').addEventListener('click', function() {
+    _annotItalic = !_annotItalic;
+    this.classList.toggle('active', _annotItalic);
+  });
+
+  $id('annotUndo').addEventListener('click', _annotUndo);
+  $id('annotClear').addEventListener('click', _annotClearPage);
+})();
+
+// Re-attach canvases whenever renderPages rebuilds the DOM
+var _origRenderPages = renderPages;
+renderPages = function() {
+  _origRenderPages.apply(this, arguments);
+  if (_annotActive) {
+    setTimeout(function() {
+      var wraps = document.querySelectorAll('.pdf-page-wrap');
+      wraps.forEach(function(wrap, i) { wrap.dataset.pageNum = pdfShowAll ? (i+1) : pdfPage; });
+      _annotAttachCanvases();
+    }, 200);
+  }
+};
+
+// ── ANNOTATED PDF EXPORT ──────────────────────────────────────────────────────
+
+// Render ALL pages of the current PDF with annotations merged into one jsPDF doc.
+// Returns a Promise<Blob> (PDF blob).
+async function _annotBuildPdfBlob() {
+  if (!pdfDoc) throw new Error('No PDF loaded');
+  var jspdf = window.jspdf && window.jspdf.jsPDF;
+  if (!jspdf) throw new Error('jsPDF not loaded');
+
+  var totalPages = pdfDoc.numPages;
+  var doc = null;
+
+  for (var i = 1; i <= totalPages; i++) {
+    var page = await pdfDoc.getPage(i);
+    var vp0 = page.getViewport({scale: 1});
+    // Render at 150dpi scale for good quality
+    var exportScale = 150 / 72;
+    var vp = page.getViewport({scale: exportScale});
+
+    // PDF canvas
+    var pdfCanvas = document.createElement('canvas');
+    pdfCanvas.width = vp.width; pdfCanvas.height = vp.height;
+    await page.render({canvasContext: pdfCanvas.getContext('2d'), viewport: vp}).promise;
+
+    // Composite canvas = pdf + annotations
+    var composite = document.createElement('canvas');
+    composite.width = vp.width; composite.height = vp.height;
+    var cctx = composite.getContext('2d');
+    cctx.drawImage(pdfCanvas, 0, 0);
+
+    // Scale and draw annotation strokes for this page
+    var strokes = _annotStrokes[i];
+    if (strokes && strokes.length) {
+      var scaleX = vp.width; var scaleY = vp.height;
+      // Annotation canvas was sized to the DOM wrap; we need to find that ratio.
+      // We stored strokes in annotation-canvas coordinates. To map to export canvas:
+      // find the DOM annotation canvas for this page if visible, else use stored width/height.
+      var acEl = document.querySelector('.annot-committed[data-page-num="'+i+'"]');
+      var acW = acEl ? acEl.width : (vp.width / exportScale);
+      var acH = acEl ? acEl.height : (vp.height / exportScale);
+      var rx = vp.width / acW;
+      var ry = vp.height / acH;
+
+      strokes.forEach(function(s) {
+        if (s.type === 'text') {
+          cctx.save();
+          cctx.globalAlpha = 1;
+          cctx.fillStyle = s.color;
+          cctx.font = (s.italic ? 'italic ' : '') + (s.bold ? 'bold ' : '') + (s.fontSize * rx) + 'px Nunito,sans-serif';
+          (s.text||'').split('\n').forEach(function(line, li) {
+            cctx.fillText(line, s.x * rx, s.y * ry + (s.fontSize * rx) * (li + 1));
+          });
+          cctx.restore();
+          return;
+        }
+        if (!s.points || s.points.length < 1) return;
+        cctx.save();
+        if (s.type === 'highlight') { cctx.globalAlpha = 0.35; cctx.globalCompositeOperation = 'multiply'; }
+        else if (s.type === 'eraser') { cctx.globalCompositeOperation = 'destination-out'; cctx.globalAlpha = 1; }
+        else { cctx.globalAlpha = 1; cctx.globalCompositeOperation = 'source-over'; }
+        cctx.strokeStyle = s.type === 'eraser' ? 'rgba(0,0,0,1)' : s.color;
+        cctx.lineWidth = (s.type === 'highlight' ? s.thickness * 4 : s.thickness) * rx;
+        cctx.lineCap = 'round'; cctx.lineJoin = 'round';
+        cctx.beginPath();
+        cctx.moveTo(s.points[0].x * rx, s.points[0].y * ry);
+        s.points.forEach(function(pt) { cctx.lineTo(pt.x * rx, pt.y * ry); });
+        cctx.stroke();
+        cctx.restore();
+      });
+    }
+
+    // Page orientation
+    var orientation = vp.width > vp.height ? 'l' : 'p';
+    var imgData = composite.toDataURL('image/jpeg', 0.92);
+    var pxToMm = 25.4 / 150;
+    var wMm = vp.width * pxToMm;
+    var hMm = vp.height * pxToMm;
+
+    if (!doc) {
+      doc = new jspdf({orientation: orientation, unit: 'mm', format: [wMm, hMm]});
+    } else {
+      doc.addPage([wMm, hMm], orientation);
+    }
+    doc.addImage(imgData, 'JPEG', 0, 0, wMm, hMm);
+  }
+
+  return doc.output('blob');
+}
+
+// Download annotated PDF
+document.getElementById('annotDownload').addEventListener('click', async function() {
+  this.textContent = '⏳ Building…';
+  this.disabled = true;
+  try {
+    var blob = await _annotBuildPdfBlob();
+    var fname = (activeFileName || 'annotated').replace(/\.pdf$/i,'') + '_annotated.pdf';
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = fname; a.click();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 5000);
+    showToast('Downloaded', fname);
+  } catch(e) {
+    showToast('Error', e.message);
+  }
+  this.textContent = '⬇ Save PDF';
+  this.disabled = false;
+});
+
+// Transfer to course — show modal with enrolled courses
+document.getElementById('annotTransfer').addEventListener('click', function() {
+  var modal = document.getElementById('annotTransferModal');
+  var list = document.getElementById('annotTransferCourseList');
+  var status = document.getElementById('annotTransferStatus');
+  status.textContent = '';
+  list.innerHTML = '';
+
+  // Gather all courses across semesters
+  var allCourses = [];
+  Object.values(SEMS).forEach(function(sem) {
+    (sem.courses || []).forEach(function(c) { allCourses.push(c); });
+  });
+
+  if (!allCourses.length) {
+    list.innerHTML = '<p style="color:var(--on-glass-muted);font-size:.85rem">No courses enrolled.</p>';
+  } else {
+    allCourses.forEach(function(course) {
+      var btn = document.createElement('button');
+      btn.style.cssText = 'display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:10px 14px;cursor:pointer;color:var(--on-glass);font-family:Nunito,sans-serif;font-size:.85rem;font-weight:700;text-align:left;transition:background .13s;width:100%';
+      btn.innerHTML = '<span style="font-size:1.1rem">📚</span><span style="flex:1">' + (course.name || course.short) + '</span>';
+      btn.addEventListener('mouseenter', function(){ this.style.background='rgba(155,93,229,.2)'; });
+      btn.addEventListener('mouseleave', function(){ this.style.background='rgba(255,255,255,.06)'; });
+      btn.addEventListener('click', async function() {
+        var uid = _currentUser && (_currentUser.id || _currentUser.sub);
+        if (!uid) { status.textContent = 'Not logged in.'; return; }
+        status.textContent = '⏳ Building PDF…';
+        btn.disabled = true;
+        try {
+          var blob = await _annotBuildPdfBlob();
+          var fname = (activeFileName || 'annotated').replace(/\.pdf$/i,'') + '_annotated.pdf';
+          var file = new File([blob], fname, {type: 'application/pdf'});
+          status.textContent = '⏳ Uploading to ' + (course.name || course.short) + '…';
+          await _ufUpload(uid, course, file, function(pct){ status.textContent = '⏳ Uploading… ' + pct + '%'; });
+          await _ufMerge(course);
+          status.textContent = '';
+          modal.style.display = 'none';
+          showToast('✅ Transferred!', fname + ' added to ' + (course.name || course.short));
+        } catch(e) {
+          status.textContent = '❌ ' + e.message;
+          btn.disabled = false;
+        }
+      });
+      list.appendChild(btn);
+    });
+  }
+
+  modal.style.display = 'flex';
+});
+
+document.getElementById('annotTransferClose').addEventListener('click', function() {
+  document.getElementById('annotTransferModal').style.display = 'none';
+});
 
 // ── INIT ─────────────────────────────────────────────────────────────────────
 
@@ -1166,7 +2104,9 @@ var SUBJECT_LIST=[
 var activeSemId='ws2526',activeCourseId=null,activeFileName=null,currentCourseShort='';
 var pdfDoc=null,pdfPage=1,pdfTotal=0,pdfScale=0.9,pdfShowAll=false,pdfFullText='';
 var aiOpen=false,aiPinned=false,sbOpen=false,sbHideTimer=null;
+var _openFolders=new Set(); // folder names currently expanded in the files section
 var BACKEND_URL=''; // Netlify Function at /api/ai (same origin — no CORS, no sleeping)
+var _MATH_PROMPT = '';
 var activeTypeTimer=null,activeThinkTimer=null,generationStopped=false,currentGenId=0;
 var activeCourseRef=null,activeCourseSection='files';
 var activePortalSection='dashboard';
@@ -1376,6 +2316,7 @@ var msmCurrentTitle = '';
 });
 
 async function runMultiSummary(fnames, course) {
+  if (!_requirePro('Multi-PDF summaries are a Pro feature.')) return;
   var modal = document.getElementById('multiSumModal');
   var body = document.getElementById('msmBody');
   var title = document.getElementById('msmTitle');
@@ -1478,6 +2419,12 @@ function updateZoomPct(){var el=document.getElementById('pdfZoomPct');if(el)el.t
   },30);
 });
 
+var _pdfScrollTimer=null;
+(document.getElementById('pdfBody')||document.createElement('div')).addEventListener('scroll',function(){
+  if(!pdfShowAll)return;
+  clearTimeout(_pdfScrollTimer);
+  _pdfScrollTimer=setTimeout(updatePageInfo,80);
+});
 (document.getElementById('pdfPrev')||{addEventListener:function(){}}).addEventListener('click',function(){if(pdfPage>1){pdfPage--;pdfShowAll=false;updatePageInfo();renderPages();}});
 (document.getElementById('pdfNext')||{addEventListener:function(){}}).addEventListener('click',function(){if(pdfPage<pdfTotal){pdfPage++;pdfShowAll=false;updatePageInfo();renderPages();}});
 (document.getElementById('pdfZoomIn')||{addEventListener:function(){}}).addEventListener('click',function(){pdfScale=Math.min(Math.round((pdfScale+.1)*10)/10,3);updateZoomPct();renderPages();});
@@ -1567,16 +2514,345 @@ var aiMsgs=document.getElementById('aiMsgs');
 function getTime(){var d=new Date();return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0');}
 
 function renderMarkdown(text){
-  text=text.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>');
-  text=text.replace(/`([^`\n]+)`/g,'<code>$1</code>');
-  text=text.replace(/^### (.+)$/gm,'<h3>$1</h3>');
-  // Group consecutive bullet lines into a proper <ul> before newline conversion
-  text=text.replace(/((?:^[•\-\*] .+$\n?)+)/gm,function(block){
-    return '<ul>'+block.replace(/^[•\-\*] (.+)$/gm,'<li>$1</li>').replace(/\n/g,'')+'</ul>';
+  var lines = text.split('\n');
+  var out = [];
+  var i = 0;
+
+  function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  function renderKatex(src, display) {
+    if (!window.katex) return display ? '\\['+src+'\\]' : '\\('+src+'\\)';
+    try { return window.katex.renderToString(src, {displayMode: display, throwOnError: false}); }
+    catch(e) { return display ? '\\['+src+'\\]' : '\\('+src+'\\)'; }
+  }
+
+  function inline(s){
+    // Render inline math \(...\) and $$...$$ via KaTeX before markdown processing
+    s = s.replace(/\\\(([^]*?)\\\)/g, function(_,m){ return renderKatex(m, false); });
+    s = s.replace(/\$\$([^]*?)\$\$/g,  function(_,m){ return renderKatex(m, true); });
+    s = s.replace(/\$([^\$\n]+?)\$/g,  function(_,m){ return renderKatex(m, false); });
+    s = s.replace(/`([^`]+)`/g, function(_,c){ return '<code>'+esc(c)+'</code>'; });
+    s = s.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+    s = s.replace(/\*\*(.+?)\*\*/g,     '<strong>$1</strong>');
+    s = s.replace(/__(.+?)__/g,         '<strong>$1</strong>');
+    s = s.replace(/\*(.+?)\*/g,         '<em>$1</em>');
+    return s;
+  }
+
+  while (i < lines.length) {
+    var line = lines[i];
+
+    // display math block \[ ... \] (may span multiple lines) — render with KaTeX
+    if (/^\s*\\\[/.test(line)) {
+      var mathLines = [];
+      if (/\\\]/.test(line)) {
+        // single line: \[ ... \]
+        mathLines.push(line.replace(/^\s*\\\[/, '').replace(/\\\]\s*$/, ''));
+      } else {
+        i++;
+        while (i < lines.length && !/\\\]/.test(lines[i])) { mathLines.push(lines[i]); i++; }
+        if (i < lines.length) mathLines.push(lines[i].replace(/\\\]\s*$/, ''));
+      }
+      out.push('<div class="md-math-block">'+renderKatex(mathLines.join('\n'), true)+'</div>');
+      i++; continue;
+    }
+
+    // display math block $$ ... $$ (may span multiple lines)
+    if (/^\s*\$\$/.test(line) && !/\$\$.*\$\$/.test(line)) {
+      var mathLines2 = [];
+      i++;
+      while (i < lines.length && !/\$\$/.test(lines[i])) { mathLines2.push(lines[i]); i++; }
+      if (i < lines.length) i++; // skip closing $$
+      out.push('<div class="md-math-block">'+renderKatex(mathLines2.join('\n'), true)+'</div>');
+      continue;
+    }
+
+    // fenced code block
+    if (/^```/.test(line)) {
+      var lang = line.slice(3).trim();
+      var code = [];
+      i++;
+      while (i < lines.length && !/^```/.test(lines[i])) { code.push(esc(lines[i])); i++; }
+      out.push('<div class="md-code-block">'+(lang?'<div class="md-code-lang">'+esc(lang)+'</div>':'')+
+        '<pre><code>'+code.join('\n')+'</code></pre></div>');
+      i++; continue;
+    }
+
+    // headings (support up to ####, clamp to h3 for visual hierarchy)
+    var hm = line.match(/^(#{1,6}) (.+)/);
+    if (hm) {
+      var hlevel = Math.min(hm[1].length, 3);
+      out.push('<h'+hlevel+' class="md-h md-h'+hlevel+'">'+inline(hm[2])+'</h'+hlevel+'>');
+      i++; continue;
+    }
+
+    // horizontal rule
+    if (/^(\*{3,}|-{3,}|_{3,})$/.test(line.trim())) {
+      out.push('<hr class="md-hr">'); i++; continue;
+    }
+
+    // blockquote
+    if (/^> /.test(line)) {
+      var bqLines = [];
+      while (i < lines.length && /^> /.test(lines[i])) { bqLines.push(inline(lines[i].slice(2))); i++; }
+      out.push('<blockquote class="md-bq">'+bqLines.join('<br>')+'</blockquote>');
+      continue;
+    }
+
+    // numbered list
+    if (/^\d+\. /.test(line)) {
+      var olItems = [];
+      while (i < lines.length && /^\d+\. /.test(lines[i])) {
+        olItems.push('<li>'+inline(lines[i].replace(/^\d+\. /,''))+'</li>');
+        i++;
+      }
+      out.push('<ol class="md-ol">'+olItems.join('')+'</ol>');
+      continue;
+    }
+
+    // bullet list
+    if (/^[•\-\*] /.test(line)) {
+      var ulItems = [];
+      while (i < lines.length && /^[•\-\*] /.test(lines[i])) {
+        ulItems.push('<li>'+inline(lines[i].replace(/^[•\-\*] /,''))+'</li>');
+        i++;
+      }
+      out.push('<ul class="md-ul">'+ulItems.join('')+'</ul>');
+      continue;
+    }
+
+    // blank line → paragraph break
+    if (line.trim() === '') { out.push('<div class="md-gap"></div>'); i++; continue; }
+
+    // normal paragraph line
+    out.push('<p class="md-p">'+inline(line)+'</p>');
+    i++;
+  }
+
+  return out.join('');
+}
+
+// ── MATH RENDERING (KaTeX) ───────────────────────────────────────────────
+function _renderMath(el) { /* math now rendered inside renderMarkdown via katex.renderToString */ }
+
+// ── AI RESPONSE → PDF EXPORT ─────────────────────────────────────────────
+
+async function _aiMakePdfBlob(title, text) {
+  var jsPDF = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+  if (!jsPDF) { showToast('jsPDF missing', 'Could not build PDF'); return null; }
+  if (!window.html2canvas) { showToast('html2canvas missing', 'Could not render PDF'); return null; }
+
+  var container = document.createElement('div');
+  // Off-screen but fully rendered (NOT opacity:0 — html2canvas captures transparency)
+  container.style.cssText = 'position:fixed;left:-9999px;top:0;width:750px;background:#ffffff;color:#1a1a1a;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.75;padding:44px 52px;box-sizing:border-box;z-index:99999;';
+
+  var titleEl = document.createElement('div');
+  titleEl.style.cssText = 'font-size:19px;font-weight:700;color:#5028a0;margin-bottom:10px;padding-bottom:10px;border-bottom:2px solid #9b5de5;';
+  titleEl.textContent = title;
+  container.appendChild(titleEl);
+
+  var contentEl = document.createElement('div');
+  contentEl.style.color = '#1a1a1a';
+  contentEl.innerHTML = renderMarkdown(text);
+  container.appendChild(contentEl);
+
+  var footer = document.createElement('div');
+  footer.style.cssText = 'margin-top:32px;font-size:10px;color:#aaa;border-top:1px solid #eee;padding-top:8px;';
+  footer.textContent = 'Generated by StudySphere AI';
+  container.appendChild(footer);
+
+  document.body.appendChild(container);
+
+  try {
+    await new Promise(function(r) { setTimeout(r, 60); }); // let layout settle
+    var canvas = await html2canvas(container, { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false });
+    document.body.removeChild(container);
+
+    var doc = new jsPDF({ unit: 'mm', format: 'a4' });
+    var pageW = 210, pageH = 297, margin = 10;
+    var imgW = pageW - margin * 2;
+    var pageContentH = pageH - margin * 2;
+    var pxPerMm = canvas.width / imgW;
+    var srcYpx = 0;
+    var firstPage = true;
+
+    while (srcYpx < canvas.height) {
+      if (!firstPage) doc.addPage();
+      firstPage = false;
+      var sliceHpx = Math.min(Math.round(pageContentH * pxPerMm), canvas.height - srcYpx);
+      var sliceCanvas = document.createElement('canvas');
+      sliceCanvas.width = canvas.width;
+      sliceCanvas.height = sliceHpx;
+      sliceCanvas.getContext('2d').drawImage(canvas, 0, srcYpx, canvas.width, sliceHpx, 0, 0, canvas.width, sliceHpx);
+      doc.addImage(sliceCanvas.toDataURL('image/png'), 'PNG', margin, margin, imgW, sliceHpx / pxPerMm);
+      srcYpx += sliceHpx;
+    }
+
+    return doc.output('blob');
+  } catch(e) {
+    if (document.body.contains(container)) document.body.removeChild(container);
+    showToast('PDF error', e.message);
+    return null;
+  }
+}
+
+async function _aiDownloadPdf(title, text) {
+  var blob = await _aiMakePdfBlob(title, text);
+  if (!blob) return;
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = title.slice(0, 60).replace(/[^\w\s-]/g, '').trim() + '.pdf';
+  a.click();
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
+}
+
+// Destination picker overlay — lets user choose root or a folder before export
+function _ufDestPicker(uid, course, onPick) {
+  var overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:10001;';
+  overlay.addEventListener('click', function(e){ if(e.target===overlay)overlay.remove(); });
+  var box = document.createElement('div');
+  box.style.cssText = 'background:var(--dp-solid);border:1px solid rgba(255,255,255,.12);border-radius:18px;padding:22px 20px;max-width:340px;width:90%;max-height:75vh;overflow-y:auto;display:flex;flex-direction:column;gap:8px;';
+  var hdr = document.createElement('div');
+  hdr.style.cssText = 'font-weight:800;font-size:.95rem;color:var(--on-glass);margin-bottom:2px;';
+  hdr.textContent = 'Where to export?';
+  box.appendChild(hdr);
+  var sub = document.createElement('div');
+  sub.style.cssText = 'font-size:.78rem;color:var(--on-glass-faint);margin-bottom:6px;';
+  sub.textContent = course.name || course.short;
+  box.appendChild(sub);
+  function addOpt(icon, label, onClick) {
+    var b = document.createElement('button');
+    b.style.cssText = 'display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:10px 14px;cursor:pointer;color:var(--on-glass);font-family:Nunito,sans-serif;font-size:.85rem;font-weight:700;text-align:left;width:100%;transition:background .13s;';
+    b.innerHTML = '<span style="font-size:1.1rem">'+icon+'</span><span style="flex:1">'+label+'</span>';
+    b.addEventListener('mouseenter',function(){b.style.background='rgba(155,93,229,.2)';});
+    b.addEventListener('mouseleave',function(){b.style.background='rgba(255,255,255,.06)';});
+    b.addEventListener('click',function(){overlay.remove();onClick();});
+    box.appendChild(b);
+  }
+  addOpt('📁', 'Course root', function(){ onPick(null); });
+  _ufGetFolders(uid, course).forEach(function(f){ addOpt('📂', f, function(){ onPick(f); }); });
+  var nb = document.createElement('button');
+  nb.style.cssText = 'display:flex;align-items:center;gap:10px;background:rgba(155,93,229,.08);border:1px dashed rgba(155,93,229,.35);border-radius:12px;padding:10px 14px;cursor:pointer;color:var(--purple);font-family:Nunito,sans-serif;font-size:.85rem;font-weight:700;text-align:left;width:100%;margin-top:2px;';
+  nb.innerHTML = '<span style="font-size:1.1rem">➕</span><span>New folder…</span>';
+  nb.addEventListener('click', function(){
+    var name = prompt('Folder name:');
+    if(!name||!name.trim())return;
+    _ufCreateFolder(uid, course, name.trim());
+    overlay.remove(); onPick(name.trim());
   });
-  text=text.replace(/\n\n/g,'<br>');
-  text=text.replace(/\n/g,'<br>');
-  return text;
+  box.appendChild(nb);
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+}
+
+// Export to a specific course (AI panel — shows folder picker first)
+async function _aiExportToCourse(title, text, course, _folder) {
+  if (!course) { showToast('No course', 'Open a course first'); return; }
+  var uid = _currentUser && (_currentUser.id || _currentUser.sub);
+  if (!uid) { showToast('Not logged in', 'Please sign in first'); return; }
+  // _folder === undefined means we haven't picked destination yet
+  if (_folder === undefined) {
+    _ufDestPicker(uid, course, function(picked){ _aiExportToCourse(title, text, course, picked); });
+    return;
+  }
+  var blob = await _aiMakePdfBlob(title, text);
+  if (!blob) return;
+  var fname = title.slice(0, 50).replace(/[^\w\s-]/g, '').trim() + '.pdf';
+  var file = new File([blob], fname, { type: 'application/pdf' });
+  try {
+    await _ufUpload(uid, course, file, null, _folder || null);
+    var dest = _folder ? '"'+_folder+'" in '+(course.name||course.short) : (course.name||course.short);
+    showToast('Exported ✓', fname + ' added to ' + dest);
+  } catch(e) {
+    showToast('Export failed', e.message);
+  }
+}
+
+// Show course picker modal (chatbot page — any course)
+function _aiShowExportModal(title, text) {
+  var modal = document.getElementById('aiExportModal');
+  var list   = document.getElementById('aiExportCourseList');
+  var status = document.getElementById('aiExportStatus');
+  if (!modal) return;
+  status.textContent = '';
+  list.innerHTML = '';
+
+  var allCourses = [];
+  Object.values(SEMS).forEach(function(sem){
+    (sem.courses || []).forEach(function(c){ allCourses.push(c); });
+  });
+
+  if (!allCourses.length) {
+    list.innerHTML = '<p style="color:var(--on-glass-muted);font-size:.85rem">No courses found.</p>';
+  } else {
+    allCourses.forEach(function(course) {
+      var btn = document.createElement('button');
+      btn.style.cssText = 'display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:10px 14px;cursor:pointer;color:var(--on-glass);font-family:Nunito,sans-serif;font-size:.85rem;font-weight:700;text-align:left;transition:background .13s;width:100%';
+      btn.innerHTML = '<span style="font-size:1.1rem">📚</span><span style="flex:1">' + (course.name || course.short) + '</span>';
+      btn.addEventListener('mouseenter', function(){ this.style.background = 'rgba(155,93,229,.2)'; });
+      btn.addEventListener('mouseleave', function(){ this.style.background = 'rgba(255,255,255,.06)'; });
+      btn.addEventListener('click', function() {
+        btn.disabled = true;
+        var uid = _currentUser && (_currentUser.id || _currentUser.sub);
+        if (!uid) { status.textContent = '⚠️ Not signed in'; return; }
+        modal.style.display = 'none';
+        _ufDestPicker(uid, course, async function(folder) {
+          modal.style.display = 'flex';
+          status.textContent = '⏳ Uploading…';
+          await _aiExportToCourse(title, text, course, folder);
+          status.textContent = '✓ Done!';
+          setTimeout(function(){ modal.style.display = 'none'; status.textContent = ''; }, 1200);
+        });
+      });
+      list.appendChild(btn);
+    });
+  }
+
+  modal.style.display = 'flex';
+}
+
+document.addEventListener('click', function(e) {
+  if (e.target.id === 'aiExportClose' || e.target === document.getElementById('aiExportModal')) {
+    document.getElementById('aiExportModal').style.display = 'none';
+  }
+});
+
+// Builds the action bar appended under a finished bot response
+// context: 'panel' = AI panel (export to current course), 'chatbot' = chatbot page (pick any course)
+function _aiResponseActions(rawText, context) {
+  // Derive title from first heading or first sentence of the response
+  var title = '';
+  var headingMatch = rawText.match(/^#{1,3} (.+)/m);
+  if (headingMatch) {
+    title = headingMatch[1].trim();
+  } else {
+    var firstLine = rawText.replace(/^[\s\n]+/, '').split('\n')[0].replace(/\*\*/g,'').trim();
+    title = firstLine.length > 60 ? firstLine.slice(0, 60) + '…' : firstLine;
+  }
+  if (!title) title = 'AI Response';
+  var bar = document.createElement('div');
+  bar.className = 'ai-action-bar';
+
+  var dlBtn = document.createElement('button');
+  dlBtn.className = 'ai-action-btn';
+  dlBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download PDF';
+  dlBtn.addEventListener('click', function(){ _aiDownloadPdf(title, rawText); });
+
+  var expBtn = document.createElement('button');
+  expBtn.className = 'ai-action-btn';
+  expBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg> Export to course';
+  expBtn.addEventListener('click', function() {
+    if (context === 'panel') {
+      _aiExportToCourse(title, rawText, activeCourseRef);
+    } else {
+      _aiShowExportModal(title, rawText);
+    }
+  });
+
+  bar.appendChild(dlBtn);
+  bar.appendChild(expBtn);
+  return bar;
 }
 
 function addBotMsg(text){
@@ -1650,6 +2926,26 @@ stopGeneration=function(){
 };
 window.stopGeneration=stopGeneration;
 
+// Render up to maxPages PDF pages as JPEG base64 strings for vision API
+async function _pdfToImages(maxPages){
+  if(!pdfDoc)return[];
+  var pages=Math.min(pdfDoc.numPages,maxPages||6);
+  var imgs=[];
+  for(var i=1;i<=pages;i++){
+    try{
+      var page=await pdfDoc.getPage(i);
+      var vp=page.getViewport({scale:1.5});
+      var canvas=document.createElement('canvas');
+      canvas.width=vp.width;canvas.height=vp.height;
+      var ctx=canvas.getContext('2d');
+      await page.render({canvasContext:ctx,viewport:vp}).promise;
+      var dataUrl=canvas.toDataURL('image/jpeg',0.82);
+      imgs.push(dataUrl.split(',')[1]); // base64 only
+    }catch(e){/* skip failed page */}
+  }
+  return imgs;
+}
+
 askAI=function(question,skipUserBubble){
   if(!question)return;
   generationStopped=false;
@@ -1679,27 +2975,39 @@ askAI=function(question,skipUserBubble){
   cycleThought();
   activeThinkTimer=setInterval(cycleThought,1100);
 
-  fetch(BACKEND_URL+'/api/ai',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({
-      model:'claude-sonnet-4-6',
-      max_tokens:1024,
-      system:(window._userType==='learner'
-        ? 'You are StudySphere, a German language tutor helping a student prepare for '+(window._germanTest||'a German exam')+(window._germanLevel?' at level '+window._germanLevel:'')+'. Always reply in '+((_lang==='de')?'German':'English')+'. The student is reading "'+activeFileName+'". ALWAYS base your answers on the actual document content below. Be thorough but concise. Use markdown: **bold**, `code`, ### headers, - bullet points.'
-        : 'You are StudySphere, a friendly tutor for TU Braunschweig engineering students. Always reply in '+(_lang==='de'?'German':'English')+'. The student is reading "'+activeFileName+'" from '+currentCourseShort+'. ALWAYS base your answers on the actual document content provided below. Do not use general knowledge when the document covers the topic. Be thorough but concise. Use markdown: **bold**, `code`, ### headers, - bullet points.'
-      )+'\n\nDOCUMENT CONTENT:\n'+(pdfFullText||'(document text not yet extracted — please wait a moment after opening the file)'),
-      messages:[{role:'user',content:question}]
-    })
-  })
-  .then(function(r){return r.json();})
+  // Detect handwritten/scanned PDF: text layer is absent or very thin
+  var isHandwritten = pdfDoc && (pdfFullText.trim().length < 100);
+
+  var sysPrompt=(window._userType==='learner'
+    ? 'You are StudySphere, a German language tutor helping a student prepare for '+(window._germanTest||'a German exam')+(window._germanLevel?' at level '+window._germanLevel:'')+'. Always reply in '+((_lang==='de')?'German':'English')+'. The student is reading "'+activeFileName+'". ALWAYS base your answers on the actual document content below. Be thorough but concise.'
+    : 'You are StudySphere, a friendly tutor for TU Braunschweig engineering students. Always reply in '+(_lang==='de'?'German':'English')+'. The student is reading "'+activeFileName+'" from '+currentCourseShort+'. ALWAYS base your answers on the actual document content provided below. Do not use general knowledge when the document covers the topic. Be thorough but concise.'
+  )+_MATH_PROMPT;
+
+  // Build user message — images for handwritten, plain text otherwise
+  Promise.resolve(isHandwritten ? _pdfToImages(6) : []).then(function(pageImages){
+    var userContent;
+    if(pageImages.length){
+      sysPrompt+='\n\nThis document is handwritten or scanned. Pages are provided as images — read all handwritten text, equations, and diagrams carefully.';
+      userContent=pageImages.map(function(b64){
+        return {type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64}};
+      });
+      userContent.push({type:'text',text:question});
+    } else {
+      sysPrompt+='\n\nDOCUMENT CONTENT:\n'+(pdfFullText||'(document text not yet extracted)');
+      userContent=question;
+    }
+    return fetch(BACKEND_URL+'/api/ai',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1024,system:sysPrompt,messages:[{role:'user',content:userContent}]})
+    });
+  }).then(function(r){return r.json();})
   .then(function(data){
-    if(myGenId!==currentGenId){thinkWrap.remove();return;} // stale — discard
+    if(myGenId!==currentGenId){thinkWrap.remove();return;}
     clearInterval(activeThinkTimer);activeThinkTimer=null;
     thinkWrap.style.transition='opacity .3s';thinkWrap.style.opacity='0';
     setTimeout(function(){thinkWrap.remove();},320);
     var rawText=data.error?('❌ Error: '+(data.error.message||JSON.stringify(data.error))):(data.content?data.content.map(function(b){return b.text||'';}).join(''):'No response');
-    // Append answer wrap immediately to preserve order
     var ansWrap=document.createElement('div');ansWrap.className='ai-msg-wrap';
     var t=getTime();
     ansWrap.innerHTML=
@@ -1713,20 +3021,17 @@ askAI=function(question,skipUserBubble){
       '</div>';
     aiMsgs.appendChild(ansWrap);
     aiMsgs.scrollTop=aiMsgs.scrollHeight;
-    var bubble=document.getElementById('streamBubble');
-    var meta=document.getElementById('streamMeta');
     setTimeout(function(){
-      // re-grab in case DOM changed
-      bubble=ansWrap.querySelector('.ai-bubble.bot');
-      meta=ansWrap.querySelector('.msg-meta');
+      var bubble=ansWrap.querySelector('.ai-bubble.bot');
+      var meta=ansWrap.querySelector('.msg-meta');
       var i=0;
       function typeNext(){
-        if(generationStopped||myGenId!==currentGenId){bubble=ansWrap.querySelector('.ai-bubble.bot');meta=ansWrap.querySelector('.msg-meta');bubble.innerHTML=renderMarkdown(rawText.slice(0,i));meta.style.display='flex';return;}
+        if(generationStopped||myGenId!==currentGenId){var partialText=rawText.slice(0,i);bubble.innerHTML=renderMarkdown(partialText);meta.style.display='flex';var eb=ansWrap.querySelector('.ai-action-bar');if(!eb&&partialText.trim())ansWrap.querySelector('.msg-body').appendChild(_aiResponseActions(partialText,'panel'));return;}
         if(i>=rawText.length){
-          bubble=ansWrap.querySelector('.ai-bubble.bot');
-          meta=ansWrap.querySelector('.msg-meta');
           bubble.innerHTML=renderMarkdown(rawText);
+          _renderMath(bubble);
           meta.style.display='flex';
+          if(!ansWrap.querySelector('.ai-action-bar'))ansWrap.querySelector('.msg-body').appendChild(_aiResponseActions(rawText,'panel'));
           document.getElementById('aiSend').disabled=false;
           document.getElementById('stopBtn').style.display='none';
           spawnConfetti();return;
@@ -1781,7 +3086,7 @@ function chipPrompt(type, level) {
 
   var prompts = {
     summarise: {
-      small:    base + 'give me a SHORT summary of the document in 3-5 bullet points covering only the most essential points. Be very concise.',
+      small:    base + 'give me a SHORT summary of the document in exactly 3 bullet points. Each bullet must be one sentence only. No intro, no outro, just the 3 bullets.',
       medium:   base + 'give me a MEDIUM summary of the document. Structure it with: ## 📝 Overview (3-4 sentences), ## 🔑 Main Topics (bullet points), ## 💡 Key Takeaways (3-5 points).',
       thorough: base + 'give me a THOROUGH and detailed summary of the entire document. Cover every section in depth. Structure it with: ## 📝 Overview, ## 🔑 Main Topics (with sub-points for each), ## 🔢 Formulas Mentioned, ## 💡 Key Takeaways, ## 📌 Things to Remember for the Exam.'
     },
@@ -1848,8 +3153,8 @@ function serializeChatDOM() {
       var txt = wrap.getAttribute('data-q') || bubble.textContent || '';
       out.push({ role: 'user', text: txt.trim() });
     } else {
-      // Bot: store rendered HTML so markdown formatting is preserved
-      out.push({ role: 'bot', html: bubble.innerHTML });
+      // Bot: store rendered HTML + raw text for PDF export
+      out.push({ role: 'bot', html: bubble.innerHTML, text: bubble.textContent || '' });
     }
   });
   return out;
@@ -1909,6 +3214,10 @@ function loadChatForFile(fileKey) {
               '<button class="msg-action-btn" onclick="copyBubble(this)">'+(window._t?window._t('copy_btn'):'Copy')+'</button>'+
             '</div>'+
           '</div>';
+        var msgBody = wrap.querySelector('.msg-body');
+        msgBody.appendChild(_aiResponseActions(m.text || m.html || '', 'panel'));
+        var botBubble = wrap.querySelector('.ai-bubble.bot');
+        _renderMath(botBubble);
         aiMsgs.appendChild(wrap);
       }
     });
@@ -2063,6 +3372,15 @@ async function lnGetPreview(text) {
 
 // Sync button
 var lnSyncing = false;
+(document.getElementById('extHowToBtn')||{addEventListener:function(){}}).addEventListener('click', function() {
+  var howto = document.getElementById('extHowTo');
+  var btn = document.getElementById('extHowToBtn');
+  if (!howto) return;
+  var open = howto.style.display !== 'none';
+  howto.style.display = open ? 'none' : 'block';
+  btn.textContent = open ? 'How to install' : 'Hide steps';
+});
+
 (document.getElementById('lnSyncBtn')||{addEventListener:function(){}}).addEventListener('click', function() {
   if (lnSyncing) return;
   lnSyncing = true;
@@ -2408,6 +3726,26 @@ if (!window.location.hash || window.location.hash.indexOf('access_token') === -1
     _ssReplaceHistory({ view: 'portal', section: _initSec }, '#portal=' + encodeURIComponent(_initSec));
   }
 }
+
+// Once KaTeX is fully loaded, re-render math on any bubbles that loaded before it was ready
+window.addEventListener('load', function() {
+  function applyKatexToAll() {
+    if (!window.renderMathInElement) { setTimeout(applyKatexToAll, 200); return; }
+    document.querySelectorAll('.ai-bubble.bot, .aip-bubble.bot').forEach(function(el) {
+      try { renderMathInElement(el, {
+        delimiters: [
+          { left: '\\[', right: '\\]', display: true },
+          { left: '\\(', right: '\\)', display: false },
+          { left: '$$',  right: '$$',  display: true },
+          { left: '$',   right: '$',   display: false }
+        ],
+        ignoredTags: ['script','noscript','style','textarea','pre','code'],
+        throwOnError: false
+      }); } catch(e) {}
+    });
+  }
+  applyKatexToAll();
+});
 
 window.addEventListener('popstate', function(e) {
   _ssHandlingPop = true;
@@ -2872,8 +4210,10 @@ async function loadUserData(uid) {
     var settings = await _sb.from('settings').select('*').eq('id', uid).single();
     if (settings) applySettings(settings);
 
-    var sub = await _sb.from('subscriptions').select('*').eq('id', uid).single();
-    if (sub) applySubscription(sub);
+    var sub = await _sb.from('subscriptions').select('*').eq('user_id', uid).single();
+    applySubscription(sub || {});
+    if (!_userIsPro) setTimeout(_showPaywall, 800);
+    _adminShowIfEligible(_currentUser);
 
     // Load lecture notes from Supabase and merge with in-memory state
     await lnLoadFromSupabase(uid);
@@ -3580,12 +4920,49 @@ function applySettings(s) {
   if (s.yt_playlists && window._ytApplyFromDB) window._ytApplyFromDB(s.yt_playlists);
 }
 
+var _userIsPro = false;
+
+var _stripeCustomerId = null;
+var _hadTrial = false;
+
 function applySubscription(sub) {
-  var badge = document.querySelector('.sub-badge');
-  var currentBtn = document.querySelector('.sub-btn-current');
-  if (badge) badge.textContent = sub.plan === 'pro' ? '⭐ Pro Plan' : '🎓 Free Plan';
-  if (currentBtn) currentBtn.textContent = sub.plan === 'pro' ? '✓ Current plan' : 'Current plan';
+  _userIsPro = sub && sub.plan === 'pro' && (sub.status === 'active' || sub.status === 'trialing');
+  if (sub && sub.stripe_customer_id) _stripeCustomerId = sub.stripe_customer_id;
+  if (sub && sub.had_trial) _hadTrial = true;
+  var proStatus  = document.getElementById('subProStatus');
+  var upgradeBtn = document.getElementById('subUpgradeBtn');
+  var manageBtn  = document.getElementById('subManageBtn');
+  var payMethods = document.getElementById('subPayMethods');
+  var paypalCont = document.getElementById('paypalButtonContainer');
+  if (_userIsPro) {
+    if (proStatus)  proStatus.style.display = '';
+    if (upgradeBtn) upgradeBtn.style.display = 'none';
+    if (manageBtn)  manageBtn.style.display = '';
+    if (payMethods) payMethods.style.display = 'none';
+    if (paypalCont) paypalCont.style.display = 'none';
+  } else {
+    if (proStatus)  proStatus.style.display = 'none';
+    if (upgradeBtn) { upgradeBtn.textContent = _hadTrial ? '🚀 Subscribe — €11.99/month' : '🎉 Start free 7-day trial'; upgradeBtn.disabled = false; upgradeBtn.style.display = ''; upgradeBtn.style.opacity = ''; }
+    if (manageBtn)  manageBtn.style.display = 'none';
+    if (payMethods) payMethods.style.display = '';
+    if (paypalCont) paypalCont.style.display = '';
+  }
 }
+
+(document.getElementById('subManageBtn') || {addEventListener:function(){}}).addEventListener('click', async function() {
+  if (!_stripeCustomerId) { showToast('Not available', 'No Stripe account found.'); return; }
+  this.textContent = 'Loading...'; this.disabled = true;
+  try {
+    var res = await fetch('/api/create-portal', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ customerId: _stripeCustomerId, origin: location.origin })
+    });
+    var data = await res.json();
+    if (data.url) location.href = data.url;
+    else showToast('Error', data.error || 'Could not open portal.');
+  } catch(e) { showToast('Error', e.message); }
+  this.textContent = '⚙️ Manage / Cancel subscription'; this.disabled = false;
+});
 
 // ── SAVE HELPERS ─────────────────────────────────────────────────────────
 async function saveProfile() {
@@ -3756,13 +5133,251 @@ if (profileSaveBtn) {
 }
 
 // ── SUBSCRIPTION UPGRADE ─────────────────────────────────────────────────
-var upgradeBtn = document.querySelector('.sub-btn-upgrade');
-if (upgradeBtn) {
-  upgradeBtn.addEventListener('click', function(){
-    showToast(_t('toast_coming_soon'), _t('toast_coming_soon_sub'));
-  });
+var _paypalRendered = false;
+
+function _initPayPalButton(attempt) {
+  if (_paypalRendered) return;
+  var container = document.getElementById('paypalButtonContainer');
+  if (!container) return;
+  if (typeof paypal === 'undefined') {
+    if ((attempt || 0) < 20) setTimeout(function(){ _initPayPalButton((attempt||0)+1); }, 500);
+    return;
+  }
+  _paypalRendered = true;
+  paypal.Buttons({
+    style: { layout: 'horizontal', color: 'blue', shape: 'rect', label: 'subscribe', height: 40 },
+    createSubscription: function(data, actions) {
+      return actions.subscription.create({ plan_id: 'P-73L51622YW356583YNHULU4Y' });
+    },
+    onApprove: async function(data) {
+      showToast('Payment received', 'Activating your Pro plan...');
+      try {
+        if (_currentUser) {
+          var exp = new Date(Date.now() + 31*24*60*60*1000).toISOString();
+          await fetch(SUPA_URL + '/rest/v1/subscriptions?on_conflict=user_id', {
+            method: 'POST',
+            headers: Object.assign(_sbHeaders(), { 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
+            body: JSON.stringify({ user_id: _currentUser.id, plan: 'pro', status: 'active', paypal_subscription_id: data.subscriptionID, expires_at: exp, updated_at: new Date().toISOString() })
+          });
+          applySubscription({ plan: 'pro', status: 'active' });
+          showToast('🎉 Pro activated!', 'Enjoy unlimited access.');
+        }
+      } catch(e) { showToast('Activation error', 'Contact support.'); }
+    },
+    onError: function(err) { console.error('PayPal error:', err); showToast('PayPal error', typeof err === 'string' ? err : (err && err.message) || 'Please try again or use card.'); }
+  }).render('#paypalButtonContainer');
 }
 
+(document.getElementById('subUpgradeBtn') || { addEventListener: function(){} }).addEventListener('click', async function() {
+  if (!_currentUser) { showToast('Sign in required', 'Please log in first.'); return; }
+  this.textContent = 'Redirecting...';
+  this.disabled = true;
+  try {
+    var res = await fetch('/api/create-checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: _currentUser.id, email: _currentUser.email, origin: location.origin, noTrial: _hadTrial })
+    });
+    var data = await res.json();
+    if (data.url) {
+      location.href = data.url;
+    } else {
+      showToast('Error', data.error || 'Could not start checkout.');
+      this.textContent = '🚀 Upgrade to Pro';
+      this.disabled = false;
+    }
+  } catch(e) {
+    showToast('Error', e.message);
+    this.textContent = '🚀 Upgrade to Pro';
+    this.disabled = false;
+  }
+});
+
+// Show PayPal button when subscription section becomes visible
+document.addEventListener('click', function(e) {
+  if (e.target.closest('#psbSubscription')) setTimeout(_initPayPalButton, 400);
+});
+setTimeout(_initPayPalButton, 2000);
+
+// Block escape key from closing paywall
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape' && !_userIsPro) e.stopImmediatePropagation();
+}, true);
+
+// Handle return from Stripe checkout
+(function() {
+  var params = new URLSearchParams(location.search);
+  if (params.get('payment') === 'success') {
+    var sessionId = params.get('session_id');
+    history.replaceState(null, '', location.pathname);
+    showToast('🎉 Payment successful!', 'Activating your Pro plan...');
+    // Wait for _currentUser to be available then verify
+    var attempts = 0;
+    var verify = setInterval(async function() {
+      attempts++;
+      if (!_currentUser && attempts < 20) return;
+      clearInterval(verify);
+      if (!_currentUser || !sessionId) return;
+      try {
+        var res = await fetch('/api/verify-payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: sessionId, userId: _currentUser.id })
+        });
+        var data = await res.json();
+        if (data.ok) {
+          applySubscription({ plan: 'pro', status: 'active' });
+          var modal = document.getElementById('paywallModal');
+          if (modal) modal.style.display = 'none';
+          showToast('✅ Pro activated!', 'Enjoy unlimited access.');
+        }
+      } catch(e) { console.warn('Verify payment error:', e); }
+    }, 500);
+  } else if (params.get('payment') === 'cancelled') {
+    history.replaceState(null, '', location.pathname);
+  }
+})();
+
+
+// ── PAYWALL ───────────────────────────────────────────────────────────────
+var _ADMIN_EMAIL = 'dalimovich2004@gmail.com';
+
+var _paywallPaypalRendered = false;
+
+function _showPaywall() {
+  if (_currentUser && _currentUser.email === _ADMIN_EMAIL) return;
+  var btn = document.getElementById('paywallUpgradeBtn');
+  if (btn) btn.textContent = _hadTrial ? '🚀 Subscribe — €11.99/month' : '🎉 Start free 7-day trial';
+  var modal = document.getElementById('paywallModal');
+  // Hide trial-specific elements if user already used their trial
+  if (_hadTrial && modal) {
+    var trialBadge = modal.querySelector('.sub-trial-badge');
+    if (trialBadge) trialBadge.style.display = 'none';
+    var desc = modal.querySelector('[data-paywall-desc]');
+    if (desc) desc.textContent = 'Subscribe to access all StudySphere features for €11.99/month.';
+    var afterTrial = modal.querySelector('[data-after-trial]');
+    if (afterTrial) afterTrial.textContent = '/ month';
+    var cancelNote = modal.querySelector('[data-cancel-note]');
+    if (cancelNote) cancelNote.textContent = 'Cancel anytime.';
+  }
+  if (modal) modal.style.display = 'flex';
+  // Render PayPal button inside paywall
+  if (!_paywallPaypalRendered && typeof paypal !== 'undefined') {
+    var container = document.getElementById('paywallPaypal');
+    if (container) {
+      _paywallPaypalRendered = true;
+      paypal.Buttons({
+        style: { layout: 'horizontal', color: 'blue', shape: 'rect', label: 'subscribe', height: 38 },
+        createSubscription: function(data, actions) {
+          return actions.subscription.create({ plan_id: 'P-73L51622YW356583YNHULU4Y' });
+        },
+        onApprove: async function(data) {
+          showToast('Payment received', 'Activating your Pro plan...');
+          try {
+            if (_currentUser) {
+              var exp = new Date(Date.now() + 31*24*60*60*1000).toISOString();
+              await fetch(SUPA_URL + '/rest/v1/subscriptions?on_conflict=user_id', {
+                method: 'POST',
+                headers: Object.assign(_sbHeaders(), { 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
+                body: JSON.stringify({ user_id: _currentUser.id, plan: 'pro', status: 'active', paypal_subscription_id: data.subscriptionID, expires_at: exp, updated_at: new Date().toISOString() })
+              });
+              applySubscription({ plan: 'pro', status: 'active' });
+              document.getElementById('paywallModal').style.display = 'none';
+              showToast('🎉 Pro activated!', 'Enjoy unlimited access.');
+            }
+          } catch(e) { showToast('Activation error', 'Contact support.'); }
+        },
+        onError: function(err) { console.error('PayPal error:', err); showToast('PayPal error', 'Please try card instead.'); }
+      }).render('#paywallPaypal');
+    }
+  }
+}
+
+function _requirePro(featureMsg) {
+  if (_userIsPro) return true;
+  _showPaywall();
+  return false;
+}
+
+(document.getElementById('paywallUpgradeBtn') || {addEventListener:function(){}}).addEventListener('click', async function() {
+  if (!_currentUser) return;
+  this.textContent = 'Redirecting...';
+  this.disabled = true;
+  try {
+    var res = await fetch('/api/create-checkout', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ userId: _currentUser.id, email: _currentUser.email, origin: location.origin, noTrial: _hadTrial })
+    });
+    var data = await res.json();
+    if (data.url) location.href = data.url;
+  } catch(e) {}
+  this.textContent = '🎉 Start free 7-day trial';
+  this.disabled = false;
+});
+
+// ── ADMIN PANEL ───────────────────────────────────────────────────────────
+function _adminShowIfEligible(user) {
+  if (user && user.email === _ADMIN_EMAIL) {
+    var btn = document.getElementById('psbAdmin');
+    if (btn) btn.style.display = '';
+  }
+}
+
+_bindIf('psbAdmin', 'click', function() {
+  showPortal(); setNavActive('psbAdmin'); showPortalSection('admin');
+});
+
+(document.getElementById('adminSearchBtn') || {addEventListener:function(){}}).addEventListener('click', _adminSearch);
+(document.getElementById('adminSearchInput') || {addEventListener:function(){}}).addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') _adminSearch();
+});
+
+async function _adminSearch() {
+  var q = (document.getElementById('adminSearchInput').value || '').trim();
+  var results = document.getElementById('adminResults');
+  if (!q) return;
+  results.innerHTML = '<div style="color:var(--on-glass-muted);font-size:.85rem">Searching...</div>';
+  try {
+    var res = await fetch('/api/admin-users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'search', token: _sbToken, query: q })
+    });
+    var users = await res.json();
+    if (!Array.isArray(users) || !users.length) { results.innerHTML = '<div style="color:var(--on-glass-muted);font-size:.85rem">No users found.</div>'; return; }
+    results.innerHTML = '';
+    users.forEach(function(u) {
+      var isPro = u.plan === 'pro' && u.status === 'active';
+      var joined = u.created_at ? new Date(u.created_at).toLocaleDateString() : '';
+      var card = document.createElement('div');
+      card.style.cssText = 'background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:14px;padding:14px 18px;margin-bottom:10px;display:flex;align-items:center;gap:12px';
+      card.innerHTML =
+        '<div style="flex:1;min-width:0">' +
+          '<div style="font-weight:800;color:var(--on-glass);font-size:.88rem">' + _chatEsc(u.email) + '</div>' +
+          '<div style="font-size:.72rem;color:var(--on-glass-muted)">Joined ' + joined + '</div>' +
+          '<div style="font-size:.75rem;margin-top:4px;font-weight:800;color:' + (isPro ? '#22c55e' : '#f87171') + '">' + (isPro ? '✓ Pro (subscribed)' : '✕ Free (not subscribed)') + '</div>' +
+        '</div>' +
+        '<button class="sub-btn ' + (isPro ? 'sub-btn-current' : 'sub-btn-upgrade') + '" data-uid="' + u.id + '" data-pro="' + isPro + '" style="width:auto;padding:8px 18px;font-size:.78rem">' +
+          (isPro ? 'Revoke Pro' : 'Grant Pro') +
+        '</button>';
+      card.querySelector('button').addEventListener('click', async function() {
+        var uid = this.dataset.uid;
+        var grantPro = this.dataset.pro === 'false';
+        this.textContent = '...'; this.disabled = true;
+        try {
+          await fetch('/api/admin-users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'setplan', token: _sbToken, userId: uid, plan: grantPro ? 'pro' : 'free' })
+          });
+          showToast(grantPro ? '✓ Pro granted' : 'Pro revoked', u.email);
+          _adminSearch();
+        } catch(e) { showToast('Error', e.message); this.disabled = false; }
+      });
+      results.appendChild(card);
+    });
+  } catch(e) { results.innerHTML = '<div style="color:#f87171;font-size:.85rem">Error: ' + e.message + '</div>'; }
+}
 
 // ── LANDING PAGE ─────────────────────────────────────────────────────────
 function landShowAuth(mode) {
@@ -4329,6 +5944,11 @@ window._obFinishLearner = async function() {
         row.className='aip-msg-row '+(m.role==='user'?'user':'bot');
         row.innerHTML='<div class="aip-sender">'+(m.role==='user'?'You':'StudySphere AI')+'</div>'+
           '<div class="aip-bubble '+(m.role==='user'?'user':'bot')+'">'+(m.role==='user'?_esc(m.content):_rm(m.content))+'</div>';
+        if(m.role==='assistant'){
+          var bubble=row.querySelector('.aip-bubble.bot');
+          _renderMath(bubble);
+          row.appendChild(_aiResponseActions(m.content,'chatbot'));
+        }
         msgs.appendChild(row);
       });
       msgs.scrollTop=msgs.scrollHeight;
@@ -4694,7 +6314,7 @@ window._obFinishLearner = async function() {
       body:JSON.stringify({
         model:'claude-sonnet-4-6',
         max_tokens:1024,
-        system:'You are StudySphere AI, a friendly and knowledgeable assistant for university students. Always reply in '+(window._lang==='de'?'German':'English')+'. Answer any question clearly and helpfully. Use markdown: **bold**, `code`, ### headers, - lists. Be concise but thorough.\n\nIMPORTANT: When the user\'s message contains <document> tags, those tags contain the FULL extracted text of an uploaded file. You CAN read and answer questions about this content — treat it as the complete document. Never say you cannot read a file when its content is provided inside <document> tags.',
+        system:'You are StudySphere AI, a friendly and knowledgeable assistant for university students. Always reply in '+(window._lang==='de'?'German':'English')+'. Answer any question clearly and helpfully. Be concise but thorough.\n\nIMPORTANT: When the user\'s message contains <document> tags, those tags contain the FULL extracted text of an uploaded file. You CAN read and answer questions about this content — treat it as the complete document. Never say you cannot read a file when its content is provided inside <document> tags.'+_MATH_PROMPT,
         messages:apiMessages
       })
     })
@@ -4714,8 +6334,8 @@ window._obFinishLearner = async function() {
       var bubble=row.querySelector('.aip-bubble.bot');
       var i=0;
       function typeNext(){
-        if(_stopTyping){var partial=raw.slice(0,i);bubble.innerHTML=_rm(partial);_history[_history.length-1].content=partial;_persistCurrent();_busy=false;_setStopMode(false);if(sb2)sb2.disabled=false;var m=document.getElementById('aipMsgs');if(m)m.scrollTop=m.scrollHeight;return;}
-        if(i>=raw.length){bubble.innerHTML=_rm(raw);_busy=false;_setStopMode(false);if(sb2)sb2.disabled=false;var m=document.getElementById('aipMsgs');if(m)m.scrollTop=m.scrollHeight;return;}
+        if(_stopTyping){var partial=raw.slice(0,i);bubble.innerHTML=_rm(partial);_history[_history.length-1].content=partial;_persistCurrent();if(!row.querySelector('.ai-action-bar')&&partial.trim())row.appendChild(_aiResponseActions(partial,'chatbot'));_busy=false;_setStopMode(false);if(sb2)sb2.disabled=false;var m=document.getElementById('aipMsgs');if(m)m.scrollTop=m.scrollHeight;return;}
+        if(i>=raw.length){bubble.innerHTML=_rm(raw);_renderMath(bubble);if(!row.querySelector('.ai-action-bar'))row.appendChild(_aiResponseActions(raw,'chatbot'));_busy=false;_setStopMode(false);if(sb2)sb2.disabled=false;var m=document.getElementById('aipMsgs');if(m)m.scrollTop=m.scrollHeight;return;}
         bubble.innerHTML=_rm(raw.slice(0,i+1));i++;
         var m=document.getElementById('aipMsgs');if(m&&!_userScrolledUp)m.scrollTop=m.scrollHeight;
         _typeTimer=setTimeout(typeNext,14+(Math.random()>0.93?50:0));
@@ -4832,6 +6452,29 @@ function _chatSetVisibility(vis) {
   });
   var invRow = document.getElementById('chatRoomInviteRow');
   if (invRow) invRow.style.display = (vis === 'invite' && _editingRoomId) ? '' : 'none';
+  var friendPicker = document.getElementById('chatRoomFriendPicker');
+  if (friendPicker) friendPicker.style.display = vis === 'friends' ? '' : 'none';
+}
+
+function _chatPopulateFriendPicker(existingMemberIds) {
+  var list = document.getElementById('chatRoomFriendList');
+  if (!list) return;
+  list.innerHTML = '';
+  var accepted = _chatFriends.filter(function(f) { return f.status === 'accepted'; });
+  if (!accepted.length) {
+    list.innerHTML = '<div style="font-size:.75rem;color:var(--on-glass-faint);padding:6px">No friends yet — add some first</div>';
+    return;
+  }
+  accepted.forEach(function(f) {
+    var name = f.profile.full_name || 'Student';
+    var isAdded = existingMemberIds && existingMemberIds.indexOf(f.otherId) !== -1;
+    var row = document.createElement('label');
+    row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:8px;cursor:pointer;font-family:\'Nunito\',sans-serif;font-size:.82rem;font-weight:700;color:var(--on-glass)';
+    row.innerHTML = '<input type="checkbox" data-friend-id="' + f.otherId + '" ' + (isAdded ? 'checked' : '') + ' style="accent-color:#c084fc"/>' +
+      '<div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#c084fc,#f472b6);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.78rem;color:#fff;flex-shrink:0">' + name.charAt(0).toUpperCase() + '</div>' +
+      name;
+    list.appendChild(row);
+  });
 }
 
 document.querySelectorAll('.chat-vis-btn').forEach(function(b) {
@@ -4849,13 +6492,30 @@ function _chatShowRoomModal(room) {
   var delBtn  = document.getElementById('chatRoomDeleteBtn');
   var err     = document.getElementById('chatRoomModalErr');
   if (!modal) return;
+  var topicInp  = document.getElementById('chatRoomTopicInput');
+  var slowSel   = document.getElementById('chatRoomSlowmodeSelect');
+  var nsfwCheck = document.getElementById('chatRoomNsfwCheck');
   title.textContent = room ? '✏️ Edit Room' : '+ Create Room';
   nameInp.value = room ? room.name : '';
   descInp.value = room ? (room.description || '') : '';
+  if (topicInp)  topicInp.value  = room ? (room.topic || '') : '';
+  if (slowSel)   slowSel.value   = room ? String(room.slowmode_seconds || 0) : '0';
+  if (nsfwCheck) nsfwCheck.checked = !!(room && room.is_nsfw);
   saveBtn.textContent = room ? 'Save →' : 'Create →';
   if (delBtn) delBtn.style.display = room && room.created_by === (_currentUser && _currentUser.id) ? '' : 'none';
   if (err) err.style.display = 'none';
   _chatSetVisibility(room ? (room.visibility || 'public') : 'public');
+  // Populate friend picker — fetch existing members if editing
+  if (room && room.visibility === 'friends') {
+    fetch(SUPA_URL + '/rest/v1/room_members?room_id=eq.' + encodeURIComponent(room.id) + '&select=user_id', { headers: _sbHeaders() })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        var ids = Array.isArray(data) ? data.map(function(m) { return m.user_id; }) : [];
+        _chatPopulateFriendPicker(ids);
+      }).catch(function() { _chatPopulateFriendPicker([]); });
+  } else {
+    _chatPopulateFriendPicker([]);
+  }
   modal.style.display = 'flex';
   nameInp.focus();
 }
@@ -4870,9 +6530,12 @@ function _chatHideRoomModal() {
 (document.getElementById('chatRoomModalClose') || {addEventListener:function(){}}).addEventListener('click', _chatHideRoomModal);
 
 (document.getElementById('chatRoomSaveBtn') || {addEventListener:function(){}}).addEventListener('click', async function() {
-  var name = (document.getElementById('chatRoomNameInput') || {}).value.trim();
-  var desc = (document.getElementById('chatRoomDescInput') || {}).value.trim();
-  var err  = document.getElementById('chatRoomModalErr');
+  var name     = (document.getElementById('chatRoomNameInput') || {}).value.trim();
+  var desc     = (document.getElementById('chatRoomDescInput') || {}).value.trim();
+  var topic    = (document.getElementById('chatRoomTopicInput') || {}).value.trim();
+  var slowmode = parseInt((document.getElementById('chatRoomSlowmodeSelect') || {}).value || '0', 10);
+  var isNsfw   = !!(document.getElementById('chatRoomNsfwCheck') || {}).checked;
+  var err      = document.getElementById('chatRoomModalErr');
   if (!name) { if (err) { err.textContent = 'Room name is required.'; err.style.display = ''; } return; }
   if (!_currentUser) return;
   try {
@@ -4880,13 +6543,13 @@ function _chatHideRoomModal() {
       await fetch(SUPA_URL + '/rest/v1/custom_rooms?id=eq.' + encodeURIComponent(_editingRoomId), {
         method: 'PATCH',
         headers: Object.assign(_sbHeaders(), { 'Prefer': 'return=minimal' }),
-        body: JSON.stringify({ name: name, description: desc, visibility: _selectedVisibility })
+        body: JSON.stringify({ name: name, description: desc, topic: topic, visibility: _selectedVisibility, slowmode_seconds: slowmode, is_nsfw: isNsfw })
       });
     } else {
       var createRes = await fetch(SUPA_URL + '/rest/v1/custom_rooms', {
         method: 'POST',
         headers: Object.assign(_sbHeaders(), { 'Prefer': 'return=representation', 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ name: name, description: desc, created_by: _currentUser.id, visibility: _selectedVisibility })
+        body: JSON.stringify({ name: name, description: desc, topic: topic, created_by: _currentUser.id, visibility: _selectedVisibility, slowmode_seconds: slowmode, is_nsfw: isNsfw })
       });
       var created = await createRes.json();
       // Auto-add creator as member
@@ -4896,6 +6559,21 @@ function _chatHideRoomModal() {
           headers: Object.assign(_sbHeaders(), { 'Prefer': 'return=minimal' }),
           body: JSON.stringify({ room_id: created[0].id, user_id: _currentUser.id })
         });
+      }
+    }
+    // Add selected friends as members (for friends-only rooms)
+    if (_selectedVisibility === 'friends') {
+      var checkedFriends = document.querySelectorAll('#chatRoomFriendList input[type="checkbox"]:checked');
+      var targetRoomId = _editingRoomId || (typeof created !== 'undefined' && Array.isArray(created) && created[0] ? created[0].id : null);
+      if (targetRoomId && checkedFriends.length) {
+        var addPromises = Array.from(checkedFriends).map(function(cb) {
+          return fetch(SUPA_URL + '/rest/v1/room_members', {
+            method: 'POST',
+            headers: Object.assign(_sbHeaders(), { 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
+            body: JSON.stringify({ room_id: targetRoomId, user_id: cb.dataset.friendId })
+          });
+        });
+        await Promise.all(addPromises);
       }
     }
     _chatHideRoomModal();
@@ -5050,15 +6728,98 @@ function _chatRenderRooms() {
   });
 }
 
-// ── Room open / messages ───────────────────────────────────────────────────
+// ── Chat state ─────────────────────────────────────────────────────────────
+var _chatReplyTo = null; // { id, display_name, content }
+var _chatSlowmode = 0;
+var _chatLastSent = 0;
+var _chatSlowTimer = null;
+var _chatTypingTimer = null;
+var _chatTypingPollTimer = null;
+var _chatNsfwAccepted = {};
+var _chatCurrentRoomData = null;
+
+// ── Markdown for chat (bold, italic, code, mentions) ──────────────────────
+function _chatMd(text) {
+  var s = _chatEsc(text);
+  // code blocks
+  s = s.replace(/`([^`]+)`/g, '<code style="background:rgba(192,132,252,.15);padding:1px 5px;border-radius:4px;font-family:monospace;font-size:.88em">$1</code>');
+  // bold
+  s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  // italic
+  s = s.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  // strikethrough
+  s = s.replace(/~~([^~]+)~~/g, '<s>$1</s>');
+  // mentions @name
+  s = s.replace(/@(\w[\w\s]*\w|\w)/g, '<span style="color:#c084fc;font-weight:800;background:rgba(192,132,252,.12);border-radius:4px;padding:0 3px">@$1</span>');
+  return s;
+}
+
+// ── Room open ──────────────────────────────────────────────────────────────
 async function _chatOpenRoom(roomId, roomName) {
   if (_chatRoomId === roomId) return;
   clearInterval(_chatPollTimer);
+  clearInterval(_chatTypingPollTimer);
+  _chatClearTyping();
   _chatRoomId = roomId;
   _chatLastTs = null;
+  _chatReplyTo = null;
+  _chatCurrentRoomData = null;
+
+  // Get room data for custom rooms
+  if (roomId.startsWith('custom_')) {
+    var rid = roomId.replace('custom_', '');
+    _chatCurrentRoomData = _customRooms.find(function(r) { return r.id === rid; }) || null;
+  }
 
   var nameEl = document.getElementById('chatRoomName');
   if (nameEl) nameEl.textContent = roomName;
+
+  // Topic
+  var topicEl = document.getElementById('chatRoomTopic');
+  if (topicEl) {
+    var topic = _chatCurrentRoomData && _chatCurrentRoomData.topic;
+    if (topic) { topicEl.textContent = topic; topicEl.style.display = ''; }
+    else topicEl.style.display = 'none';
+  }
+
+  // Settings button (creator only)
+  var isCreator = _chatCurrentRoomData && _chatCurrentRoomData.created_by === (_currentUser && _currentUser.id);
+  var settBtn = document.getElementById('chatRoomSettingsBtn');
+  if (settBtn) settBtn.style.display = isCreator ? '' : 'none';
+
+  // Invite button (visible to all members of invite-only rooms)
+  var invHdrBtn = document.getElementById('chatCopyInviteHdrBtn');
+  if (invHdrBtn) invHdrBtn.style.display = (_chatCurrentRoomData && _chatCurrentRoomData.visibility === 'invite') ? '' : 'none';
+
+  // Pins + nickname buttons (visible in any room)
+  var pinsBtn = document.getElementById('chatPinsBtn');
+  var nickBtn = document.getElementById('chatNicknameBtn');
+  var inRoom = !!roomId;
+  if (pinsBtn) pinsBtn.style.display = inRoom ? '' : 'none';
+  if (nickBtn) nickBtn.style.display = inRoom ? '' : 'none';
+
+  // Close pins panel when switching rooms
+  var pinsPanel = document.getElementById('chatPinsPanel');
+  if (pinsPanel) pinsPanel.style.display = 'none';
+
+  // Enable attach + gif buttons
+  var attachBtn = document.getElementById('chatAttachBtn');
+  var gifBtn = document.getElementById('chatGifBtn');
+  if (attachBtn) attachBtn.disabled = false;
+  if (gifBtn) gifBtn.disabled = false;
+
+  // Load nicknames and blocked users for this room
+  _chatLoadNicknames();
+  _chatLoadBlocked();
+
+  // Slowmode
+  _chatSlowmode = (_chatCurrentRoomData && _chatCurrentRoomData.slowmode_seconds) || 0;
+  var slowBar = document.getElementById('chatSlowmodeBar');
+  if (slowBar) slowBar.style.display = _chatSlowmode ? '' : 'none';
+
+  // Hide reply bar
+  var replyBar = document.getElementById('chatReplyBar');
+  if (replyBar) replyBar.style.display = 'none';
 
   document.querySelectorAll('.chat-room-item, .chat-friend-item').forEach(function(el) {
     el.classList.toggle('active', el.dataset.rid === roomId);
@@ -5066,23 +6827,87 @@ async function _chatOpenRoom(roomId, roomName) {
 
   var inp = document.getElementById('chatInput');
   var btn = document.getElementById('chatSendBtn');
-  if (inp) { inp.disabled = false; inp.placeholder = 'Type a message...'; }
+  if (inp) { inp.disabled = false; inp.placeholder = 'Message ' + roomName + '...'; }
   if (btn) btn.disabled = false;
+
+  // NSFW gate
+  var isNsfw = _chatCurrentRoomData && _chatCurrentRoomData.is_nsfw;
+  var gate = document.getElementById('chatNsfwGate');
+  if (gate) gate.style.display = (isNsfw && !_chatNsfwAccepted[roomId]) ? 'flex' : 'none';
 
   var msgs = document.getElementById('chatMsgs');
   if (msgs) msgs.innerHTML = '<div class="chat-loading">Loading&#x2026;</div>';
 
   await _chatLoad(true);
-  _chatPollTimer = setInterval(function() { _chatLoad(false); }, 3000);
+  _chatPollTimer = setInterval(function() { _chatLoad(false); _chatPollTyping(); }, 3000);
+}
+
+// ── Message rendering ──────────────────────────────────────────────────────
+function _chatRenderMsg(m, msgs) {
+  if (document.querySelector('[data-mid="' + m.id + '"]')) return;
+  if (_blockedUsers.has(m.user_id)) return; // hide blocked users
+  var isMe = m.user_id === _currentUser.id;
+  var wrap = document.createElement('div');
+  wrap.className = 'chat-msg' + (isMe ? ' chat-msg-me' : '');
+  wrap.dataset.mid = m.id;
+  wrap.dataset.senderId = m.user_id;
+
+  var d = new Date(m.created_at);
+  var time = d.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+  var editedMark = m.edited_at ? ' <span style="font-size:.65rem;opacity:.5">(edited)</span>' : '';
+
+  // Reply reference
+  var replyHTML = '';
+  if (m.reply_to_id && m._replyRef) {
+    replyHTML = '<div class="chat-reply-ref"><span class="chat-reply-ref-name">' + _chatEsc(m._replyRef.display_name || 'User') + '</span>: ' + _chatEsc((m._replyRef.content || '').slice(0, 60)) + '</div>';
+  }
+
+  // Display name (use nickname if set)
+  var displayName = _chatNicknames[m.user_id] || m.display_name || 'Student';
+  var nameHTML = isMe ? '' : '<div class="chat-msg-name">' + _chatEsc(displayName) + '</div>';
+
+  // Attachment
+  var attachHTML = '';
+  if (m.attachment_url) {
+    var t = m.attachment_type || '';
+    if (t.startsWith('image/')) {
+      attachHTML = '<div style="margin-top:6px"><img src="' + _chatEsc(m.attachment_url) + '" style="max-width:260px;max-height:200px;border-radius:10px;display:block;cursor:pointer" onclick="window.open(this.src,\'_blank\')"/></div>';
+    } else if (t.startsWith('video/')) {
+      attachHTML = '<div style="margin-top:6px"><video src="' + _chatEsc(m.attachment_url) + '" controls style="max-width:260px;border-radius:10px"></video></div>';
+    } else {
+      attachHTML = '<div style="margin-top:6px"><a href="' + _chatEsc(m.attachment_url) + '" target="_blank" style="display:inline-flex;align-items:center;gap:6px;padding:7px 12px;background:rgba(192,132,252,.1);border:1px solid rgba(192,132,252,.2);border-radius:10px;color:#c084fc;font-size:.8rem;font-weight:700;text-decoration:none">📎 ' + _chatEsc(m.attachment_name || 'File') + '</a></div>';
+    }
+  }
+
+  // Make URLs clickable in content
+  var contentHTML = m.content ? _chatMd(m.content).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color:#c084fc;text-decoration:underline;word-break:break-all">$1</a>') : '';
+
+  var escName = _chatEsc(m.display_name || 'Student');
+  var escContent = _chatEsc(m.content || '');
+
+  wrap.innerHTML = replyHTML + nameHTML +
+    (contentHTML ? '<div class="chat-msg-bubble">' + contentHTML + editedMark + '</div>' : '') +
+    attachHTML +
+    '<div class="chat-msg-time">' + time + '</div>' +
+    '<div class="chat-msg-actions">' +
+      '<button class="chat-action-btn" data-act="react" data-mid="' + m.id + '" title="React">😊</button>' +
+      '<button class="chat-action-btn" data-act="reply" data-mid="' + m.id + '" data-name="' + escName + '" data-content="' + escContent + '" title="Reply">↩</button>' +
+      '<button class="chat-action-btn" data-act="pin" data-mid="' + m.id + '" data-name="' + escName + '" data-content="' + escContent + '" title="Pin">📌</button>' +
+      (isMe ? '<button class="chat-action-btn" data-act="edit" data-mid="' + m.id + '" data-content="' + escContent + '" title="Edit">✏️</button>' : '') +
+      (isMe ? '<button class="chat-action-btn" data-act="delete" data-mid="' + m.id + '" title="Delete">🗑</button>' : '') +
+      (!isMe ? '<button class="chat-action-btn" data-act="block" data-uid="' + m.user_id + '" data-name="' + escName + '" title="Block user">🚫</button>' : '') +
+    '</div>' +
+    '<div class="chat-reactions" id="reactions-' + m.id + '"></div>';
+
+  msgs.appendChild(wrap);
+  _chatLoadReactions(m.id);
 }
 
 async function _chatLoad(initial) {
   if (!_chatRoomId || !_currentUser) return;
   try {
     var url = SUPA_URL + '/rest/v1/messages?room_id=eq.' + encodeURIComponent(_chatRoomId);
-    if (!initial && _chatLastTs) {
-      url += '&created_at=gt.' + encodeURIComponent(_chatLastTs);
-    }
+    if (!initial && _chatLastTs) url += '&created_at=gt.' + encodeURIComponent(_chatLastTs);
     url += '&order=created_at.asc&limit=' + (initial ? '60' : '30');
 
     var res = await fetch(url, { headers: _sbHeaders() });
@@ -5094,15 +6919,23 @@ async function _chatLoad(initial) {
 
     if (initial) {
       msgs.innerHTML = '';
-      if (!data.length) {
-        msgs.innerHTML = '<div class="chat-empty">No messages yet &#x1F44B; Say hello!</div>';
-        return;
-      }
+      if (!data.length) { msgs.innerHTML = '<div class="chat-empty">No messages yet 👋 Say hello!</div>'; return; }
     }
     if (!data.length) return;
 
     _chatLastTs = data[data.length - 1].created_at;
     var atBottom = msgs.scrollHeight - msgs.scrollTop <= msgs.clientHeight + 80;
+
+    // Fetch reply references for messages that have reply_to_id
+    var replyIds = data.filter(function(m) { return m.reply_to_id; }).map(function(m) { return m.reply_to_id; });
+    var replyMap = {};
+    if (replyIds.length) {
+      try {
+        var rRes = await fetch(SUPA_URL + '/rest/v1/messages?id=in.(' + replyIds.map(encodeURIComponent).join(',') + ')&select=id,display_name,content', { headers: _sbHeaders() });
+        var rData = await rRes.json();
+        if (Array.isArray(rData)) rData.forEach(function(r) { replyMap[r.id] = r; });
+      } catch(e) {}
+    }
 
     var lastDate = null;
     data.forEach(function(m) {
@@ -5110,48 +6943,665 @@ async function _chatLoad(initial) {
       var dateStr = d.toLocaleDateString([], { weekday:'short', month:'short', day:'numeric' });
       if (dateStr !== lastDate) {
         lastDate = dateStr;
-        var div = document.createElement('div');
-        div.className = 'chat-date-divider';
-        div.textContent = dateStr;
-        msgs.appendChild(div);
+        if (!document.querySelector('.chat-date-divider[data-date="' + dateStr + '"]')) {
+          var div = document.createElement('div');
+          div.className = 'chat-date-divider';
+          div.dataset.date = dateStr;
+          div.textContent = dateStr;
+          msgs.appendChild(div);
+        }
       }
-      var isMe = m.user_id === _currentUser.id;
-      var wrap = document.createElement('div');
-      wrap.className = 'chat-msg' + (isMe ? ' chat-msg-me' : '');
-      var time = d.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
-      wrap.innerHTML =
-        (isMe ? '' : '<div class="chat-msg-name">' + _chatEsc(m.display_name || 'Student') + '</div>') +
-        '<div class="chat-msg-bubble">' + _chatEsc(m.content) + '</div>' +
-        '<div class="chat-msg-time">' + time + '</div>';
-      msgs.appendChild(wrap);
+      if (m.reply_to_id) m._replyRef = replyMap[m.reply_to_id] || null;
+      _chatRenderMsg(m, msgs);
     });
 
     if (initial || atBottom) msgs.scrollTop = msgs.scrollHeight;
   } catch(e) { console.warn('Chat load error:', e); }
 }
 
+// ── Reactions ──────────────────────────────────────────────────────────────
+async function _chatLoadReactions(msgId) {
+  try {
+    var res = await fetch(SUPA_URL + '/rest/v1/message_reactions?message_id=eq.' + encodeURIComponent(msgId), { headers: _sbHeaders() });
+    var data = await res.json();
+    if (!Array.isArray(data)) return;
+    var el = document.getElementById('reactions-' + msgId);
+    if (!el) return;
+    var counts = {};
+    var mine = {};
+    data.forEach(function(r) {
+      counts[r.emoji] = (counts[r.emoji] || 0) + 1;
+      if (r.user_id === _currentUser.id) mine[r.emoji] = true;
+    });
+    el.innerHTML = '';
+    Object.keys(counts).forEach(function(emoji) {
+      var btn = document.createElement('button');
+      btn.className = 'chat-reaction-pill' + (mine[emoji] ? ' mine' : '');
+      btn.textContent = emoji + ' ' + counts[emoji];
+      btn.addEventListener('click', function() { _chatToggleReaction(msgId, emoji); });
+      el.appendChild(btn);
+    });
+  } catch(e) {}
+}
+
+async function _chatToggleReaction(msgId, emoji) {
+  try {
+    // Check if user already reacted
+    var res = await fetch(SUPA_URL + '/rest/v1/message_reactions?message_id=eq.' + encodeURIComponent(msgId) + '&user_id=eq.' + encodeURIComponent(_currentUser.id) + '&emoji=eq.' + encodeURIComponent(emoji), { headers: _sbHeaders() });
+    var existing = await res.json();
+    if (Array.isArray(existing) && existing.length) {
+      await fetch(SUPA_URL + '/rest/v1/message_reactions?message_id=eq.' + encodeURIComponent(msgId) + '&user_id=eq.' + encodeURIComponent(_currentUser.id) + '&emoji=eq.' + encodeURIComponent(emoji), { method: 'DELETE', headers: _sbHeaders() });
+    } else {
+      await fetch(SUPA_URL + '/rest/v1/message_reactions', { method: 'POST', headers: Object.assign(_sbHeaders(), { 'Prefer': 'return=minimal' }), body: JSON.stringify({ message_id: msgId, user_id: _currentUser.id, emoji: emoji }) });
+    }
+    _chatLoadReactions(msgId);
+  } catch(e) {}
+}
+
+// Reaction picker
+var _chatReactTargetMsgId = null;
+document.addEventListener('click', function(e) {
+  var picker = document.getElementById('chatReactionPicker');
+  if (!picker) return;
+  var actBtn = e.target.closest('[data-act="react"]');
+  if (actBtn) {
+    _chatReactTargetMsgId = actBtn.dataset.mid;
+    var rect = actBtn.getBoundingClientRect();
+    var chatMain = document.querySelector('.chat-main');
+    var mainRect = chatMain ? chatMain.getBoundingClientRect() : { left: 0, top: 0 };
+    picker.style.left = (rect.left - mainRect.left) + 'px';
+    picker.style.top = (rect.top - mainRect.top - 52) + 'px';
+    picker.style.display = 'block';
+    e.stopPropagation();
+    return;
+  }
+  if (!picker.contains(e.target)) picker.style.display = 'none';
+});
+
+document.querySelectorAll('.chat-react-emoji').forEach(function(el) {
+  el.addEventListener('click', function() {
+    if (_chatReactTargetMsgId) {
+      _chatToggleReaction(_chatReactTargetMsgId, el.dataset.emoji);
+      document.getElementById('chatReactionPicker').style.display = 'none';
+    }
+  });
+});
+
+// ── Reply ──────────────────────────────────────────────────────────────────
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest('[data-act="reply"]');
+  if (!btn) return;
+  _chatReplyTo = { id: btn.dataset.mid, display_name: btn.dataset.name, content: btn.dataset.content };
+  var bar = document.getElementById('chatReplyBar');
+  var nameEl = document.getElementById('chatReplyName');
+  var prevEl = document.getElementById('chatReplyPreview');
+  if (bar) bar.style.display = 'flex';
+  if (nameEl) nameEl.textContent = _chatReplyTo.display_name;
+  if (prevEl) prevEl.textContent = (_chatReplyTo.content || '').slice(0, 60);
+  var inp = document.getElementById('chatInput');
+  if (inp) inp.focus();
+});
+
+(document.getElementById('chatReplyCancelBtn') || {addEventListener:function(){}}).addEventListener('click', function() {
+  _chatReplyTo = null;
+  var bar = document.getElementById('chatReplyBar');
+  if (bar) bar.style.display = 'none';
+});
+
+// ── Edit message ───────────────────────────────────────────────────────────
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest('[data-act="edit"]');
+  if (!btn) return;
+  var msgId = btn.dataset.mid;
+  var current = btn.dataset.content;
+  var inp = document.getElementById('chatInput');
+  if (!inp) return;
+  inp.value = current;
+  inp.dataset.editingMsgId = msgId;
+  inp.placeholder = 'Editing message... (press Enter)';
+  inp.focus();
+});
+
+// ── Typing indicator ───────────────────────────────────────────────────────
+function _chatClearTyping() {
+  var bar = document.getElementById('chatTypingBar');
+  if (bar) bar.textContent = '';
+}
+
+async function _chatPollTyping() {
+  if (!_chatRoomId || !_currentUser) return;
+  try {
+    var cutoff = new Date(Date.now() - 4000).toISOString();
+    var res = await fetch(SUPA_URL + '/rest/v1/typing_indicators?room_id=eq.' + encodeURIComponent(_chatRoomId) + '&user_id=neq.' + encodeURIComponent(_currentUser.id) + '&updated_at=gt.' + encodeURIComponent(cutoff), { headers: _sbHeaders() });
+    var data = await res.json();
+    var bar = document.getElementById('chatTypingBar');
+    if (!bar) return;
+    if (!Array.isArray(data) || !data.length) { bar.textContent = ''; return; }
+    var names = data.map(function(t) { return t.display_name || 'Someone'; });
+    bar.textContent = names.join(', ') + (names.length === 1 ? ' is typing...' : ' are typing...');
+  } catch(e) {}
+}
+
+async function _chatSendTyping() {
+  if (!_chatRoomId || !_currentUser) return;
+  var displayName = (document.getElementById('authName') || {}).textContent || 'Student';
+  try {
+    await fetch(SUPA_URL + '/rest/v1/typing_indicators', {
+      method: 'POST',
+      headers: Object.assign(_sbHeaders(), { 'Prefer': 'resolution=merge-duplicates' }),
+      body: JSON.stringify({ room_id: _chatRoomId, user_id: _currentUser.id, display_name: displayName, updated_at: new Date().toISOString() })
+    });
+  } catch(e) {}
+}
+
+async function _chatClearTypingIndicator() {
+  if (!_chatRoomId || !_currentUser) return;
+  try {
+    await fetch(SUPA_URL + '/rest/v1/typing_indicators?room_id=eq.' + encodeURIComponent(_chatRoomId) + '&user_id=eq.' + encodeURIComponent(_currentUser.id), { method: 'DELETE', headers: _sbHeaders() });
+  } catch(e) {}
+}
+
+// Wire typing to input
+(function() {
+  var inp = document.getElementById('chatInput');
+  if (!inp) return;
+  inp.addEventListener('input', function() {
+    if (inp.dataset.editingMsgId) return;
+    clearTimeout(_chatTypingTimer);
+    _chatSendTyping();
+    _chatTypingTimer = setTimeout(_chatClearTypingIndicator, 3000);
+  });
+})();
+
+// ── Slowmode ───────────────────────────────────────────────────────────────
+function _chatCheckSlowmode() {
+  if (!_chatSlowmode) return true;
+  var elapsed = (Date.now() - _chatLastSent) / 1000;
+  if (elapsed >= _chatSlowmode) return true;
+  var remaining = Math.ceil(_chatSlowmode - elapsed);
+  var bar = document.getElementById('chatSlowmodeBar');
+  if (bar) bar.textContent = '🐌 Slowmode: wait ' + remaining + 's before sending another message';
+  var inp = document.getElementById('chatInput');
+  var btn = document.getElementById('chatSendBtn');
+  if (inp) inp.disabled = true;
+  if (btn) btn.disabled = true;
+  clearInterval(_chatSlowTimer);
+  _chatSlowTimer = setInterval(function() {
+    var rem = Math.ceil(_chatSlowmode - (Date.now() - _chatLastSent) / 1000);
+    if (rem <= 0) {
+      clearInterval(_chatSlowTimer);
+      if (inp) { inp.disabled = false; inp.placeholder = 'Type a message...'; }
+      if (btn) btn.disabled = false;
+      if (bar) { bar.textContent = ''; bar.style.display = 'none'; }
+    } else {
+      if (bar) bar.textContent = '🐌 Slowmode: wait ' + rem + 's before sending another message';
+    }
+  }, 1000);
+  return false;
+}
+
+// ── NSFW gate ──────────────────────────────────────────────────────────────
+(document.getElementById('chatNsfwEnterBtn') || {addEventListener:function(){}}).addEventListener('click', function() {
+  if (_chatRoomId) _chatNsfwAccepted[_chatRoomId] = true;
+  var gate = document.getElementById('chatNsfwGate');
+  if (gate) gate.style.display = 'none';
+});
+
+// ── Room settings button ───────────────────────────────────────────────────
+(document.getElementById('chatRoomSettingsBtn') || {addEventListener:function(){}}).addEventListener('click', function() {
+  if (_chatCurrentRoomData) _chatShowRoomModal(_chatCurrentRoomData);
+});
+
+// ── Invite button in header ────────────────────────────────────────────────
+(document.getElementById('chatCopyInviteHdrBtn') || {addEventListener:function(){}}).addEventListener('click', function() {
+  if (!_chatCurrentRoomData || !_chatCurrentRoomData.invite_code) return;
+  var link = location.origin + location.pathname + '?join=' + _chatCurrentRoomData.invite_code;
+  navigator.clipboard.writeText(link).then(function() {
+    var btn = document.getElementById('chatCopyInviteHdrBtn');
+    if (btn) { btn.textContent = '✅ Copied!'; setTimeout(function() { btn.innerHTML = '&#x1F517; Invite'; }, 2000); }
+  });
+});
+
+// ── Join Room modal ────────────────────────────────────────────────────────
+(function() {
+  var openBtn  = document.getElementById('chatJoinRoomBtn');
+  var modal    = document.getElementById('chatJoinRoomModal');
+  var closeBtn = document.getElementById('chatJoinRoomModalClose');
+  var inp      = document.getElementById('chatJoinRoomInput');
+  var results  = document.getElementById('chatJoinRoomResults');
+  var errEl    = document.getElementById('chatJoinRoomErr');
+  if (!modal) return;
+
+  function showModal() { modal.style.display = 'flex'; if (inp) { inp.value = ''; inp.focus(); } if (results) results.innerHTML = '<div style="font-size:.75rem;color:var(--on-glass-faint);font-weight:700;padding:6px 4px">Type a room name to search public rooms, or paste an invite link</div>'; if (errEl) errEl.style.display = 'none'; }
+  function hideModal() { modal.style.display = 'none'; }
+
+  if (openBtn) openBtn.addEventListener('click', showModal);
+  if (closeBtn) closeBtn.addEventListener('click', hideModal);
+  modal.addEventListener('click', function(e) { if (e.target === modal) hideModal(); });
+
+  async function _joinByInviteCode(code) {
+    if (!_currentUser) return;
+    if (errEl) errEl.style.display = 'none';
+    try {
+      var res = await fetch(SUPA_URL + '/rest/v1/custom_rooms?invite_code=eq.' + encodeURIComponent(code) + '&select=id,name,visibility', { headers: _sbHeaders() });
+      var data = await res.json();
+      if (!Array.isArray(data) || !data[0]) { if (errEl) { errEl.textContent = 'Invalid invite link or code.'; errEl.style.display = ''; } return; }
+      var room = data[0];
+      await fetch(SUPA_URL + '/rest/v1/room_members', {
+        method: 'POST',
+        headers: Object.assign(_sbHeaders(), { 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
+        body: JSON.stringify({ room_id: room.id, user_id: _currentUser.id })
+      });
+      hideModal();
+      showToast('Joined ' + room.name, 'You can now access this room.');
+      await _chatLoadCustomRooms();
+      _chatOpenRoom('custom_' + room.id, room.name);
+    } catch(e) { if (errEl) { errEl.textContent = 'Could not join room. Try again.'; errEl.style.display = ''; } }
+  }
+
+  async function _searchPublicRooms(query) {
+    if (!results) return;
+    results.innerHTML = '<div style="font-size:.75rem;color:var(--on-glass-faint);padding:8px">Searching...</div>';
+    try {
+      var res = await fetch(SUPA_URL + '/rest/v1/custom_rooms?visibility=eq.public&name=ilike.*' + encodeURIComponent(query) + '*&select=id,name,description&limit=10', { headers: _sbHeaders() });
+      var data = await res.json();
+      results.innerHTML = '';
+      if (!Array.isArray(data) || !data.length) {
+        results.innerHTML = '<div style="font-size:.75rem;color:var(--on-glass-faint);font-weight:700;padding:8px">No public rooms found</div>';
+        return;
+      }
+      data.forEach(function(r) {
+        var alreadyIn = _customRooms.some(function(cr) { return cr.id === r.id; });
+        var row = document.createElement('div');
+        row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-radius:10px;background:var(--row-bg);gap:10px';
+        row.innerHTML = '<div style="min-width:0"><div style="font-weight:800;font-size:.85rem;color:var(--on-glass)">' + _chatEsc(r.name) + '</div>' +
+          (r.description ? '<div style="font-size:.72rem;color:var(--on-glass-faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + _chatEsc(r.description) + '</div>' : '') + '</div>' +
+          '<button style="flex-shrink:0;padding:5px 14px;background:' + (alreadyIn ? 'rgba(34,197,94,.15)' : 'linear-gradient(135deg,#c084fc,#f472b6)') + ';border:none;border-radius:20px;font-family:\'Nunito\',sans-serif;font-weight:800;font-size:.75rem;color:' + (alreadyIn ? '#22c55e' : '#fff') + ';cursor:pointer">' + (alreadyIn ? '✅ Joined' : 'Join') + '</button>';
+        if (!alreadyIn) {
+          row.querySelector('button').addEventListener('click', async function() {
+            await fetch(SUPA_URL + '/rest/v1/room_members', {
+              method: 'POST',
+              headers: Object.assign(_sbHeaders(), { 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
+              body: JSON.stringify({ room_id: r.id, user_id: _currentUser.id })
+            });
+            hideModal();
+            showToast('Joined ' + r.name, '');
+            await _chatLoadCustomRooms();
+            _chatOpenRoom('custom_' + r.id, r.name);
+          });
+        }
+        results.appendChild(row);
+      });
+    } catch(e) { if (results) results.innerHTML = '<div style="font-size:.75rem;color:#ef4444;padding:8px">Search failed. Try again.</div>'; }
+  }
+
+  var _joinSearchTimer = null;
+  if (inp) inp.addEventListener('input', function() {
+    var val = inp.value.trim();
+    if (errEl) errEl.style.display = 'none';
+    // Detect invite link
+    var linkMatch = val.match(/[?&]join=([a-f0-9-]{8,})/);
+    if (linkMatch) { _joinByInviteCode(linkMatch[1]); return; }
+    // Plain invite code (looks like a UUID fragment)
+    if (/^[a-f0-9-]{8,36}$/.test(val)) { clearTimeout(_joinSearchTimer); _joinSearchTimer = setTimeout(function() { _joinByInviteCode(val); }, 600); return; }
+    // Room name search
+    if (val.length >= 2) {
+      clearTimeout(_joinSearchTimer);
+      _joinSearchTimer = setTimeout(function() { _searchPublicRooms(val); }, 400);
+    } else {
+      if (results) results.innerHTML = '<div style="font-size:.75rem;color:var(--on-glass-faint);font-weight:700;padding:6px 4px">Type a room name to search public rooms, or paste an invite link</div>';
+    }
+  });
+})();
+
+// ── Send ───────────────────────────────────────────────────────────────────
 async function _chatSend() {
   if (!_currentUser || !_chatRoomId) return;
   var inp = document.getElementById('chatInput');
   if (!inp) return;
   var content = inp.value.trim();
   if (!content) return;
+
+  // Edit mode
+  if (inp.dataset.editingMsgId) {
+    var editId = inp.dataset.editingMsgId;
+    inp.value = '';
+    inp.dataset.editingMsgId = '';
+    inp.placeholder = 'Type a message...';
+    try {
+      await fetch(SUPA_URL + '/rest/v1/messages?id=eq.' + encodeURIComponent(editId), {
+        method: 'PATCH',
+        headers: Object.assign(_sbHeaders(), { 'Prefer': 'return=minimal' }),
+        body: JSON.stringify({ content: content, edited_at: new Date().toISOString() })
+      });
+      // Re-render that message
+      var msgEl = document.querySelector('[data-mid="' + editId + '"]');
+      if (msgEl) msgEl.remove();
+      await _chatLoad(false);
+    } catch(e) { console.warn('Edit error:', e); }
+    return;
+  }
+
+  if (!_chatCheckSlowmode()) return;
   inp.value = '';
 
-  var displayName = (document.getElementById('authName') || {}).textContent || 'Student';
+  var displayName = _chatNicknames[_currentUser.id] || (document.getElementById('authName') || {}).textContent || 'Student';
+  var payload = { room_id: _chatRoomId, user_id: _currentUser.id, display_name: displayName, content: content };
+
+  // Handle file attachment
+  if (_chatPendingFile) {
+    try {
+      var att = await _chatUploadFile(_chatPendingFile);
+      payload.attachment_url = att.url;
+      payload.attachment_type = att.type;
+      payload.attachment_name = att.name;
+    } catch(e) { showToast('Upload failed', e.message); return; }
+    _chatPendingFile = null;
+    var bar = document.getElementById('chatFilePreviewBar');
+    if (bar) bar.style.display = 'none';
+  }
+  if (_chatReplyTo) { payload.reply_to_id = _chatReplyTo.id; }
+
+  // Parse mentions
+  var mentionMatches = content.match(/@(\w[\w\s]*\w|\w)/g) || [];
+  if (mentionMatches.length) payload.mentions = mentionMatches;
+
+  _chatReplyTo = null;
+  var replyBar = document.getElementById('chatReplyBar');
+  if (replyBar) replyBar.style.display = 'none';
+  _chatLastSent = Date.now();
+  _chatClearTypingIndicator();
+
   try {
     await fetch(SUPA_URL + '/rest/v1/messages', {
       method: 'POST',
       headers: Object.assign(_sbHeaders(), { 'Prefer': 'return=minimal' }),
-      body: JSON.stringify({
-        room_id: _chatRoomId,
-        user_id: _currentUser.id,
-        display_name: displayName,
-        content: content
-      })
+      body: JSON.stringify(payload)
     });
     await _chatLoad(false);
+    if (_chatSlowmode) {
+      var bar = document.getElementById('chatSlowmodeBar');
+      if (bar) { bar.style.display = ''; _chatCheckSlowmode(); }
+    }
   } catch(e) { console.warn('Chat send error:', e); }
+}
+
+// ── Blocked users ──────────────────────────────────────────────────────────
+var _blockedUsers = new Set();
+async function _chatLoadBlocked() {
+  if (!_currentUser) return;
+  try {
+    var res = await fetch(SUPA_URL + '/rest/v1/blocked_users?blocker_id=eq.' + encodeURIComponent(_currentUser.id) + '&select=blocked_id', { headers: _sbHeaders() });
+    var data = await res.json();
+    _blockedUsers = new Set(Array.isArray(data) ? data.map(function(b) { return b.blocked_id; }) : []);
+  } catch(e) {}
+}
+async function _chatBlockUser(userId, name) {
+  if (!confirm('Block ' + name + '? Their messages will be hidden.')) return;
+  try {
+    await fetch(SUPA_URL + '/rest/v1/blocked_users', { method: 'POST', headers: Object.assign(_sbHeaders(), { 'Prefer': 'return=minimal' }), body: JSON.stringify({ blocker_id: _currentUser.id, blocked_id: userId }) });
+    _blockedUsers.add(userId);
+    document.querySelectorAll('[data-sender-id="' + userId + '"]').forEach(function(el) { el.style.display = 'none'; });
+    showToast('User blocked', name + ' has been blocked.');
+  } catch(e) {}
+}
+
+// ── Message deletion ────────────────────────────────────────────────────────
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest('[data-act="block"]');
+  if (btn) _chatBlockUser(btn.dataset.uid, btn.dataset.name);
+});
+
+document.addEventListener('click', async function(e) {
+  var btn = e.target.closest('[data-act="delete"]');
+  if (!btn) return;
+  if (!confirm('Delete this message?')) return;
+  var msgId = btn.dataset.mid;
+  try {
+    var res = await fetch(SUPA_URL + '/rest/v1/messages?id=eq.' + encodeURIComponent(msgId), { method: 'DELETE', headers: _sbHeaders() });
+    if (!res.ok) {
+      var errBody = await res.text();
+      console.warn('Delete failed:', res.status, errBody);
+      showToast('Could not delete', 'Permission denied or server error.');
+      return;
+    }
+    var el = document.querySelector('[data-mid="' + msgId + '"]');
+    if (el) el.remove();
+  } catch(e) { console.warn('Delete error:', e); showToast('Could not delete', e.message || String(e)); }
+});
+
+// ── Pinned messages ─────────────────────────────────────────────────────────
+async function _chatPinMessage(msgId, content, senderName) {
+  if (!_currentUser || !_chatRoomId) return;
+  try {
+    await fetch(SUPA_URL + '/rest/v1/pinned_messages', { method: 'POST', headers: Object.assign(_sbHeaders(), { 'Prefer': 'resolution=merge-duplicates,return=minimal' }), body: JSON.stringify({ room_id: _chatRoomId, message_id: msgId, pinned_by: _currentUser.id }) });
+    showToast('Message pinned', '');
+    _chatLoadPins();
+  } catch(e) {}
+}
+
+async function _chatLoadPins() {
+  if (!_chatRoomId) return;
+  var list = document.getElementById('chatPinsList');
+  if (!list) return;
+  try {
+    var res = await fetch(SUPA_URL + '/rest/v1/pinned_messages?room_id=eq.' + encodeURIComponent(_chatRoomId) + '&order=pinned_at.desc&select=id,message_id,messages(id,content,display_name)', { headers: _sbHeaders() });
+    var data = await res.json();
+    list.innerHTML = '';
+    if (!Array.isArray(data) || !data.length) { list.innerHTML = '<div style="font-size:.75rem;color:var(--on-glass-faint);padding:8px;font-weight:700">No pinned messages</div>'; return; }
+    data.forEach(function(p) {
+      var m = p.messages || {};
+      var div = document.createElement('div');
+      div.style.cssText = 'padding:10px;border-radius:10px;background:var(--row-bg);margin-bottom:8px';
+      div.innerHTML = '<div style="font-size:.7rem;font-weight:800;color:rgba(192,132,252,.9);margin-bottom:4px">' + _chatEsc(m.display_name || 'User') + '</div>' +
+        '<div style="font-size:.8rem;color:var(--on-glass);line-height:1.4">' + _chatEsc((m.content || '').slice(0, 120)) + '</div>' +
+        '<button data-pin-id="' + p.id + '" style="margin-top:6px;background:none;border:none;font-size:.7rem;color:rgba(239,68,68,.6);cursor:pointer;font-family:\'Nunito\',sans-serif;font-weight:700">Unpin</button>';
+      div.querySelector('button').addEventListener('click', async function() {
+        await fetch(SUPA_URL + '/rest/v1/pinned_messages?id=eq.' + encodeURIComponent(p.id), { method: 'DELETE', headers: _sbHeaders() });
+        _chatLoadPins();
+      });
+      list.appendChild(div);
+    });
+  } catch(e) {}
+}
+
+(document.getElementById('chatPinsBtn') || {addEventListener:function(){}}).addEventListener('click', function() {
+  var panel = document.getElementById('chatPinsPanel');
+  if (!panel) return;
+  var showing = panel.style.display !== 'none';
+  panel.style.display = showing ? 'none' : 'flex';
+  if (!showing) _chatLoadPins();
+});
+(document.getElementById('chatPinsPanelClose') || {addEventListener:function(){}}).addEventListener('click', function() {
+  var panel = document.getElementById('chatPinsPanel'); if (panel) panel.style.display = 'none';
+});
+
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest('[data-act="pin"]');
+  if (!btn) return;
+  _chatPinMessage(btn.dataset.mid, btn.dataset.content, btn.dataset.name);
+});
+
+// ── Nicknames ────────────────────────────────────────────────────────────────
+var _chatNicknames = {}; // userId -> nickname for current room
+async function _chatLoadNicknames() {
+  if (!_chatRoomId || !_currentUser) return;
+  try {
+    var res = await fetch(SUPA_URL + '/rest/v1/room_nicknames?room_id=eq.' + encodeURIComponent(_chatRoomId), { headers: _sbHeaders() });
+    var data = await res.json();
+    _chatNicknames = {};
+    if (Array.isArray(data)) data.forEach(function(n) { _chatNicknames[n.user_id] = n.nickname; });
+  } catch(e) {}
+}
+
+(document.getElementById('chatNicknameBtn') || {addEventListener:function(){}}).addEventListener('click', function() {
+  var modal = document.getElementById('chatNicknameModal');
+  var inp = document.getElementById('chatNicknameInput');
+  if (!modal) return;
+  if (inp) inp.value = _chatNicknames[_currentUser && _currentUser.id] || '';
+  modal.style.display = 'flex';
+  if (inp) inp.focus();
+});
+(document.getElementById('chatNicknameModalClose') || {addEventListener:function(){}}).addEventListener('click', function() { var m = document.getElementById('chatNicknameModal'); if (m) m.style.display = 'none'; });
+
+(document.getElementById('chatNicknameSaveBtn') || {addEventListener:function(){}}).addEventListener('click', async function() {
+  var inp = document.getElementById('chatNicknameInput');
+  var val = inp ? inp.value.trim() : '';
+  if (!val || !_currentUser || !_chatRoomId) return;
+  try {
+    await fetch(SUPA_URL + '/rest/v1/room_nicknames', { method: 'POST', headers: Object.assign(_sbHeaders(), { 'Prefer': 'resolution=merge-duplicates,return=minimal' }), body: JSON.stringify({ room_id: _chatRoomId, user_id: _currentUser.id, nickname: val }) });
+    _chatNicknames[_currentUser.id] = val;
+    var m = document.getElementById('chatNicknameModal'); if (m) m.style.display = 'none';
+    showToast('Nickname set', 'You appear as "' + val + '" in this room.');
+  } catch(e) {}
+});
+(document.getElementById('chatNicknameClearBtn') || {addEventListener:function(){}}).addEventListener('click', async function() {
+  if (!_currentUser || !_chatRoomId) return;
+  try {
+    await fetch(SUPA_URL + '/rest/v1/room_nicknames?room_id=eq.' + encodeURIComponent(_chatRoomId) + '&user_id=eq.' + encodeURIComponent(_currentUser.id), { method: 'DELETE', headers: _sbHeaders() });
+    delete _chatNicknames[_currentUser.id];
+    var m = document.getElementById('chatNicknameModal'); if (m) m.style.display = 'none';
+    showToast('Nickname cleared', '');
+  } catch(e) {}
+});
+
+// ── File sharing ─────────────────────────────────────────────────────────────
+var _chatPendingFile = null;
+(document.getElementById('chatAttachBtn') || {addEventListener:function(){}}).addEventListener('click', function() {
+  var fi = document.getElementById('chatFileInput'); if (fi) fi.click();
+});
+(document.getElementById('chatFileInput') || {addEventListener:function(){}}).addEventListener('change', function(e) {
+  var file = e.target.files[0]; if (!file) return;
+  _chatPendingFile = file;
+  var bar = document.getElementById('chatFilePreviewBar');
+  var name = document.getElementById('chatFilePreviewName');
+  if (bar) bar.style.display = 'flex';
+  if (name) name.textContent = file.name + ' (' + (file.size > 1048576 ? (file.size/1048576).toFixed(1)+'MB' : (file.size/1024).toFixed(0)+'KB') + ')';
+  e.target.value = '';
+});
+(document.getElementById('chatFileCancelBtn') || {addEventListener:function(){}}).addEventListener('click', function() {
+  _chatPendingFile = null;
+  var bar = document.getElementById('chatFilePreviewBar'); if (bar) bar.style.display = 'none';
+});
+
+async function _chatUploadFile(file) {
+  var path = _currentUser.id + '/' + Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  var res = await fetch(SUPA_URL + '/storage/v1/object/chat-attachments/' + path, {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + window._ssToken, 'Content-Type': file.type },
+    body: file
+  });
+  if (!res.ok) throw new Error('Upload failed');
+  return { url: SUPA_URL + '/storage/v1/object/public/chat-attachments/' + path, type: file.type, name: file.name };
+}
+
+// ── GIF search (Giphy) ────────────────────────────────────────────────────
+var GIPHY_KEY = 'dc6zaTOxFJmzC';
+(document.getElementById('chatGifBtn') || {addEventListener:function(){}}).addEventListener('click', function() {
+  var panel = document.getElementById('chatGifPanel');
+  if (!panel) return;
+  var showing = panel.style.display !== 'none';
+  panel.style.display = showing ? 'none' : 'block';
+  if (!showing) { var s = document.getElementById('chatGifSearch'); if (s) { s.value = ''; s.focus(); } _chatLoadTrendingGifs(); }
+});
+
+async function _chatLoadTrendingGifs() {
+  var results = document.getElementById('chatGifResults'); if (!results) return;
+  results.innerHTML = '<div style="font-size:.75rem;color:var(--on-glass-faint);padding:4px">Loading...</div>';
+  try {
+    var res = await fetch('https://api.giphy.com/v1/gifs/trending?api_key=' + GIPHY_KEY + '&limit=12&rating=g');
+    var data = await res.json();
+    _chatRenderGifs(data.data || []);
+  } catch(e) { results.innerHTML = '<div style="font-size:.75rem;color:#ef4444;padding:4px">Could not load GIFs</div>'; }
+}
+
+async function _chatSearchGifs(q) {
+  var results = document.getElementById('chatGifResults'); if (!results) return;
+  results.innerHTML = '<div style="font-size:.75rem;color:var(--on-glass-faint);padding:4px">Searching...</div>';
+  try {
+    var res = await fetch('https://api.giphy.com/v1/gifs/search?api_key=' + GIPHY_KEY + '&q=' + encodeURIComponent(q) + '&limit=12&rating=g');
+    var data = await res.json();
+    _chatRenderGifs(data.data || []);
+  } catch(e) {}
+}
+
+function _chatRenderGifs(gifs) {
+  var results = document.getElementById('chatGifResults'); if (!results) return;
+  results.innerHTML = '';
+  gifs.forEach(function(g) {
+    var url = g.images && g.images.fixed_height_small && g.images.fixed_height_small.url;
+    var orig = g.images && g.images.original && g.images.original.url;
+    if (!url || !orig) return;
+    var img = document.createElement('img');
+    img.src = url; img.style.cssText = 'height:80px;border-radius:6px;cursor:pointer;object-fit:cover';
+    img.addEventListener('click', function() {
+      document.getElementById('chatGifPanel').style.display = 'none';
+      _chatSendGif(orig, g.title || 'GIF');
+    });
+    results.appendChild(img);
+  });
+}
+
+async function _chatSendGif(gifUrl, title) {
+  if (!_currentUser || !_chatRoomId) return;
+  var displayName = _chatNicknames[_currentUser.id] || (document.getElementById('authName') || {}).textContent || 'Student';
+  try {
+    await fetch(SUPA_URL + '/rest/v1/messages', { method: 'POST', headers: Object.assign(_sbHeaders(), { 'Prefer': 'return=minimal' }), body: JSON.stringify({ room_id: _chatRoomId, user_id: _currentUser.id, display_name: displayName, content: '', attachment_url: gifUrl, attachment_type: 'image/gif', attachment_name: title }) });
+    await _chatLoad(false);
+  } catch(e) {}
+}
+
+var _gifSearchTimer = null;
+(document.getElementById('chatGifSearch') || {addEventListener:function(){}}).addEventListener('input', function() {
+  var val = this.value.trim();
+  clearTimeout(_gifSearchTimer);
+  _gifSearchTimer = setTimeout(function() { val ? _chatSearchGifs(val) : _chatLoadTrendingGifs(); }, 400);
+});
+
+// ── Message search ────────────────────────────────────────────────────────────
+(document.getElementById('chatSearchToggleBtn') || {addEventListener:function(){}}).addEventListener('click', function() {
+  var bar = document.getElementById('chatSearchBar');
+  if (!bar) return;
+  var showing = bar.style.display !== 'none';
+  bar.style.display = showing ? 'none' : 'flex';
+  bar.style.flexDirection = 'column';
+  if (!showing) { var inp = document.getElementById('chatSearchInput'); if (inp) inp.focus(); }
+});
+
+var _searchTimer = null;
+(document.getElementById('chatSearchInput') || {addEventListener:function(){}}).addEventListener('input', function() {
+  clearTimeout(_searchTimer);
+  var val = this.value.trim();
+  _searchTimer = setTimeout(function() { if (val.length >= 2) _chatSearch(val); }, 400);
+});
+
+async function _chatSearch(query) {
+  var results = document.getElementById('chatSearchResults'); if (!results || !_chatRoomId) return;
+  results.innerHTML = '<div style="font-size:.75rem;color:var(--on-glass-faint);padding:4px">Searching...</div>';
+
+  // Parse filters: from:name has:link
+  var fromFilter = (query.match(/from:(\S+)/) || [])[1];
+  var hasLink = /has:link/.test(query);
+  var cleanQ = query.replace(/from:\S+/g, '').replace(/has:\S+/g, '').trim();
+
+  var url = SUPA_URL + '/rest/v1/messages?room_id=eq.' + encodeURIComponent(_chatRoomId) + '&order=created_at.desc&limit=20';
+  if (cleanQ) url += '&content=ilike.*' + encodeURIComponent(cleanQ) + '*';
+  if (fromFilter) url += '&display_name=ilike.*' + encodeURIComponent(fromFilter) + '*';
+
+  try {
+    var res = await fetch(url, { headers: _sbHeaders() });
+    var data = await res.json();
+    if (hasLink) data = (data || []).filter(function(m) { return /https?:\/\//.test(m.content); });
+    results.innerHTML = '';
+    if (!Array.isArray(data) || !data.length) { results.innerHTML = '<div style="font-size:.75rem;color:var(--on-glass-faint);padding:4px;font-weight:700">No results</div>'; return; }
+    data.forEach(function(m) {
+      var d = document.createElement('div');
+      d.style.cssText = 'padding:7px 10px;border-radius:8px;background:var(--row-bg);cursor:pointer';
+      d.innerHTML = '<div style="font-size:.68rem;font-weight:800;color:rgba(192,132,252,.8)">' + _chatEsc(m.display_name || 'User') + ' · ' + new Date(m.created_at).toLocaleDateString() + '</div>' +
+        '<div style="font-size:.8rem;color:var(--on-glass);margin-top:2px">' + _chatEsc((m.content || '').slice(0, 100)) + '</div>';
+      results.appendChild(d);
+    });
+  } catch(e) {}
 }
 
 // ── Add Friend modal ───────────────────────────────────────────────────────
