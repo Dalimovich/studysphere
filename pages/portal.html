@@ -487,61 +487,117 @@
         </div>
 
         <!-- EDITOR -->
-        <div id="psec-editor" class="portal-section" style="display:none">
-          <div class="editor-page">
-            <div class="editor-doclist" id="editorDocList">
-              <div class="editor-doclist-hdr">
-                <span>My Documents</span>
-                <button class="editor-new-btn" id="editorNewBtn">+ New</button>
-              </div>
-              <div class="editor-doc-items" id="editorDocItems"></div>
+        <div id="psec-editor" class="portal-section editor-portal-section" style="display:none">
+
+          <!-- Top bar -->
+          <div class="editor-topbar" id="editorTopbar">
+            <div class="editor-topbar-left">
+              <svg class="editor-file-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              <input class="editor-title-input" id="editorTitleInput" type="text" placeholder="Untitled document" maxlength="120" disabled>
+              <svg class="editor-title-edit-icon" id="editorTitleEditIcon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
             </div>
-            <div class="editor-main" id="editorMain">
+            <div class="editor-topbar-right">
+              <button class="editor-cancel-btn" id="editorNewBtn">+ New</button>
+              <button class="editor-save-doc-btn" id="editorSaveBtn" disabled>Save Document</button>
+              <button class="editor-export-btn" id="editorExportBtn" disabled>&#x2B07; Export PDF</button>
+              <button class="editor-delete-btn" id="editorDeleteBtn" disabled title="Delete">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Tools bar -->
+          <div class="editor-toolbar" id="editorToolbar">
+            <div class="ed-tb-group">
+              <button class="ed-tool-btn" data-cmd="undo" title="Undo">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+              </button>
+              <button class="ed-tool-btn" data-cmd="redo" title="Redo">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+              </button>
+            </div>
+            <div class="ed-tb-sep"></div>
+            <div class="ed-tb-group">
+              <button class="ed-tool-btn ed-tool-labeled" data-cmd="bold">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h8a4 4 0 010 8H6zM6 12h9a4 4 0 010 8H6z"/></svg>
+                <span>Bold</span>
+              </button>
+              <button class="ed-tool-btn ed-tool-labeled" data-cmd="italic">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="4" x2="10" y2="4"/><line x1="14" y1="20" x2="5" y2="20"/><line x1="15" y1="4" x2="9" y2="20"/></svg>
+                <span>Italic</span>
+              </button>
+              <button class="ed-tool-btn ed-tool-labeled" data-cmd="underline">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v7a6 6 0 006 6 6 6 0 006-6V3"/><line x1="4" y1="21" x2="20" y2="21"/></svg>
+                <span>Underline</span>
+              </button>
+            </div>
+            <div class="ed-tb-sep"></div>
+            <div class="ed-tb-group">
+              <button class="ed-tool-btn ed-tool-labeled" data-cmd="insertUnorderedList">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                <span>Bullet List</span>
+              </button>
+              <button class="ed-tool-btn ed-tool-labeled" data-cmd="insertOrderedList">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 6h1v4"/><path d="M4 10h2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg>
+                <span>Numbered</span>
+              </button>
+            </div>
+            <div class="ed-tb-sep"></div>
+            <div class="ed-tb-group">
+              <button class="ed-tool-btn ed-tool-labeled" data-cmd="formatBlock" data-val="h1"><span style="font-weight:800">H1</span><span>Heading 1</span></button>
+              <button class="ed-tool-btn ed-tool-labeled" data-cmd="formatBlock" data-val="h2"><span style="font-weight:800">H2</span><span>Heading 2</span></button>
+              <button class="ed-tool-btn ed-tool-labeled" data-cmd="formatBlock" data-val="p"><span style="font-weight:800">P</span><span>Paragraph</span></button>
+            </div>
+            <div class="ed-tb-sep"></div>
+            <div class="ed-tb-group">
+              <button class="ed-tool-btn ed-tool-labeled" data-cmd="justifyLeft">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="17" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="17" y1="18" x2="3" y2="18"/></svg>
+                <span>Left</span>
+              </button>
+              <button class="ed-tool-btn ed-tool-labeled" data-cmd="justifyCenter">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="10" x2="6" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="18" y1="18" x2="6" y2="18"/></svg>
+                <span>Center</span>
+              </button>
+            </div>
+            <div class="ed-tb-sep"></div>
+            <div class="ed-tb-group">
+              <select class="ed-tb-select" id="edFontSize" title="Font size">
+                <option value="1">Small</option>
+                <option value="3" selected>Normal</option>
+                <option value="5">Large</option>
+                <option value="7">XL</option>
+              </select>
+              <label class="ed-color-wrap" title="Text colour">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+                <input class="ed-tb-color" id="edFontColor" type="color" value="#000000" title="Text colour">
+              </label>
+            </div>
+          </div>
+
+          <!-- Body: thumbnail list + canvas -->
+          <div class="editor-body-wrap">
+            <!-- Left: document thumbnail list -->
+            <div class="editor-thumblist" id="editorDocList">
+              <div class="editor-thumblist-hdr">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                <span>Documents</span>
+              </div>
+              <div class="editor-doc-items" id="editorDocItems">
+                <div class="editor-empty-hint">No documents yet</div>
+              </div>
+            </div>
+
+            <!-- Center: canvas + empty state -->
+            <div class="editor-canvas-wrap" id="editorMain">
               <div class="editor-empty-state" id="editorEmptyState">
-                <div style="font-size:3rem">&#x270F;&#xFE0F;</div>
-                <div style="font-family:'Fredoka One',cursive;font-size:1.2rem;color:var(--on-glass);margin-top:10px">No document open</div>
-                <div style="font-size:.82rem;color:var(--on-glass-muted);margin-top:6px">Create a new document or select one from the list</div>
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.35"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                <div class="editor-empty-title">No document open</div>
+                <div class="editor-empty-sub">Click <b>+ New</b> to create a document</div>
               </div>
-              <div class="editor-workspace" id="editorWorkspace" style="display:none">
-                <div class="editor-topbar">
-                  <input class="editor-title-input" id="editorTitleInput" type="text" placeholder="Untitled document" maxlength="120">
-                  <div class="editor-topbar-actions">
-                    <button class="editor-action-btn editor-save-btn" id="editorSaveBtn">&#x1F4BE; Save</button>
-                    <button class="editor-action-btn editor-export-btn" id="editorExportBtn">&#x2B07; Export PDF</button>
-                    <button class="editor-action-btn editor-delete-btn" id="editorDeleteBtn">&#x1F5D1;</button>
-                  </div>
-                </div>
-                <div class="editor-toolbar" id="editorToolbar">
-                  <button class="ed-tb-btn" data-cmd="bold" title="Bold"><b>B</b></button>
-                  <button class="ed-tb-btn" data-cmd="italic" title="Italic"><i>I</i></button>
-                  <button class="ed-tb-btn" data-cmd="underline" title="Underline"><u>U</u></button>
-                  <div class="ed-tb-sep"></div>
-                  <button class="ed-tb-btn" data-cmd="formatBlock" data-val="h1" title="Heading 1">H1</button>
-                  <button class="ed-tb-btn" data-cmd="formatBlock" data-val="h2" title="Heading 2">H2</button>
-                  <button class="ed-tb-btn" data-cmd="formatBlock" data-val="h3" title="Heading 3">H3</button>
-                  <button class="ed-tb-btn" data-cmd="formatBlock" data-val="p" title="Paragraph">P</button>
-                  <div class="ed-tb-sep"></div>
-                  <button class="ed-tb-btn" data-cmd="insertUnorderedList" title="Bullet list">&#x2022; List</button>
-                  <button class="ed-tb-btn" data-cmd="insertOrderedList" title="Numbered list">1. List</button>
-                  <div class="ed-tb-sep"></div>
-                  <button class="ed-tb-btn" data-cmd="justifyLeft" title="Align left">&#x2190;</button>
-                  <button class="ed-tb-btn" data-cmd="justifyCenter" title="Center">&#x2194;</button>
-                  <button class="ed-tb-btn" data-cmd="justifyRight" title="Align right">&#x2192;</button>
-                  <div class="ed-tb-sep"></div>
-                  <select class="ed-tb-select" id="edFontSize" title="Font size">
-                    <option value="1">Small</option>
-                    <option value="3" selected>Normal</option>
-                    <option value="5">Large</option>
-                    <option value="7">XL</option>
-                  </select>
-                  <input class="ed-tb-color" id="edFontColor" type="color" value="#ffffff" title="Text colour">
-                  <div class="ed-tb-sep"></div>
-                  <button class="ed-tb-btn" data-cmd="undo" title="Undo">&#x21B6;</button>
-                  <button class="ed-tb-btn" data-cmd="redo" title="Redo">&#x21B7;</button>
-                </div>
-                <div class="editor-body" id="editorBody" contenteditable="true" spellcheck="true"></div>
-                <div class="editor-wordcount" id="editorWordCount">0 words</div>
+              <div class="editor-doc-sheet" id="editorWorkspace" style="display:none">
+                <div class="editor-doc-body" id="editorBody" contenteditable="true" spellcheck="true"></div>
               </div>
+              <div class="editor-wordcount" id="editorWordCount" style="display:none">0 words · Ctrl+S to save</div>
             </div>
           </div>
         </div>
