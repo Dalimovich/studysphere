@@ -523,12 +523,14 @@ async function _ufMerge(course){
   var discoveredFolders=[];
   items.forEach(function(item){
     if(!item.id && item.name && !item.name.endsWith('/')){
-      // This is a subfolder entry — collect folder name
+      // This is a subfolder prefix entry — collect folder name
       var fn=decodeURIComponent(item.name);
       if(fn && !discoveredFolders.includes(fn)) discoveredFolders.push(fn);
       return;
     }
     var m=_parseMeta(item);if(!m)return;
+    // Skip files that are inside a subfolder (their storage name contains '/')
+    if(m.storageName && m.storageName.indexOf('/')!==-1) return;
     if(!course.files.find(function(f){return f.name===m.name&&f._uploaded;}))
       course.files.unshift({name:m.name,_storageName:m.storageName,size:m.size,date:m.date,_uploaded:true,_uid:uid,_course:course});
   });
