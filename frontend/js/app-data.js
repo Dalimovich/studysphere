@@ -133,10 +133,60 @@ function _loadUserCourses(data) {
           if (_f) {
             openFile(_f, _prcCourse);
           } else {
-            _ssClearRestoredFileState(
-              _prcCourse,
-              'This file is no longer in Supabase Storage. Re-upload it if needed.'
-            );
+            // _ufMerge may have been slow or partially failed — try the localStorage
+            // cache as a fallback before giving up and clearing state.
+            try {
+              var _cachedUf = JSON.parse(
+                localStorage.getItem('ss_uf_cache_' + _prcCourse.id) || 'null'
+              );
+              var _cachedFile = null;
+              var _cachedFolder = null;
+              if (_cachedUf) {
+                _cachedFile = (_cachedUf.files || []).find(function (x) {
+                  return x.name === _prc.file;
+                });
+                if (!_cachedFile) {
+                  (_cachedUf.folders || []).forEach(function (fd) {
+                    if (!_cachedFile) {
+                      var hit = (fd.files || []).find(function (x) {
+                        return x.name === _prc.file;
+                      });
+                      if (hit) {
+                        _cachedFile = hit;
+                        _cachedFolder = fd.name;
+                      }
+                    }
+                  });
+                }
+              }
+              if (_cachedFile && _cachedFile.storageName) {
+                var _cachedUid =
+                  (window._currentUser &&
+                    (window._currentUser.id || window._currentUser.sub)) ||
+                  localStorage.getItem('ss_last_uid');
+                openFile(
+                  {
+                    name: _cachedFile.name,
+                    _storageName: _cachedFile.storageName,
+                    _folder: _cachedFolder,
+                    _uploaded: true,
+                    _uid: _cachedUid,
+                    _course: _prcCourse
+                  },
+                  _prcCourse
+                );
+              } else {
+                _ssClearRestoredFileState(
+                  _prcCourse,
+                  'This file is no longer in Supabase Storage. Re-upload it if needed.'
+                );
+              }
+            } catch (e) {
+              _ssClearRestoredFileState(
+                _prcCourse,
+                'This file is no longer in Supabase Storage. Re-upload it if needed.'
+              );
+            }
           }
         }
       })

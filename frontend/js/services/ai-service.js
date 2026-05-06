@@ -92,25 +92,36 @@ export async function listCourseDocuments(courseId) {
 export async function indexExistingDocument(courseId, storageName, fileName, sourceType, folder) {
   var BACKEND_URL = window.BACKEND_URL || '';
   var token = window._sbToken || '';
-  var response = await fetch(BACKEND_URL + '/api/documents/index-existing', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: 'Bearer ' + token
-    },
-    body: JSON.stringify({
-      courseId: courseId,
-      storageName: storageName,
-      fileName: fileName,
-      sourceType: sourceType || 'lecture',
-      folder: folder || null
-    })
-  });
-  var text = await response.text();
+  var controller = new AbortController();
+  var timeoutId = setTimeout(function () {
+    controller.abort();
+  }, 12000);
   try {
-    return JSON.parse(text);
+    var response = await fetch(BACKEND_URL + '/api/documents/index-existing', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer ' + token
+      },
+      body: JSON.stringify({
+        courseId: courseId,
+        storageName: storageName,
+        fileName: fileName,
+        sourceType: sourceType || 'lecture',
+        folder: folder || null
+      }),
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    var text = await response.text();
+    try {
+      return JSON.parse(text);
+    } catch (e) {
+      throw new Error('Index failed (' + response.status + ')');
+    }
   } catch (e) {
-    throw new Error('Index failed (' + response.status + ')');
+    clearTimeout(timeoutId);
+    throw e;
   }
 }
 

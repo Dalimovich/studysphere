@@ -551,12 +551,10 @@ async function _bindRagStatus(co, course) {
         return;
       }
 
-      // In-progress — re-trigger to refresh path/status, or just poll if no file ref
-      if (f)
-        _ragEnqueue(function () {
-          return _triggerRagIndex(el, fname, f, course, courseId);
-        });
-      else _pollRagStatus(el, courseId, doc.id);
+      // In-progress — show current status and poll; do NOT re-trigger, which
+      // would reset the DB row and waste the processing already in flight.
+      _setRagStatus(el, doc.processing_status);
+      _pollRagStatus(el, courseId, doc.id);
     } else if (f) {
       // Not indexed yet — auto-start
       _ragEnqueue(function () {
@@ -606,7 +604,11 @@ async function _triggerRagIndex(el, fname, f, course, courseId) {
       f._folder || null
     );
     if (result.alreadyIndexed) {
-      _setRagStatus(el, result.processingStatus || 'ready');
+      var st = result.processingStatus || 'ready';
+      _setRagStatus(el, st);
+      if (st !== 'ready' && st !== 'failed' && result.documentId) {
+        _pollRagStatus(el, courseId, result.documentId);
+      }
       return;
     }
     _setRagStatus(el, 'uploaded');

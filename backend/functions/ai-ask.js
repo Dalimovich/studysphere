@@ -85,8 +85,8 @@ function embedQuestion(question) {
 
 // ─── Retrieval ────────────────────────────────────────────────────────────────
 
-function retrieveChunks(serviceKey, userId, courseId, embedding) {
-  // Call the match_chunks SQL function via Supabase RPC.
+function retrieveChunks(serviceKey, userId, courseId, embedding, question) {
+  // Call match_chunks_hybrid via Supabase RPC.
   // pgvector via PostgREST RPC requires the embedding as a string "[v1,v2,...]"
   // — passing a raw JS array gets serialized as a JSON array which pgvector
   // can't cast to vector at the RPC boundary, silently returning 0 rows.
@@ -97,13 +97,14 @@ function retrieveChunks(serviceKey, userId, courseId, embedding) {
       p_user_id: userId,
       p_course_id: courseId,
       p_embedding: embeddingStr,
+      p_query: question || '',
       p_match_count: MAX_CHUNKS,
       p_threshold: MIN_SIMILARITY
     });
     const req = https.request(
       {
         hostname: new URL(supaUrl).hostname,
-        path: '/rest/v1/rpc/match_chunks',
+        path: '/rest/v1/rpc/match_chunks_hybrid',
         method: 'POST',
         headers: {
           apikey: serviceKey,
@@ -186,6 +187,7 @@ function buildSystemPrompt(mode) {
     '4. Set "unsupported": false unless the context is completely unrelated to the question.',
     '5. Cite the source file and page when you directly use content from it.',
     '6. Set "confidence" to "high" if the context directly answers the question, "medium" if partially, "low" if you relied mostly on general knowledge.',
+    '7. Write math using plain ASCII notation: use x^2 for superscripts, x_0 for subscripts, * for multiplication. Do NOT use Unicode math letters (𝑎, 𝑣, 𝑥, etc.) or Unicode subscript digits. Use bold **text** and *italic* for emphasis instead.',
     '',
     'Always respond in this JSON format:',
     '{',
@@ -253,6 +255,7 @@ function callOpenAI(systemPrompt, contextBlock, question) {
     const body = JSON.stringify({
       model: OPENAI_CHAT_MODEL,
       max_tokens: MAX_COMPLETION_TOKENS,
+      response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userMessage }
@@ -297,9 +300,24 @@ function callOpenAI(systemPrompt, contextBlock, question) {
 }
 
 function parseOpenAIResponse(text) {
+  // Strip optional markdown code fences
+  const stripped = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
+  // First try: parse as-is (works when response_format:json_object is used)
   try {
-    const match = text.match(/\{[\s\S]*\}/);
-    if (match) return JSON.parse(match[0]);
+    const direct = JSON.parse(stripped);
+    if (direct && typeof direct === 'object') return direct;
+  } catch (e) {}
+  // Second try: extract {...} block and repair literal newlines inside strings
+  try {
+    const match = stripped.match(/\{[\s\S]*\}/);
+    if (match) {
+      // Replace unescaped literal newlines inside JSON string values
+      const repaired = match[0].replace(/("(?:[^"\\]|\\.)*")|(\n)/g, function (m, str) {
+        return str ? str : '\\n';
+      });
+      const parsed = JSON.parse(repaired);
+      if (parsed && typeof parsed === 'object') return parsed;
+    }
   } catch (e) {}
   return { answer: text, sources: [], confidence: 'low', unsupported: false };
 }
@@ -557,7 +575,7 @@ exports.handler = async function (event) {
   }
 
   // 5. Retrieve relevant chunks via vector search
-  const rawChunks = await retrieveChunks(serviceKey, user.id, courseId, embedding);
+  const rawChunks = await retrieveChunks(serviceKey, user.id, courseId, embedding, question);
 
   // 6. No chunks found — fall back to general knowledge answer
   if (!rawChunks.length) {
