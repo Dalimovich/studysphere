@@ -116,6 +116,16 @@
   to = "/.netlify/functions/ai-evaluate"
   status = 200
 
+# API routes: restrict CORS to production origin only.
+# Replace HTTPS://YOUR-PRODUCTION-DOMAIN.COM with the real URL before go-live.
+[[headers]]
+  for = "/api/*"
+  [headers.values]
+    Access-Control-Allow-Origin = "https://YOUR-PRODUCTION-DOMAIN.COM"
+    Access-Control-Allow-Methods = "GET, POST, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type, Authorization"
+    Access-Control-Max-Age = "86400"
+
 [[headers]]
   for = "/*"
   [headers.values]

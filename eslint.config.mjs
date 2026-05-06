@@ -221,6 +221,7 @@ export default [
       'no-useless-escape': 'warn',
       'no-irregular-whitespace': 'warn',
       'no-redeclare': 'warn',
+      'no-func-assign': 'warn',
     },
   },
 ];
