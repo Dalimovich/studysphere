@@ -24,7 +24,7 @@ const EMBED_MODEL = 'text-embedding-3-small';
 const EMBED_DIMENSIONS = 1536;
 const OPENAI_CHAT_MODEL = optionalEnv('AI_MODEL', 'gpt-4o-mini');
 const MIN_SIMILARITY = 0.12;
-const MAX_CHUNKS = 12;
+const MAX_CHUNKS = 8;
 
 const AI_RATE_LIMIT_MAX = Number(optionalEnv('AI_RATE_LIMIT_MAX', '20'));
 const AI_RATE_LIMIT_WINDOW_MS = Number(optionalEnv('AI_RATE_LIMIT_WINDOW_MS', '3600000'));
@@ -54,6 +54,7 @@ function embedText(text) {
         } catch (e) { reject(e); }
       });
     });
+    req.setTimeout(5000, function () { req.destroy(new Error('Embed request timed out')); });
     req.on('error', reject);
     req.write(body);
     req.end();
@@ -65,7 +66,7 @@ function callOpenAI(systemPrompt, userMessage) {
     const apiKey = requireEnv('OPENAI_API_KEY');
     const body = JSON.stringify({
       model: OPENAI_CHAT_MODEL,
-      max_tokens: 2048,
+      max_tokens: 1400,
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: systemPrompt },
@@ -87,6 +88,7 @@ function callOpenAI(systemPrompt, userMessage) {
         } catch (e) { reject(e); }
       });
     });
+    req.setTimeout(8000, function () { req.destroy(new Error('OpenAI request timed out')); });
     req.on('error', reject);
     req.write(body);
     req.end();
@@ -254,7 +256,7 @@ exports.handler = async function (event) {
   if (!courseId || typeof courseId !== 'string') return fail(400, 'courseId is required');
   if (!['flashcards', 'quiz', 'summary'].includes(tool)) return fail(400, 'tool must be flashcards, quiz, or summary');
 
-  const itemCount = Math.min(Math.max(parseInt(count) || 8, 3), 20);
+  const itemCount = Math.min(Math.max(parseInt(count) || 6, 3), 10);
   const diff = ['easy', 'medium', 'hard'].includes(difficulty) ? difficulty : 'medium';
   const query = topic || (tool === 'flashcards' ? 'key concepts definitions terms' : tool === 'quiz' ? 'important concepts problems exercises' : 'main topics overview');
 

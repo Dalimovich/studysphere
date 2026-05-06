@@ -61,7 +61,7 @@ async function _generateWithRag(tool, level, topic) {
   if (window.addTyping) window.addTyping();
 
   try {
-    var countMap = { easy: 6, medium: 8, hard: 10 };
+    var countMap = { easy: 5, medium: 6, hard: 8 };
     var result = await generateStudyTool(courseId, tool, {
       count: countMap[level] || 8,
       difficulty: level,

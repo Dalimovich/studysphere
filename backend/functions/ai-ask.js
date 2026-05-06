@@ -329,10 +329,10 @@ function normalizeQuestion(q) {
   return q.toLowerCase().replace(/\s+/g, ' ').trim();
 }
 
-function hashQuestion(userId, courseId, normalizedQ, docVersionHash) {
+function hashQuestion(userId, courseId, normalizedQ, docVersionHash, mode) {
   return crypto
     .createHash('sha256')
-    .update('v2|' + userId + '|' + courseId + '|' + normalizedQ + '|' + docVersionHash)
+    .update('v2|' + userId + '|' + courseId + '|' + normalizedQ + '|' + docVersionHash + '|' + (mode || 'strict'))
     .digest('hex');
 }
 
@@ -358,7 +358,7 @@ async function getDocumentVersionHash(serviceKey, userId, courseId) {
 }
 
 // Look up exact answer cache
-async function getExactCache(serviceKey, userId, courseId, questionHash, docVersionHash) {
+async function getExactCache(serviceKey, userId, courseId, questionHash, docVersionHash, mode) {
   const result = await supaRequest(
     'GET',
     'ai_answer_cache?user_id=eq.' +
@@ -369,6 +369,8 @@ async function getExactCache(serviceKey, userId, courseId, questionHash, docVers
       questionHash +
       '&document_version_hash=eq.' +
       docVersionHash +
+      '&mode=eq.' +
+      (mode || 'strict') +
       '&select=id,answer_json&limit=1',
     null,
     serviceKey
@@ -388,12 +390,13 @@ function touchAnswerCache(serviceKey, cacheId) {
 }
 
 // Look up semantic cache via match_cached_questions RPC
-async function getSemanticCache(serviceKey, userId, courseId, embedding, docVersionHash) {
+async function getSemanticCache(serviceKey, userId, courseId, embedding, docVersionHash, mode) {
   const body = JSON.stringify({
     p_user_id: userId,
     p_course_id: courseId,
     p_embedding: '[' + embedding.join(',') + ']',
     p_document_version_hash: docVersionHash,
+    p_mode: mode || 'strict',
     p_threshold: 0.92,
     p_limit: 1
   });
@@ -454,6 +457,7 @@ async function storeAnswerCache(
   questionHash,
   normalizedQ,
   docVersionHash,
+  mode,
   answerJson
 ) {
   const result = await supaRequest(
@@ -465,6 +469,7 @@ async function storeAnswerCache(
       question_hash: questionHash,
       normalized_question: normalizedQ,
       document_version_hash: docVersionHash,
+      mode: mode || 'strict',
       answer_json: answerJson
     },
     serviceKey,
@@ -482,7 +487,8 @@ function storeQuestionCache(
   question,
   embedding,
   answerId,
-  docVersionHash
+  docVersionHash,
+  mode
 ) {
   return supaRequest(
     'POST',
@@ -491,9 +497,10 @@ function storeQuestionCache(
       user_id: userId,
       course_id: courseId,
       question: question,
-      question_embedding: JSON.stringify(embedding),
+      question_embedding: '[' + embedding.join(',') + ']',
       answer_cache_id: answerId,
-      document_version_hash: docVersionHash
+      document_version_hash: docVersionHash,
+      mode: mode || 'strict'
     },
     serviceKey,
     { Prefer: 'return=minimal' }
@@ -632,7 +639,6 @@ exports.handler = async function (event) {
   if (!question || typeof question !== 'string') return fail(400, 'question is required');
   if (question.length > 2000) return fail(400, 'Question too long (max 2000 characters)');
 
-  const strictMode = mode !== 'general';
   const normalizedQ = normalizeQuestion(question);
 
   // 1. Embed the question
@@ -645,10 +651,11 @@ exports.handler = async function (event) {
 
   // 2. Get document version hash (used for cache invalidation)
   const docVersionHash = await getDocumentVersionHash(serviceKey, user.id, courseId);
-  const questionHash = hashQuestion(user.id, courseId, normalizedQ, docVersionHash);
+  const ragMode = mode === 'general' ? 'general' : 'strict';
+  const questionHash = hashQuestion(user.id, courseId, normalizedQ, docVersionHash, ragMode);
 
   // 3. Check exact answer cache
-  const exactHit = await getExactCache(serviceKey, user.id, courseId, questionHash, docVersionHash);
+  const exactHit = await getExactCache(serviceKey, user.id, courseId, questionHash, docVersionHash, ragMode);
   if (exactHit) {
     touchAnswerCache(serviceKey, exactHit.id);
     return jsonResponse(200, Object.assign({}, exactHit.answer_json, { cached: true }));
@@ -660,7 +667,8 @@ exports.handler = async function (event) {
     user.id,
     courseId,
     embedding,
-    docVersionHash
+    docVersionHash,
+    ragMode
   );
   if (semanticHit && semanticHit.answer_cache_id) {
     const cachedAnswer = await getAnswerById(serviceKey, semanticHit.answer_cache_id);
@@ -723,6 +731,7 @@ exports.handler = async function (event) {
       questionHash,
       normalizedQ,
       docVersionHash,
+      ragMode,
       fallbackJson
     ).catch(function () {});
     return jsonResponse(200, fallbackJson);
@@ -759,7 +768,7 @@ exports.handler = async function (event) {
   const knownFileNames = new Set(Object.values(docNames));
 
   // 9. Build context and call OpenAI
-  const systemPrompt = buildSystemPrompt(strictMode ? 'strict' : 'general');
+  const systemPrompt = buildSystemPrompt(ragMode);
   const contextBlock = buildContextBlock(rankedChunks, docNames);
 
   let rawResponse;
@@ -795,6 +804,7 @@ exports.handler = async function (event) {
     questionHash,
     normalizedQ,
     docVersionHash,
+    ragMode,
     answerJson
   )
     .then(function (newCacheId) {
@@ -806,7 +816,8 @@ exports.handler = async function (event) {
           question,
           embedding,
           newCacheId,
-          docVersionHash
+          docVersionHash,
+          ragMode
         );
       }
     })

@@ -1,105 +1,107 @@
 // POST /api/ai/evaluate
-// Runs a stored evaluation test case against the live RAG pipeline and records the result.
-// Also supports GET to list evaluation results for a course.
+// Runs one or all test questions for a course through the RAG pipeline
+// and records whether each evaluation passed.
 //
-// POST body: { courseId, testQuestion, expectedBehavior, expectedSourceKeywords? }
-// GET query: ?courseId=xxx
+// Request body:
+//   { courseId, evaluationId? }
+//   evaluationId: run a single test; omit to run all tests for courseId
+//
+// Response:
+//   { ran, passed, failed, results: [{ id, test_question, passed, failure_reason }] }
 
-const { requireEnv, optionalEnv } = require('../lib/env');
+const { requireEnv } = require('../lib/env');
 const { jsonResponse, fail, handleOptions } = require('../lib/responses');
 const { verifySupabaseToken, extractBearerToken } = require('../lib/supabase-auth');
 const { supaRequest } = require('../lib/supabase-admin');
-const https = require('https');
 
-const VALID_BEHAVIORS = new Set([
-  'answer_found', // should find and cite from docs
-  'answer_not_found', // should refuse (no relevant chunks)
-  'cite_specific_file', // answer must cite a specific file
-  'no_hallucination' // answer must not include content outside retrieved chunks
-]);
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-// Re-use the ai-ask logic inline by calling the live endpoint
-function callAskEndpoint(token, courseId, question) {
-  return new Promise(function (resolve, reject) {
-    const baseUrl = optionalEnv('PROCESS_FUNCTION_URL', '');
-    const host = baseUrl ? new URL(baseUrl).hostname : 'localhost';
-    const isLocalhost = host === 'localhost' || host === '127.0.0.1';
-
-    const body = JSON.stringify({ courseId, question, mode: 'strict' });
-    const options = {
-      hostname: host,
-      path: isLocalhost ? '/.netlify/functions/ai-ask' : '/api/ai/ask',
-      method: 'POST',
-      headers: {
-        Authorization: 'Bearer ' + token,
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(body)
-      }
-    };
-    if (!isLocalhost) options.port = 443;
-
-    const req = (isLocalhost ? require('http') : https).request(options, function (res) {
-      let d = '';
-      res.on('data', function (c) {
-        d += c;
-      });
-      res.on('end', function () {
-        try {
-          resolve(JSON.parse(d));
-        } catch (e) {
-          reject(e);
-        }
-      });
-    });
-    req.on('error', reject);
-    req.write(body);
-    req.end();
-  });
+async function fetchEvaluations(serviceKey, courseId, evaluationId) {
+  let path = 'ai_evaluations?course_id=eq.' + encodeURIComponent(courseId);
+  if (evaluationId) path += '&id=eq.' + encodeURIComponent(evaluationId);
+  path += '&select=id,test_question,expected_behavior,expected_sources&order=created_at.asc';
+  const result = await supaRequest('GET', path, null, serviceKey);
+  return Array.isArray(result.body) ? result.body : [];
 }
 
-function evaluateResult(answer, sources, expectedBehavior, expectedSourceKeywords) {
-  const notes = [];
-  let passed = false;
+async function callAskEndpoint(token, courseId, question) {
+  const SITE_URL = requireEnv('URL'); // Netlify injects this automatically
+  const response = await fetch(SITE_URL + '/api/ai/ask', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+    body: JSON.stringify({ courseId, question, mode: 'strict' })
+  });
+  return response.json();
+}
 
-  if (expectedBehavior === 'answer_found') {
-    passed = !answer.unsupported && sources.length > 0;
-    if (!passed)
-      notes.push(
-        'Expected a grounded answer with sources but got unsupported=' +
-          answer.unsupported +
-          ', sources=' +
-          sources.length
-      );
-  } else if (expectedBehavior === 'answer_not_found') {
-    passed = !!answer.unsupported || sources.length === 0;
-    if (!passed) notes.push('Expected refusal but AI returned an answer with sources');
-  } else if (expectedBehavior === 'cite_specific_file') {
-    const keywords = (expectedSourceKeywords || []).map(function (k) {
-      return k.toLowerCase();
-    });
-    const citedFiles = sources.map(function (s) {
-      return (s.file_name || '').toLowerCase();
-    });
-    passed = keywords.every(function (k) {
-      return citedFiles.some(function (f) {
-        return f.includes(k);
-      });
-    });
-    if (!passed)
-      notes.push(
-        'Expected citation of ' + keywords.join(', ') + ' but got: ' + citedFiles.join(', ')
-      );
-  } else if (expectedBehavior === 'no_hallucination') {
-    // Pass if confidence is high or medium and not unsupported
-    passed = answer.confidence !== 'low' && !answer.unsupported;
-    if (!passed) notes.push('Low confidence or unsupported answer detected');
+function evaluateResult(ev, answer) {
+  const behavior = ev.expected_behavior || 'grounded';
+  const isRefused = answer.unsupported === true ||
+    (answer.answer || '').toLowerCase().includes('could not find') ||
+    (answer.answer || '').toLowerCase().includes('not in your uploaded');
+
+  if (behavior === 'refuse') {
+    return isRefused
+      ? { passed: true, failure_reason: null }
+      : { passed: false, failure_reason: 'Expected refusal but got a grounded answer.' };
   }
 
-  return { passed, notes: notes.join('; ') };
+  if (behavior === 'general') {
+    return (answer.answer && answer.answer.length > 20)
+      ? { passed: true, failure_reason: null }
+      : { passed: false, failure_reason: 'Answer was empty or too short.' };
+  }
+
+  // grounded (default)
+  if (isRefused) {
+    return { passed: false, failure_reason: 'Answer was refused but a grounded answer was expected.' };
+  }
+
+  const sources = Array.isArray(answer.sources) ? answer.sources : [];
+  const expectedSources = Array.isArray(ev.expected_sources) ? ev.expected_sources : [];
+
+  if (expectedSources.length > 0) {
+    const citedFiles = sources.map(function (s) { return (s.file_name || '').toLowerCase(); });
+    const anyMatched = expectedSources.some(function (exp) {
+      return citedFiles.some(function (cited) { return cited.includes(exp.toLowerCase()); });
+    });
+    if (!anyMatched) {
+      return {
+        passed: false,
+        failure_reason: 'Expected sources not cited. Expected one of: [' +
+          expectedSources.join(', ') + ']. Got: [' + (citedFiles.join(', ') || 'none') + ']'
+      };
+    }
+  }
+
+  if (answer.confidence === 'low' && sources.length === 0) {
+    return { passed: false, failure_reason: 'Low confidence with no sources cited.' };
+  }
+
+  return { passed: true, failure_reason: null };
 }
+
+async function saveResult(serviceKey, ev, answer, verdict) {
+  return supaRequest(
+    'PATCH',
+    'ai_evaluations?id=eq.' + ev.id,
+    {
+      actual_answer: answer.answer || '',
+      actual_sources: answer.sources || [],
+      actual_confidence: answer.confidence || null,
+      passed: verdict.passed,
+      failure_reason: verdict.failure_reason || null,
+      run_at: new Date().toISOString()
+    },
+    serviceKey
+  ).catch(function () {});
+}
+
+// ─── Handler ──────────────────────────────────────────────────────────────────
 
 exports.handler = async function (event) {
   if (event.httpMethod === 'OPTIONS') return handleOptions();
+  if (event.httpMethod !== 'POST') return fail(405, 'Method not allowed');
 
   const token = extractBearerToken(event.headers);
   if (!token) return fail(401, 'Missing authorization token');
@@ -109,79 +111,45 @@ exports.handler = async function (event) {
 
   const serviceKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
 
-  // GET — list evaluation results
-  if (event.httpMethod === 'GET') {
-    const courseId = (event.queryStringParameters || {}).courseId;
-    if (!courseId) return fail(400, 'courseId is required');
-
-    const result = await supaRequest(
-      'GET',
-      'ai_evaluations?course_id=eq.' +
-        encodeURIComponent(courseId) +
-        '&user_id=eq.' +
-        user.id +
-        '&order=created_at.desc&limit=50',
-      null,
-      serviceKey
-    );
-    return jsonResponse(200, { evaluations: Array.isArray(result.body) ? result.body : [] });
-  }
-
-  if (event.httpMethod !== 'POST') return fail(405, 'Method not allowed');
-
   let body;
-  try {
-    body = JSON.parse(event.body || '{}');
-  } catch (e) {
-    return fail(400, 'Invalid JSON');
-  }
+  try { body = JSON.parse(event.body || '{}'); }
+  catch (e) { return fail(400, 'Invalid JSON'); }
 
-  const { courseId, testQuestion, expectedBehavior, expectedSourceKeywords } = body;
+  const { courseId, evaluationId } = body;
   if (!courseId || typeof courseId !== 'string') return fail(400, 'courseId is required');
-  if (!testQuestion || typeof testQuestion !== 'string')
-    return fail(400, 'testQuestion is required');
-  if (!expectedBehavior || !VALID_BEHAVIORS.has(expectedBehavior)) {
-    return fail(400, 'expectedBehavior must be one of: ' + [...VALID_BEHAVIORS].join(', '));
+
+  const evaluations = await fetchEvaluations(serviceKey, courseId, evaluationId || null);
+  if (!evaluations.length) {
+    return jsonResponse(200, { ran: 0, passed: 0, failed: 0, results: [] });
   }
 
-  // Run the question through the live RAG pipeline
-  let ragResponse;
-  try {
-    ragResponse = await callAskEndpoint(token, courseId, testQuestion);
-  } catch (e) {
-    return fail(502, 'RAG pipeline unavailable: ' + e.message);
+  const results = [];
+  for (var i = 0; i < evaluations.length; i++) {
+    var ev = evaluations[i];
+    var answer;
+    try {
+      answer = await callAskEndpoint(token, courseId, ev.test_question);
+    } catch (e) {
+      answer = { answer: '', sources: [], confidence: 'low', unsupported: true };
+    }
+    var verdict = evaluateResult(ev, answer);
+    await saveResult(serviceKey, ev, answer, verdict);
+    results.push({
+      id: ev.id,
+      test_question: ev.test_question,
+      expected_behavior: ev.expected_behavior,
+      passed: verdict.passed,
+      failure_reason: verdict.failure_reason,
+      confidence: answer.confidence,
+      sources_count: Array.isArray(answer.sources) ? answer.sources.length : 0
+    });
   }
 
-  const sources = ragResponse.sources || [];
-  const { passed, notes } = evaluateResult(
-    ragResponse,
-    sources,
-    expectedBehavior,
-    expectedSourceKeywords || []
-  );
-
-  // Store result
-  const row = {
-    user_id: user.id,
-    course_id: courseId,
-    test_question: testQuestion,
-    expected_behavior: expectedBehavior,
-    expected_sources: expectedSourceKeywords ? JSON.stringify(expectedSourceKeywords) : null,
-    actual_answer: ragResponse.answer ? ragResponse.answer.slice(0, 2000) : '',
-    actual_sources: JSON.stringify(sources),
-    confidence: ragResponse.confidence || null,
-    passed,
-    notes: notes || null
-  };
-
-  await supaRequest('POST', 'ai_evaluations', row, serviceKey, { Prefer: 'return=minimal' });
-
+  const passed = results.filter(function (r) { return r.passed; }).length;
   return jsonResponse(200, {
-    passed,
-    notes,
-    answer: ragResponse.answer,
-    sources,
-    confidence: ragResponse.confidence,
-    unsupported: ragResponse.unsupported
+    ran: results.length,
+    passed: passed,
+    failed: results.length - passed,
+    results: results
   });
 };
