@@ -1,6 +1,17 @@
 import { showCourseSection } from './course-view.js';
 import { indexExistingDocument } from '../../services/ai-service.js';
 
+function _guessFolderDocMeta(fileName) {
+  var n = fileName.replace(/\.[^.]+$/, '');
+  var meta = {};
+  var m;
+  m = n.match(/(?:lecture|vorlesung|vl|lec)[_\s-]*(\d+)/i);
+  if (m) { meta.lectureNumber = parseInt(m[1], 10); return meta; }
+  m = n.match(/(?:exercise|aufgabe|seminar|ag|uebung|übung|ue)[_\s-]*(\d+)/i);
+  if (m) { meta.exerciseNumber = parseInt(m[1], 10); return meta; }
+  return meta;
+}
+
 export function bindFolderEvents(co, course) {
   // ── Restore open folder state ──────────────────────────────────────────────
   co.querySelectorAll('.co-folder-section').forEach(function (sec) {
@@ -163,7 +174,8 @@ export function bindFolderEvents(co, course) {
                     merged._storageName,
                     merged.name,
                     st,
-                    merged._folder || targetFolder || null
+                    merged._folder || targetFolder || null,
+                    _guessFolderDocMeta(pf.name)
                   ).catch(function () {});
                 }
               });

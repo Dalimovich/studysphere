@@ -92,6 +92,11 @@
   status = 200
 
 [[redirects]]
+  from = "/api/ai/generate"
+  to = "/.netlify/functions/ai-generate"
+  status = 200
+
+[[redirects]]
   from = "/api/ai/feedback"
   to = "/.netlify/functions/ai-feedback"
   status = 200

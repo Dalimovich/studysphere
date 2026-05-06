@@ -174,7 +174,9 @@ export function initAskAI(state) {
         var _hasRag = _courseId ? await courseHasRagDocs(_courseId) : false;
 
         if (_hasRag) {
-          return sendRagRequest(_courseId, question, 'strict').then(function (data) {
+          var _modeToggle = document.getElementById('aiModeStrict');
+          var _ragMode = (!_modeToggle || _modeToggle.checked) ? 'strict' : 'general';
+          return sendRagRequest(_courseId, question, _ragMode).then(function (data) {
             var answer = data.answer || 'No answer found.';
 
             // Confidence badge
@@ -195,17 +197,17 @@ export function initAskAI(state) {
                 '\n\n**Sources:**\n' +
                 data.sources
                   .map(function (s) {
-                    return (
-                      '- ' +
-                      s.file_name +
-                      (s.pages ? ', p.' + s.pages : '') +
-                      (s.quote ? ' — *"' + s.quote.slice(0, 80) + '…"*' : '')
-                    );
+                    var line = '- ' + s.file_name;
+                    if (s.pages) line += ', p.' + s.pages;
+                    if (s.section) line += ' · *' + s.section + '*';
+                    if (s.quote) line += ' — *"' + s.quote.slice(0, 80) + '…"*';
+                    return line;
                   })
                   .join('\n');
             }
 
-            answer += '\n\n' + confLabel + (data.cached ? ' · ⚡ cached' : '');
+            var _modeLabel = _ragMode === 'general' ? ' · 🌐 general mode' : '';
+            answer += '\n\n' + confLabel + (data.cached ? ' · ⚡ cached' : '') + _modeLabel;
 
             // Attach feedback metadata to window for the feedback buttons
             window._lastRagMeta = {

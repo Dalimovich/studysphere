@@ -27,6 +27,9 @@ CREATE INDEX IF NOT EXISTS idx_document_chunks_fts
 -- RRF merge     : score = 1/(60+rank_semantic) + 1/(60+rank_keyword)
 -- similarity    : cosine similarity is returned for downstream source-boost logic
 
+-- Drop old version first (return type changed — can't use CREATE OR REPLACE)
+DROP FUNCTION IF EXISTS match_chunks_hybrid(uuid, text, vector, text, integer, double precision);
+
 CREATE OR REPLACE FUNCTION match_chunks_hybrid(
   p_user_id    uuid,
   p_course_id  text,
@@ -36,13 +39,15 @@ CREATE OR REPLACE FUNCTION match_chunks_hybrid(
   p_threshold   float DEFAULT 0.1
 )
 RETURNS TABLE (
-  id           uuid,
-  document_id  uuid,
-  chunk_text   text,
-  page_start   int,
-  page_end     int,
-  source_type  text,
-  similarity   float
+  id             uuid,
+  document_id    uuid,
+  chunk_text     text,
+  page_start     int,
+  page_end       int,
+  source_type    text,
+  section_title  text,
+  is_official    boolean,
+  similarity     float
 )
 LANGUAGE plpgsql STABLE
 AS $$
@@ -90,6 +95,8 @@ BEGIN
     dc.page_start,
     dc.page_end,
     dc.source_type,
+    dc.section_title,
+    COALESCE(dc.is_official, false)                                     AS is_official,
     -- For FTS-only results vec_sim is NULL: compute cosine similarity on-the-fly
     -- (at most 20 extra dot products — negligible cost)
     COALESCE(c.vec_sim, (1 - (dc.embedding <=> p_embedding))::float)   AS similarity

@@ -1,7 +1,88 @@
+import { generateStudyTool, courseHasRagDocs } from '../../services/ai-service.js';
+
 export function closeAllOpts() {
   document.querySelectorAll('.chip-drawer').forEach(function (el) {
     el.classList.remove('open');
   });
+}
+
+// ─── Rendered output helpers ──────────────────────────────────────────────────
+
+function _sourcesFooter(sources) {
+  if (!sources || !sources.length) return '';
+  return '\n\n**Sources:** ' + sources.map(function (s) {
+    return s.file_name + (s.pages ? ', p.' + s.pages : '') + (s.section ? ' · *' + s.section + '*' : '');
+  }).join(' · ');
+}
+
+function _renderFlashcards(items, sources) {
+  if (!items || !items.length) return 'No flashcards could be generated from your course materials.';
+  var md = '## Flashcards\n\n';
+  items.forEach(function (card, i) {
+    md += '**' + (i + 1) + '. ' + card.front + '**\n';
+    md += card.back + '\n';
+    if (card.source) md += '*(' + card.source + ')*\n';
+    md += '\n';
+  });
+  return md + _sourcesFooter(sources);
+}
+
+function _renderQuiz(items, sources) {
+  if (!items || !items.length) return 'No quiz questions could be generated from your course materials.';
+  var md = '## Quiz\n\n';
+  items.forEach(function (q, i) {
+    md += '**' + (i + 1) + '. ' + q.question + '**\n';
+    var opts = q.options || {};
+    ['A', 'B', 'C', 'D'].forEach(function (k) {
+      if (opts[k]) {
+        var marker = k === q.answer ? '✅ ' : '';
+        md += marker + k + '. ' + opts[k] + '\n';
+      }
+    });
+    if (q.explanation) md += '\n*' + q.explanation + '*\n';
+    md += '\n';
+  });
+  return md + _sourcesFooter(sources);
+}
+
+function _renderSummary(text, sources) {
+  return (text || 'No summary could be generated.') + _sourcesFooter(sources);
+}
+
+// ─── RAG-powered generate (falls back to text prompt when no docs) ────────────
+
+async function _generateWithRag(tool, level, topic) {
+  var courseId = window.activeCourseId || window.currentCourseId || '';
+  if (!courseId) return false;
+  var hasRag = await courseHasRagDocs(courseId).catch(function () { return false; });
+  if (!hasRag) return false;
+
+  // Show typing indicator while generating
+  if (window.addTyping) window.addTyping();
+
+  try {
+    var countMap = { easy: 6, medium: 8, hard: 10 };
+    var result = await generateStudyTool(courseId, tool, {
+      count: countMap[level] || 8,
+      difficulty: level,
+      topic: topic || null
+    });
+
+    var md = '';
+    if (tool === 'flashcards') md = _renderFlashcards(result.items, result.sources);
+    else if (tool === 'quiz')   md = _renderQuiz(result.items, result.sources);
+    else                        md = _renderSummary(result.text, result.sources);
+
+    if (result.error) md = '⚠️ ' + result.error;
+
+    // Remove typing indicator and add the bot message
+    document.querySelectorAll('.typing-wrap').forEach(function (el) { el.remove(); });
+    if (window.addBotMsg) window.addBotMsg(md);
+    return true;
+  } catch (e) {
+    document.querySelectorAll('.typing-wrap').forEach(function (el) { el.remove(); });
+    return false;
+  }
 }
 
 export function chipPrompt(type, level) {
@@ -51,6 +132,16 @@ export function chipPrompt(type, level) {
 
   var prompt = typeof prompts[type] === 'object' ? prompts[type][level || 'medium'] : prompts[type];
   closeAllOpts();
+
+  // For quiz and summarise, try the RAG generate endpoint first
+  if (type === 'quiz' || type === 'summarise') {
+    var ragTool = type === 'summarise' ? 'summary' : 'quiz';
+    _generateWithRag(ragTool, level || 'medium').then(function (used) {
+      if (!used && window.askAI) window.askAI(prompt);
+    });
+    return;
+  }
+
   if (window.askAI) window.askAI(prompt);
 }
 
@@ -88,6 +179,17 @@ export function initChipListeners() {
     closeAllOpts();
     chipPrompt('analogy');
   });
+
+  (document.getElementById('chip-flashcards') || { addEventListener: function () {} }).addEventListener(
+    'click',
+    function () {
+      closeAllOpts();
+      _generateWithRag('flashcards', 'medium').then(function (used) {
+        if (!used && window.askAI)
+          window.askAI('Create 8 flashcards from the key concepts in this document. Format each as Q: [question] A: [answer].');
+      });
+    }
+  );
 
   document.querySelectorAll('.chip-sub').forEach(function (opt) {
     opt.addEventListener('click', function () {

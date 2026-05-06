@@ -136,12 +136,13 @@ function retrieveChunks(serviceKey, userId, courseId, embedding, question) {
   });
 }
 
-// Apply source priority boost and re-sort
+// Apply source priority boost + official-material boost, then re-sort
 function rankChunks(chunks) {
   return chunks
     .map(function (c) {
-      const boost = SOURCE_BOOST[c.source_type] || 0;
-      return Object.assign({}, c, { final_score: c.similarity + boost });
+      const sourceBoost = SOURCE_BOOST[c.source_type] || 0;
+      const officialBoost = c.is_official ? 0.05 : 0;
+      return Object.assign({}, c, { final_score: c.similarity + sourceBoost + officialBoost });
     })
     .sort(function (a, b) {
       return b.final_score - a.final_score;
@@ -192,7 +193,7 @@ function buildSystemPrompt(mode) {
     'Always respond in this JSON format:',
     '{',
     '  "answer": "...",',
-    '  "sources": [{ "file_name": "...", "pages": "...", "quote": "..." }],',
+    '  "sources": [{ "file_name": "...", "pages": "...", "section": "...", "quote": "..." }],',
     '  "confidence": "high|medium|low",',
     '  "unsupported": false',
     '}'
@@ -235,14 +236,14 @@ function buildContextBlock(rankedChunks, docNames) {
         c.page_start === c.page_end
           ? 'page ' + c.page_start
           : 'pages ' + c.page_start + '-' + c.page_end;
-      return [
+      const lines = [
         '[Source ' + (i + 1) + ']',
         'File: ' + fileName,
-        'Pages: ' + pages,
-        'Type: ' + c.source_type,
-        'Text:',
-        c.chunk_text
-      ].join('\n');
+        'Pages: ' + pages
+      ];
+      if (c.section_title) lines.push('Section: ' + c.section_title);
+      lines.push('Type: ' + c.source_type, 'Text:', c.chunk_text);
+      return lines.join('\n');
     })
     .join('\n\n---\n\n');
 }
@@ -499,6 +500,101 @@ function storeQuestionCache(
   ).catch(function () {});
 }
 
+// ─── Retrieval cache ──────────────────────────────────────────────────────────
+// Caches the ranked chunk set for a question+docVersion so repeated questions
+// can skip the vector search and go straight to fetching chunks by PK.
+
+async function getRetrievalCache(serviceKey, userId, courseId, questionHash, docVersionHash) {
+  const result = await supaRequest(
+    'GET',
+    'retrieval_cache?user_id=eq.' +
+      userId +
+      '&course_id=eq.' +
+      encodeURIComponent(courseId) +
+      '&question_hash=eq.' +
+      questionHash +
+      '&document_version_hash=eq.' +
+      docVersionHash +
+      '&select=id,chunk_entries&limit=1',
+    null,
+    serviceKey
+  );
+  if (Array.isArray(result.body) && result.body[0]) return result.body[0];
+  return null;
+}
+
+// Fetch full chunk rows for a set of IDs (used on retrieval cache hit)
+async function fetchChunksByIds(serviceKey, userId, courseId, chunkIds) {
+  if (!chunkIds.length) return [];
+  const ids = chunkIds
+    .map(function (id) {
+      return '"' + id + '"';
+    })
+    .join(',');
+  const result = await supaRequest(
+    'GET',
+    'document_chunks?id=in.(' +
+      ids +
+      ')&user_id=eq.' +
+      userId +
+      '&course_id=eq.' +
+      encodeURIComponent(courseId) +
+      '&select=id,document_id,chunk_text,page_start,page_end,source_type,section_title',
+    null,
+    serviceKey
+  );
+  return Array.isArray(result.body) ? result.body : [];
+}
+
+function storeRetrievalCache(
+  serviceKey,
+  userId,
+  courseId,
+  questionHash,
+  docVersionHash,
+  rankedChunks
+) {
+  // Store { id, similarity } per chunk so source-boost order is preserved on hit
+  const entries = rankedChunks.map(function (c) {
+    return { id: c.id, similarity: c.similarity };
+  });
+  return supaRequest(
+    'POST',
+    'retrieval_cache',
+    {
+      user_id: userId,
+      course_id: courseId,
+      question_hash: questionHash,
+      document_version_hash: docVersionHash,
+      chunk_entries: entries
+    },
+    serviceKey,
+    { Prefer: 'return=minimal' }
+  ).catch(function () {});
+}
+
+// ─── Chunk deduplication ──────────────────────────────────────────────────────
+// After source-boost ranking, remove chunks that overlap in page range with an
+// already-selected chunk from the same document. Prevents the same passage from
+// appearing multiple times in the context window.
+
+function deduplicateChunks(rankedChunks) {
+  const selected = [];
+  for (var i = 0; i < rankedChunks.length; i++) {
+    var chunk = rankedChunks[i];
+    var overlaps = selected.some(function (sel) {
+      if (sel.document_id !== chunk.document_id) return false;
+      return (
+        Math.max(sel.page_start, chunk.page_start) <=
+        Math.min(sel.page_end, chunk.page_end)
+      );
+    });
+    if (!overlaps) selected.push(chunk);
+    if (selected.length >= MAX_CHUNKS) break;
+  }
+  return selected;
+}
+
 // ─── Handler ──────────────────────────────────────────────────────────────────
 
 exports.handler = async function (event) {
@@ -574,8 +670,28 @@ exports.handler = async function (event) {
     }
   }
 
-  // 5. Retrieve relevant chunks via vector search
-  const rawChunks = await retrieveChunks(serviceKey, user.id, courseId, embedding, question);
+  // 5. Check retrieval cache (skip vector search for repeated questions)
+  let rawChunks;
+  const retrievalHit = await getRetrievalCache(
+    serviceKey,
+    user.id,
+    courseId,
+    questionHash,
+    docVersionHash
+  );
+  if (retrievalHit) {
+    const entries = Array.isArray(retrievalHit.chunk_entries) ? retrievalHit.chunk_entries : [];
+    const ids = entries.map(function (e) { return e.id; });
+    const fetchedChunks = await fetchChunksByIds(serviceKey, user.id, courseId, ids);
+    // Restore cached similarity scores so rankChunks sorts correctly
+    const simMap = {};
+    entries.forEach(function (e) { simMap[e.id] = e.similarity; });
+    rawChunks = fetchedChunks.map(function (c) {
+      return Object.assign({}, c, { similarity: simMap[c.id] || 0.5 });
+    });
+  } else {
+    rawChunks = await retrieveChunks(serviceKey, user.id, courseId, embedding, question);
+  }
 
   // 6. No chunks found — fall back to general knowledge answer
   if (!rawChunks.length) {
@@ -612,8 +728,20 @@ exports.handler = async function (event) {
     return jsonResponse(200, fallbackJson);
   }
 
-  // 7. Rank by similarity + source type boost
-  const rankedChunks = rankChunks(rawChunks);
+  // 7. Rank by similarity + source type boost, then deduplicate overlapping pages
+  const rankedChunks = deduplicateChunks(rankChunks(rawChunks));
+
+  // Store retrieval cache for future identical questions (fire-and-forget)
+  if (!retrievalHit && rankedChunks.length) {
+    storeRetrievalCache(
+      serviceKey,
+      user.id,
+      courseId,
+      questionHash,
+      docVersionHash,
+      rankedChunks
+    );
+  }
 
   // Guardrail: best chunk is below strong threshold — still answer but flag low confidence
   const topScore = rankedChunks[0] ? rankedChunks[0].final_score : 0;

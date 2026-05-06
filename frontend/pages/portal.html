@@ -1079,6 +1079,7 @@
                   <span class="ai-tip" id="chip-analogy" data-i18n="chip_analogy"
                     >&#x1F517; Analogy</span
                   >
+                  <span class="ai-tip" id="chip-flashcards">&#x1F4C7; Flashcards</span>
                 </div>
                 <div class="chip-drawer" id="opts-summarise">
                   <div class="chip-drawer-inner">
@@ -1142,6 +1143,11 @@
                     rows="2"
                   ></textarea>
                   <div class="ai-bottom-row">
+                    <label class="ai-mode-pill" id="aiModePill" title="Strict: answers from your uploaded course files only. General: also uses outside knowledge.">
+                      <input type="checkbox" id="aiModeStrict" checked />
+                      <span class="ai-mode-on">&#x1F4DA; Course only</span>
+                      <span class="ai-mode-off">&#x1F310; General</span>
+                    </label>
                     <span class="ai-char-count" id="aiCharCount">0 / 2000</span>
                     <button class="ai-attach-btn ai-snip-btn" id="aiSnipBtn" title="Snip from PDF">
                       <svg

@@ -71,7 +71,10 @@ exports.handler = async function (event) {
     return fail(400, 'Invalid JSON');
   }
 
-  const { courseId, storageName, fileName, sourceType, folder } = body;
+  const {
+    courseId, storageName, fileName, sourceType, folder,
+    professorName, lectureNumber, exerciseNumber, language, isOfficialProfMaterial
+  } = body;
   if (!courseId || typeof courseId !== 'string') return fail(400, 'courseId is required');
   if (!storageName || typeof storageName !== 'string') return fail(400, 'storageName is required');
   if (!fileName || typeof fileName !== 'string') return fail(400, 'fileName is required');
@@ -148,7 +151,12 @@ exports.handler = async function (event) {
     file_type: 'pdf',
     source_type: sourceType || 'lecture',
     storage_path: docStoragePath,
-    processing_status: 'uploaded'
+    processing_status: 'uploaded',
+    professor_name: professorName || null,
+    lecture_number: Number.isFinite(lectureNumber) ? lectureNumber : null,
+    exercise_number: Number.isFinite(exerciseNumber) ? exerciseNumber : null,
+    language: language || 'en',
+    is_official_prof_material: isOfficialProfMaterial === true
   };
 
   const insertResult = await supaRequest('POST', 'documents', docRow, serviceKey, {

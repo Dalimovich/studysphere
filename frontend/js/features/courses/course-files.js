@@ -454,7 +454,8 @@ export function bindFileEvents(co, course) {
                   merged._storageName,
                   merged.name,
                   _guessSourceType(merged.name),
-                  merged._folder || null
+                  merged._folder || null,
+                  _guessDocMeta(merged.name)
                 ).catch(function () {});
               }
             });
@@ -478,6 +479,21 @@ function _guessSourceType(fileName) {
   if (n.includes('exam') || n.includes('klausur') || n.includes('prüfung')) return 'exam';
   if (n.includes('notes') || n.includes('notiz') || n.includes('mitschrift')) return 'notes';
   return 'lecture';
+}
+
+// Extract lecture_number / exercise_number from filename patterns like:
+//   Lecture_04, VL04, L04, Aufgabe_3, Exercise_03, Seminar_01, AG_02
+function _guessDocMeta(fileName) {
+  var n = fileName.replace(/\.[^.]+$/, ''); // strip extension
+  var meta = {};
+  var m;
+  // Lecture number: Lecture_04, VL04, VL_04, L04, Vorlesung_4
+  m = n.match(/(?:lecture|vorlesung|vl|lec)[_\s-]*(\d+)/i);
+  if (m) { meta.lectureNumber = parseInt(m[1], 10); return meta; }
+  // Exercise / Seminar number: Exercise_03, Aufgabe_3, AG_02, Seminar_01, UE_03, Uebung_2
+  m = n.match(/(?:exercise|aufgabe|seminar|ag|uebung|übung|ue)[_\s-]*(\d+)/i);
+  if (m) { meta.exerciseNumber = parseInt(m[1], 10); return meta; }
+  return meta;
 }
 
 // Simple FIFO throttle to avoid hammering the index-existing endpoint
@@ -601,7 +617,8 @@ async function _triggerRagIndex(el, fname, f, course, courseId) {
       f._storageName,
       fname,
       _guessSourceType(fname),
-      f._folder || null
+      f._folder || null,
+      _guessDocMeta(fname)
     );
     if (result.alreadyIndexed) {
       var st = result.processingStatus || 'ready';

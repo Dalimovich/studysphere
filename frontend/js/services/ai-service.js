@@ -89,13 +89,28 @@ export async function listCourseDocuments(courseId) {
 }
 
 // Index a file already in course-uploads storage (server-side copy — no browser upload)
-export async function indexExistingDocument(courseId, storageName, fileName, sourceType, folder) {
+// meta (optional): { professorName, lectureNumber, exerciseNumber, language, isOfficialProfMaterial }
+export async function indexExistingDocument(courseId, storageName, fileName, sourceType, folder, meta) {
   var BACKEND_URL = window.BACKEND_URL || '';
   var token = window._sbToken || '';
   var controller = new AbortController();
   var timeoutId = setTimeout(function () {
     controller.abort();
   }, 12000);
+  var payload = {
+    courseId: courseId,
+    storageName: storageName,
+    fileName: fileName,
+    sourceType: sourceType || 'lecture',
+    folder: folder || null
+  };
+  if (meta) {
+    if (meta.professorName) payload.professorName = meta.professorName;
+    if (meta.lectureNumber != null) payload.lectureNumber = Number(meta.lectureNumber);
+    if (meta.exerciseNumber != null) payload.exerciseNumber = Number(meta.exerciseNumber);
+    if (meta.language) payload.language = meta.language;
+    if (meta.isOfficialProfMaterial != null) payload.isOfficialProfMaterial = !!meta.isOfficialProfMaterial;
+  }
   try {
     var response = await fetch(BACKEND_URL + '/api/documents/index-existing', {
       method: 'POST',
@@ -103,13 +118,7 @@ export async function indexExistingDocument(courseId, storageName, fileName, sou
         'Content-Type': 'application/json',
         Authorization: 'Bearer ' + token
       },
-      body: JSON.stringify({
-        courseId: courseId,
-        storageName: storageName,
-        fileName: fileName,
-        sourceType: sourceType || 'lecture',
-        folder: folder || null
-      }),
+      body: JSON.stringify(payload),
       signal: controller.signal
     });
     clearTimeout(timeoutId);
@@ -136,6 +145,19 @@ export async function deleteRagDocument(documentId) {
       Authorization: 'Bearer ' + token
     },
     body: JSON.stringify({ documentId: documentId })
+  });
+  return response.json();
+}
+
+// Generate study tools (flashcards / quiz / summary) from course documents
+// opts: { topic?, count?, difficulty? }
+export async function generateStudyTool(courseId, tool, opts) {
+  var BACKEND_URL = window.BACKEND_URL || '';
+  var token = window._sbToken || '';
+  var response = await fetch(BACKEND_URL + '/api/ai/generate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+    body: JSON.stringify(Object.assign({ courseId: courseId, tool: tool }, opts || {}))
   });
   return response.json();
 }
