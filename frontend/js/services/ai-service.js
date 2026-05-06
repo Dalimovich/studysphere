@@ -90,7 +90,14 @@ export async function listCourseDocuments(courseId) {
 
 // Index a file already in course-uploads storage (server-side copy — no browser upload)
 // meta (optional): { professorName, lectureNumber, exerciseNumber, language, isOfficialProfMaterial }
-export async function indexExistingDocument(courseId, storageName, fileName, sourceType, folder, meta) {
+export async function indexExistingDocument(
+  courseId,
+  storageName,
+  fileName,
+  sourceType,
+  folder,
+  meta
+) {
   var BACKEND_URL = window.BACKEND_URL || '';
   var token = window._sbToken || '';
   var controller = new AbortController();
@@ -109,7 +116,8 @@ export async function indexExistingDocument(courseId, storageName, fileName, sou
     if (meta.lectureNumber != null) payload.lectureNumber = Number(meta.lectureNumber);
     if (meta.exerciseNumber != null) payload.exerciseNumber = Number(meta.exerciseNumber);
     if (meta.language) payload.language = meta.language;
-    if (meta.isOfficialProfMaterial != null) payload.isOfficialProfMaterial = !!meta.isOfficialProfMaterial;
+    if (meta.isOfficialProfMaterial != null)
+      payload.isOfficialProfMaterial = !!meta.isOfficialProfMaterial;
   }
   try {
     var response = await fetch(BACKEND_URL + '/api/documents/index-existing', {

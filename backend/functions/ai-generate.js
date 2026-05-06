@@ -30,8 +30,13 @@ const AI_RATE_LIMIT_MAX = Number(optionalEnv('AI_RATE_LIMIT_MAX', '20'));
 const AI_RATE_LIMIT_WINDOW_MS = Number(optionalEnv('AI_RATE_LIMIT_WINDOW_MS', '3600000'));
 
 const SOURCE_BOOST = {
-  solution: 0.08, exercise: 0.08, lecture: 0.1,
-  exam: 0.06, notes: 0.02, summary: -0.03, other: 0.0
+  solution: 0.08,
+  exercise: 0.08,
+  lecture: 0.1,
+  exam: 0.06,
+  notes: 0.02,
+  summary: -0.03,
+  other: 0.0
 };
 
 // ─── OpenAI helpers ───────────────────────────────────────────────────────────
@@ -40,21 +45,36 @@ function embedText(text) {
   return new Promise(function (resolve, reject) {
     const apiKey = requireEnv('OPENAI_API_KEY');
     const body = JSON.stringify({ model: EMBED_MODEL, input: text, dimensions: EMBED_DIMENSIONS });
-    const req = https.request({
-      hostname: 'api.openai.com', path: '/v1/embeddings', method: 'POST',
-      headers: { Authorization: 'Bearer ' + apiKey, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
-    }, function (res) {
-      let d = '';
-      res.on('data', function (c) { d += c; });
-      res.on('end', function () {
-        try {
-          const p = JSON.parse(d);
-          if (!p.data || !p.data[0]) return reject(new Error('Embed failed'));
-          resolve(p.data[0].embedding);
-        } catch (e) { reject(e); }
-      });
+    const req = https.request(
+      {
+        hostname: 'api.openai.com',
+        path: '/v1/embeddings',
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer ' + apiKey,
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(body)
+        }
+      },
+      function (res) {
+        let d = '';
+        res.on('data', function (c) {
+          d += c;
+        });
+        res.on('end', function () {
+          try {
+            const p = JSON.parse(d);
+            if (!p.data || !p.data[0]) return reject(new Error('Embed failed'));
+            resolve(p.data[0].embedding);
+          } catch (e) {
+            reject(e);
+          }
+        });
+      }
+    );
+    req.setTimeout(5000, function () {
+      req.destroy(new Error('Embed request timed out'));
     });
-    req.setTimeout(5000, function () { req.destroy(new Error('Embed request timed out')); });
     req.on('error', reject);
     req.write(body);
     req.end();
@@ -73,22 +93,38 @@ function callOpenAI(systemPrompt, userMessage) {
         { role: 'user', content: userMessage }
       ]
     });
-    const req = https.request({
-      hostname: 'api.openai.com', path: '/v1/chat/completions', method: 'POST',
-      headers: { Authorization: 'Bearer ' + apiKey, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
-    }, function (res) {
-      let d = '';
-      res.on('data', function (c) { d += c; });
-      res.on('end', function () {
-        try {
-          const p = JSON.parse(d);
-          const text = p.choices && p.choices[0] && p.choices[0].message && p.choices[0].message.content;
-          if (!text) return reject(new Error('Empty OpenAI response'));
-          resolve(JSON.parse(text));
-        } catch (e) { reject(e); }
-      });
+    const req = https.request(
+      {
+        hostname: 'api.openai.com',
+        path: '/v1/chat/completions',
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer ' + apiKey,
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(body)
+        }
+      },
+      function (res) {
+        let d = '';
+        res.on('data', function (c) {
+          d += c;
+        });
+        res.on('end', function () {
+          try {
+            const p = JSON.parse(d);
+            const text =
+              p.choices && p.choices[0] && p.choices[0].message && p.choices[0].message.content;
+            if (!text) return reject(new Error('Empty OpenAI response'));
+            resolve(JSON.parse(text));
+          } catch (e) {
+            reject(e);
+          }
+        });
+      }
+    );
+    req.setTimeout(8000, function () {
+      req.destroy(new Error('OpenAI request timed out'));
     });
-    req.setTimeout(8000, function () { req.destroy(new Error('OpenAI request timed out')); });
     req.on('error', reject);
     req.write(body);
     req.end();
@@ -108,23 +144,35 @@ function retrieveChunks(serviceKey, userId, courseId, embedding, query) {
       p_match_count: MAX_CHUNKS,
       p_threshold: MIN_SIMILARITY
     });
-    const req = https.request({
-      hostname: new URL(supaUrl).hostname,
-      path: '/rest/v1/rpc/match_chunks_hybrid',
-      method: 'POST',
-      headers: {
-        apikey: serviceKey, Authorization: 'Bearer ' + serviceKey,
-        'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body)
+    const req = https.request(
+      {
+        hostname: new URL(supaUrl).hostname,
+        path: '/rest/v1/rpc/match_chunks_hybrid',
+        method: 'POST',
+        headers: {
+          apikey: serviceKey,
+          Authorization: 'Bearer ' + serviceKey,
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(body)
+        }
+      },
+      function (res) {
+        let d = '';
+        res.on('data', function (c) {
+          d += c;
+        });
+        res.on('end', function () {
+          try {
+            resolve(Array.isArray(JSON.parse(d)) ? JSON.parse(d) : []);
+          } catch (e) {
+            resolve([]);
+          }
+        });
       }
-    }, function (res) {
-      let d = '';
-      res.on('data', function (c) { d += c; });
-      res.on('end', function () {
-        try { resolve(Array.isArray(JSON.parse(d)) ? JSON.parse(d) : []); }
-        catch (e) { resolve([]); }
-      });
+    );
+    req.on('error', function () {
+      resolve([]);
     });
-    req.on('error', function () { resolve([]); });
     req.write(body);
     req.end();
   });
@@ -137,17 +185,24 @@ function rankChunks(chunks) {
         final_score: c.similarity + (SOURCE_BOOST[c.source_type] || 0) + (c.is_official ? 0.05 : 0)
       });
     })
-    .sort(function (a, b) { return b.final_score - a.final_score; });
+    .sort(function (a, b) {
+      return b.final_score - a.final_score;
+    });
 }
 
 function deduplicateChunks(chunks) {
   const selected = [];
   for (var i = 0; i < chunks.length; i++) {
     var c = chunks[i];
-    if (!selected.some(function (s) {
-      return s.document_id === c.document_id &&
-        Math.max(s.page_start, c.page_start) <= Math.min(s.page_end, c.page_end);
-    })) selected.push(c);
+    if (
+      !selected.some(function (s) {
+        return (
+          s.document_id === c.document_id &&
+          Math.max(s.page_start, c.page_start) <= Math.min(s.page_end, c.page_end)
+        );
+      })
+    )
+      selected.push(c);
     if (selected.length >= MAX_CHUNKS) break;
   }
   return selected;
@@ -155,24 +210,38 @@ function deduplicateChunks(chunks) {
 
 function fetchDocNames(serviceKey, docIds) {
   if (!docIds.length) return Promise.resolve({});
-  const ids = docIds.map(function (id) { return '"' + id + '"'; }).join(',');
-  return supaRequest('GET', 'documents?id=in.(' + ids + ')&select=id,file_name', null, serviceKey)
-    .then(function (r) {
-      const map = {};
-      if (Array.isArray(r.body)) r.body.forEach(function (d) { map[d.id] = d.file_name; });
-      return map;
-    });
+  const ids = docIds
+    .map(function (id) {
+      return '"' + id + '"';
+    })
+    .join(',');
+  return supaRequest(
+    'GET',
+    'documents?id=in.(' + ids + ')&select=id,file_name',
+    null,
+    serviceKey
+  ).then(function (r) {
+    const map = {};
+    if (Array.isArray(r.body))
+      r.body.forEach(function (d) {
+        map[d.id] = d.file_name;
+      });
+    return map;
+  });
 }
 
 function buildContext(chunks, docNames) {
-  return chunks.map(function (c, i) {
-    const file = docNames[c.document_id] || 'Unknown file';
-    const pages = c.page_start === c.page_end ? 'p.' + c.page_start : 'pp.' + c.page_start + '-' + c.page_end;
-    const lines = ['[Source ' + (i + 1) + '] ' + file + ', ' + pages];
-    if (c.section_title) lines.push('Section: ' + c.section_title);
-    lines.push(c.chunk_text);
-    return lines.join('\n');
-  }).join('\n\n---\n\n');
+  return chunks
+    .map(function (c, i) {
+      const file = docNames[c.document_id] || 'Unknown file';
+      const pages =
+        c.page_start === c.page_end ? 'p.' + c.page_start : 'pp.' + c.page_start + '-' + c.page_end;
+      const lines = ['[Source ' + (i + 1) + '] ' + file + ', ' + pages];
+      if (c.section_title) lines.push('Section: ' + c.section_title);
+      lines.push(c.chunk_text);
+      return lines.join('\n');
+    })
+    .join('\n\n---\n\n');
 }
 
 // ─── System prompts ───────────────────────────────────────────────────────────
@@ -184,7 +253,7 @@ function flashcardsPrompt(count) {
     'Rules:',
     '1. Every card must be based on content in the context — no invented facts.',
     '2. Front: concise question or term (under 15 words).',
-    '3. Back: clear answer (1-3 sentences). Use the professor\'s notation.',
+    "3. Back: clear answer (1-3 sentences). Use the professor's notation.",
     '4. Write math as plain ASCII: x^2, x_0, not Unicode math letters.',
     '5. source: file name and page where the concept appears.',
     '',
@@ -201,7 +270,13 @@ function quizPrompt(count, difficulty) {
   };
   return [
     'You are StudySphere AI generating a multiple-choice quiz from course materials.',
-    'Create exactly ' + count + ' ' + difficulty + ' questions (' + (diffMap[difficulty] || diffMap.medium) + ').',
+    'Create exactly ' +
+      count +
+      ' ' +
+      difficulty +
+      ' questions (' +
+      (diffMap[difficulty] || diffMap.medium) +
+      ').',
     'Rules:',
     '1. Every question must come from the provided COURSE CONTEXT.',
     '2. Each question has exactly 4 options (A-D). Only one is correct.',
@@ -245,25 +320,43 @@ exports.handler = async function (event) {
 
   const serviceKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
 
-  const recentCount = await countRecentEvents(serviceKey, user.id, 'ai_ask', AI_RATE_LIMIT_WINDOW_MS);
+  const recentCount = await countRecentEvents(
+    serviceKey,
+    user.id,
+    'ai_ask',
+    AI_RATE_LIMIT_WINDOW_MS
+  );
   if (recentCount >= AI_RATE_LIMIT_MAX) return rateLimitResponse();
 
   let body;
-  try { body = JSON.parse(event.body || '{}'); }
-  catch (e) { return fail(400, 'Invalid JSON'); }
+  try {
+    body = JSON.parse(event.body || '{}');
+  } catch (e) {
+    return fail(400, 'Invalid JSON');
+  }
 
   const { courseId, tool, topic, count, difficulty } = body;
   if (!courseId || typeof courseId !== 'string') return fail(400, 'courseId is required');
-  if (!['flashcards', 'quiz', 'summary'].includes(tool)) return fail(400, 'tool must be flashcards, quiz, or summary');
+  if (!['flashcards', 'quiz', 'summary'].includes(tool))
+    return fail(400, 'tool must be flashcards, quiz, or summary');
 
   const itemCount = Math.min(Math.max(parseInt(count) || 6, 3), 10);
   const diff = ['easy', 'medium', 'hard'].includes(difficulty) ? difficulty : 'medium';
-  const query = topic || (tool === 'flashcards' ? 'key concepts definitions terms' : tool === 'quiz' ? 'important concepts problems exercises' : 'main topics overview');
+  const query =
+    topic ||
+    (tool === 'flashcards'
+      ? 'key concepts definitions terms'
+      : tool === 'quiz'
+        ? 'important concepts problems exercises'
+        : 'main topics overview');
 
   // Embed the retrieval query
   let embedding;
-  try { embedding = await embedText(query); }
-  catch (e) { return fail(502, 'Embedding service unavailable'); }
+  try {
+    embedding = await embedText(query);
+  } catch (e) {
+    return fail(502, 'Embedding service unavailable');
+  }
 
   // Retrieve and rank chunks
   const rawChunks = await retrieveChunks(serviceKey, user.id, courseId, embedding, query);
@@ -278,19 +371,32 @@ exports.handler = async function (event) {
   }
 
   const chunks = deduplicateChunks(rankChunks(rawChunks));
-  const docNames = await fetchDocNames(serviceKey, [...new Set(chunks.map(function (c) { return c.document_id; }))]);
+  const docNames = await fetchDocNames(serviceKey, [
+    ...new Set(
+      chunks.map(function (c) {
+        return c.document_id;
+      })
+    )
+  ]);
   const context = buildContext(chunks, docNames);
 
   // Pick system prompt
-  const sysPrompt = tool === 'flashcards' ? flashcardsPrompt(itemCount)
-    : tool === 'quiz' ? quizPrompt(itemCount, diff)
-    : summaryPrompt();
+  const sysPrompt =
+    tool === 'flashcards'
+      ? flashcardsPrompt(itemCount)
+      : tool === 'quiz'
+        ? quizPrompt(itemCount, diff)
+        : summaryPrompt();
 
-  const userMessage = 'COURSE CONTEXT:\n\n' + context + (topic ? '\n\n---\n\nFocus on: ' + topic : '');
+  const userMessage =
+    'COURSE CONTEXT:\n\n' + context + (topic ? '\n\n---\n\nFocus on: ' + topic : '');
 
   let result;
-  try { result = await callOpenAI(sysPrompt, userMessage); }
-  catch (e) { return fail(502, 'AI service unavailable'); }
+  try {
+    result = await callOpenAI(sysPrompt, userMessage);
+  } catch (e) {
+    return fail(502, 'AI service unavailable');
+  }
 
   // Build deduplicated sources list
   const seenFiles = new Set();

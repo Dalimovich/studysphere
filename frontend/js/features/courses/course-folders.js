@@ -6,9 +6,15 @@ function _guessFolderDocMeta(fileName) {
   var meta = {};
   var m;
   m = n.match(/(?:lecture|vorlesung|vl|lec)[_\s-]*(\d+)/i);
-  if (m) { meta.lectureNumber = parseInt(m[1], 10); return meta; }
+  if (m) {
+    meta.lectureNumber = parseInt(m[1], 10);
+    return meta;
+  }
   m = n.match(/(?:exercise|aufgabe|seminar|ag|uebung|übung|ue)[_\s-]*(\d+)/i);
-  if (m) { meta.exerciseNumber = parseInt(m[1], 10); return meta; }
+  if (m) {
+    meta.exerciseNumber = parseInt(m[1], 10);
+    return meta;
+  }
   return meta;
 }
 

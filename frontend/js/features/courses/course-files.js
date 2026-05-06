@@ -489,10 +489,16 @@ function _guessDocMeta(fileName) {
   var m;
   // Lecture number: Lecture_04, VL04, VL_04, L04, Vorlesung_4
   m = n.match(/(?:lecture|vorlesung|vl|lec)[_\s-]*(\d+)/i);
-  if (m) { meta.lectureNumber = parseInt(m[1], 10); return meta; }
+  if (m) {
+    meta.lectureNumber = parseInt(m[1], 10);
+    return meta;
+  }
   // Exercise / Seminar number: Exercise_03, Aufgabe_3, AG_02, Seminar_01, UE_03, Uebung_2
   m = n.match(/(?:exercise|aufgabe|seminar|ag|uebung|übung|ue)[_\s-]*(\d+)/i);
-  if (m) { meta.exerciseNumber = parseInt(m[1], 10); return meta; }
+  if (m) {
+    meta.exerciseNumber = parseInt(m[1], 10);
+    return meta;
+  }
   return meta;
 }
 

@@ -36,7 +36,8 @@ async function callAskEndpoint(token, courseId, question) {
 
 function evaluateResult(ev, answer) {
   const behavior = ev.expected_behavior || 'grounded';
-  const isRefused = answer.unsupported === true ||
+  const isRefused =
+    answer.unsupported === true ||
     (answer.answer || '').toLowerCase().includes('could not find') ||
     (answer.answer || '').toLowerCase().includes('not in your uploaded');
 
@@ -47,29 +48,40 @@ function evaluateResult(ev, answer) {
   }
 
   if (behavior === 'general') {
-    return (answer.answer && answer.answer.length > 20)
+    return answer.answer && answer.answer.length > 20
       ? { passed: true, failure_reason: null }
       : { passed: false, failure_reason: 'Answer was empty or too short.' };
   }
 
   // grounded (default)
   if (isRefused) {
-    return { passed: false, failure_reason: 'Answer was refused but a grounded answer was expected.' };
+    return {
+      passed: false,
+      failure_reason: 'Answer was refused but a grounded answer was expected.'
+    };
   }
 
   const sources = Array.isArray(answer.sources) ? answer.sources : [];
   const expectedSources = Array.isArray(ev.expected_sources) ? ev.expected_sources : [];
 
   if (expectedSources.length > 0) {
-    const citedFiles = sources.map(function (s) { return (s.file_name || '').toLowerCase(); });
+    const citedFiles = sources.map(function (s) {
+      return (s.file_name || '').toLowerCase();
+    });
     const anyMatched = expectedSources.some(function (exp) {
-      return citedFiles.some(function (cited) { return cited.includes(exp.toLowerCase()); });
+      return citedFiles.some(function (cited) {
+        return cited.includes(exp.toLowerCase());
+      });
     });
     if (!anyMatched) {
       return {
         passed: false,
-        failure_reason: 'Expected sources not cited. Expected one of: [' +
-          expectedSources.join(', ') + ']. Got: [' + (citedFiles.join(', ') || 'none') + ']'
+        failure_reason:
+          'Expected sources not cited. Expected one of: [' +
+          expectedSources.join(', ') +
+          ']. Got: [' +
+          (citedFiles.join(', ') || 'none') +
+          ']'
       };
     }
   }
@@ -112,8 +124,11 @@ exports.handler = async function (event) {
   const serviceKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
 
   let body;
-  try { body = JSON.parse(event.body || '{}'); }
-  catch (e) { return fail(400, 'Invalid JSON'); }
+  try {
+    body = JSON.parse(event.body || '{}');
+  } catch (e) {
+    return fail(400, 'Invalid JSON');
+  }
 
   const { courseId, evaluationId } = body;
   if (!courseId || typeof courseId !== 'string') return fail(400, 'courseId is required');
@@ -145,7 +160,9 @@ exports.handler = async function (event) {
     });
   }
 
-  const passed = results.filter(function (r) { return r.passed; }).length;
+  const passed = results.filter(function (r) {
+    return r.passed;
+  }).length;
   return jsonResponse(200, {
     ran: results.length,
     passed: passed,

@@ -74,43 +74,12 @@ export function initAskAI(state) {
     var aiPanel = document.getElementById('aiPanel');
 
     var thinkWrap = document.createElement('div');
-    thinkWrap.className = 'ai-msg-wrap';
+    thinkWrap.className = 'ai-msg-wrap typing-wrap';
     thinkWrap.innerHTML =
       '<div class="msg-sender bot-sender"><span class="msg-sender-dot"></span>StudySphere AI</div>' +
-      '<div class="think-bubble">' +
-      '<span class="think-label">Thinking…</span>' +
-      '<span class="think-text" id="thinkText"></span>' +
-      '</div>';
+      '<div class="typing-bubble"><span></span><span></span><span></span></div>';
     aiMsgs.appendChild(thinkWrap);
     aiMsgs.scrollTop = aiMsgs.scrollHeight;
-
-    var THOUGHTS = [
-      'Reading the document context…',
-      'Identifying key concepts…',
-      'Checking formulas…',
-      'Structuring a clear explanation…',
-      'Almost ready…'
-    ];
-    var tIdx = 0;
-    function cycleThought() {
-      var el = document.getElementById('thinkText');
-      if (!el) return;
-      el.textContent = '';
-      var txt = THOUGHTS[tIdx % THOUGHTS.length];
-      tIdx++;
-      var ci = 0;
-      var ti = setInterval(function () {
-        if (!document.getElementById('thinkText')) {
-          clearInterval(ti);
-          return;
-        }
-        document.getElementById('thinkText').textContent = txt.slice(0, ci + 1);
-        ci++;
-        if (ci >= txt.length) clearInterval(ti);
-      }, 20);
-    }
-    cycleThought();
-    state.activeThinkTimer = setInterval(cycleThought, 1100);
 
     var pdfDoc = window.pdfDoc;
     var pdfFullText = window.pdfFullText || '';
@@ -175,7 +144,7 @@ export function initAskAI(state) {
 
         if (_hasRag) {
           var _modeToggle = document.getElementById('aiModeStrict');
-          var _ragMode = (!_modeToggle || _modeToggle.checked) ? 'strict' : 'general';
+          var _ragMode = !_modeToggle || _modeToggle.checked ? 'strict' : 'general';
           return sendRagRequest(_courseId, question, _ragMode).then(function (data) {
             var answer = data.answer || 'No answer found.';
 
@@ -237,8 +206,6 @@ export function initAskAI(state) {
           thinkWrap.remove();
           return;
         }
-        clearInterval(state.activeThinkTimer);
-        state.activeThinkTimer = null;
         thinkWrap.style.transition = 'opacity .3s';
         thinkWrap.style.opacity = '0';
         setTimeout(function () {
@@ -343,8 +310,6 @@ export function initAskAI(state) {
         }, 60);
       })
       .catch(function (e) {
-        clearInterval(state.activeThinkTimer);
-        state.activeThinkTimer = null;
         thinkWrap.remove();
         if (window.addBotMsg) window.addBotMsg('❌ Error: ' + e.message);
         var _sb2 = document.getElementById('aiSend');

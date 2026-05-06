@@ -10,13 +10,23 @@ export function closeAllOpts() {
 
 function _sourcesFooter(sources) {
   if (!sources || !sources.length) return '';
-  return '\n\n**Sources:** ' + sources.map(function (s) {
-    return s.file_name + (s.pages ? ', p.' + s.pages : '') + (s.section ? ' · *' + s.section + '*' : '');
-  }).join(' · ');
+  return (
+    '\n\n**Sources:** ' +
+    sources
+      .map(function (s) {
+        return (
+          s.file_name +
+          (s.pages ? ', p.' + s.pages : '') +
+          (s.section ? ' · *' + s.section + '*' : '')
+        );
+      })
+      .join(' · ')
+  );
 }
 
 function _renderFlashcards(items, sources) {
-  if (!items || !items.length) return 'No flashcards could be generated from your course materials.';
+  if (!items || !items.length)
+    return 'No flashcards could be generated from your course materials.';
   var md = '## Flashcards\n\n';
   items.forEach(function (card, i) {
     md += '**' + (i + 1) + '. ' + card.front + '**\n';
@@ -28,7 +38,8 @@ function _renderFlashcards(items, sources) {
 }
 
 function _renderQuiz(items, sources) {
-  if (!items || !items.length) return 'No quiz questions could be generated from your course materials.';
+  if (!items || !items.length)
+    return 'No quiz questions could be generated from your course materials.';
   var md = '## Quiz\n\n';
   items.forEach(function (q, i) {
     md += '**' + (i + 1) + '. ' + q.question + '**\n';
@@ -54,7 +65,9 @@ function _renderSummary(text, sources) {
 async function _generateWithRag(tool, level, topic) {
   var courseId = window.activeCourseId || window.currentCourseId || '';
   if (!courseId) return false;
-  var hasRag = await courseHasRagDocs(courseId).catch(function () { return false; });
+  var hasRag = await courseHasRagDocs(courseId).catch(function () {
+    return false;
+  });
   if (!hasRag) return false;
 
   // Show typing indicator while generating
@@ -70,17 +83,21 @@ async function _generateWithRag(tool, level, topic) {
 
     var md = '';
     if (tool === 'flashcards') md = _renderFlashcards(result.items, result.sources);
-    else if (tool === 'quiz')   md = _renderQuiz(result.items, result.sources);
-    else                        md = _renderSummary(result.text, result.sources);
+    else if (tool === 'quiz') md = _renderQuiz(result.items, result.sources);
+    else md = _renderSummary(result.text, result.sources);
 
     if (result.error) md = '⚠️ ' + result.error;
 
     // Remove typing indicator and add the bot message
-    document.querySelectorAll('.typing-wrap').forEach(function (el) { el.remove(); });
+    document.querySelectorAll('.typing-wrap').forEach(function (el) {
+      el.remove();
+    });
     if (window.addBotMsg) window.addBotMsg(md);
     return true;
   } catch (e) {
-    document.querySelectorAll('.typing-wrap').forEach(function (el) { el.remove(); });
+    document.querySelectorAll('.typing-wrap').forEach(function (el) {
+      el.remove();
+    });
     return false;
   }
 }
@@ -180,16 +197,17 @@ export function initChipListeners() {
     chipPrompt('analogy');
   });
 
-  (document.getElementById('chip-flashcards') || { addEventListener: function () {} }).addEventListener(
-    'click',
-    function () {
-      closeAllOpts();
-      _generateWithRag('flashcards', 'medium').then(function (used) {
-        if (!used && window.askAI)
-          window.askAI('Create 8 flashcards from the key concepts in this document. Format each as Q: [question] A: [answer].');
-      });
-    }
-  );
+  (
+    document.getElementById('chip-flashcards') || { addEventListener: function () {} }
+  ).addEventListener('click', function () {
+    closeAllOpts();
+    _generateWithRag('flashcards', 'medium').then(function (used) {
+      if (!used && window.askAI)
+        window.askAI(
+          'Create 8 flashcards from the key concepts in this document. Format each as Q: [question] A: [answer].'
+        );
+    });
+  });
 
   document.querySelectorAll('.chip-sub').forEach(function (opt) {
     opt.addEventListener('click', function () {

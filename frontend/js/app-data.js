@@ -161,8 +161,7 @@ function _loadUserCourses(data) {
               }
               if (_cachedFile && _cachedFile.storageName) {
                 var _cachedUid =
-                  (window._currentUser &&
-                    (window._currentUser.id || window._currentUser.sub)) ||
+                  (window._currentUser && (window._currentUser.id || window._currentUser.sub)) ||
                   localStorage.getItem('ss_last_uid');
                 openFile(
                   {

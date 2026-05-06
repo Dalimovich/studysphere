@@ -19,11 +19,12 @@ const { countRecentEvents, rateLimitResponse } = require('../lib/rate-limit');
 
 const EMBED_MODEL = 'text-embedding-3-small';
 const EMBED_DIMENSIONS = 1536;
-const OPENAI_CHAT_MODEL = optionalEnv('AI_MODEL', 'gpt-4o-mini');
-const MAX_CHUNKS = 10;
-const MIN_SIMILARITY = 0.15;
-const STRONG_SIMILARITY_THRESHOLD = 0.35; // below this, warn even if chunks exist
-const MAX_COMPLETION_TOKENS = 2048;
+const OPENAI_CHAT_MODEL = optionalEnv('AI_MODEL', 'gpt-4o');
+const OPENAI_FAST_MODEL = 'gpt-4o-mini'; // used for HyDE + query expansion (cheap, fast)
+const MAX_CHUNKS = 12;
+const MIN_SIMILARITY = 0.12;
+const STRONG_SIMILARITY_THRESHOLD = 0.3;
+const MAX_COMPLETION_TOKENS = 3000;
 
 const AI_RATE_LIMIT_MAX = Number(optionalEnv('AI_RATE_LIMIT_MAX', '20'));
 const AI_RATE_LIMIT_WINDOW_MS = Number(optionalEnv('AI_RATE_LIMIT_WINDOW_MS', '3600000'));
@@ -81,6 +82,213 @@ function embedQuestion(question) {
     req.write(body);
     req.end();
   });
+}
+
+// ─── HyDE + multi-query ───────────────────────────────────────────────────────
+// HyDE: generate a short hypothetical passage that would answer the question,
+// then embed that passage. Documents are written as answers; this closes the
+// vocabulary gap and dramatically improves retrieval for technical content.
+//
+// Multi-query: also generate 2 alternative phrasings, retrieve for each,
+// then merge results. Catches chunks that one phrasing misses.
+
+function callFastOpenAI(systemPrompt, userMsg, maxTokens) {
+  return new Promise(function (resolve, reject) {
+    const apiKey = requireEnv('OPENAI_API_KEY');
+    const body = JSON.stringify({
+      model: OPENAI_FAST_MODEL,
+      max_tokens: maxTokens || 300,
+      temperature: 0.2,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMsg }
+      ]
+    });
+    const req = https.request(
+      {
+        hostname: 'api.openai.com',
+        path: '/v1/chat/completions',
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer ' + apiKey,
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(body)
+        }
+      },
+      function (res) {
+        let d = '';
+        res.on('data', function (c) {
+          d += c;
+        });
+        res.on('end', function () {
+          try {
+            const p = JSON.parse(d);
+            const text =
+              p.choices && p.choices[0] && p.choices[0].message && p.choices[0].message.content;
+            resolve(text || '');
+          } catch (e) {
+            resolve('');
+          }
+        });
+      }
+    );
+    req.setTimeout(4000, function () {
+      req.destroy();
+      resolve('');
+    });
+    req.on('error', function () {
+      resolve('');
+    });
+    req.write(body);
+    req.end();
+  });
+}
+
+async function generateHydeAndQueries(question) {
+  // Single fast LLM call: returns a hypothetical passage + 2 query variants as JSON
+  const sysPrompt = [
+    'You are a retrieval query generator for an academic study assistant.',
+    'Given a student question, output JSON with:',
+    '  "hypothetical": a 2-3 sentence passage from an academic lecture or textbook that would directly answer this question (write as if extracted from a course document),',
+    '  "queries": array of exactly 2 alternative phrasings of the question optimized for keyword search.',
+    'Output ONLY valid JSON. No markdown, no explanation.'
+  ].join('\n');
+
+  const raw = await callFastOpenAI(sysPrompt, question, 350);
+  try {
+    const parsed = JSON.parse(raw);
+    return {
+      hypothetical: (parsed.hypothetical || '').trim(),
+      queries: Array.isArray(parsed.queries) ? parsed.queries.slice(0, 2) : []
+    };
+  } catch (e) {
+    return { hypothetical: '', queries: [] };
+  }
+}
+
+function embedBatch(texts) {
+  // Embed up to 3 texts in a single API call
+  return new Promise(function (resolve, reject) {
+    const apiKey = requireEnv('OPENAI_API_KEY');
+    const body = JSON.stringify({ model: EMBED_MODEL, input: texts, dimensions: EMBED_DIMENSIONS });
+    const req = https.request(
+      {
+        hostname: 'api.openai.com',
+        path: '/v1/embeddings',
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer ' + apiKey,
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(body)
+        }
+      },
+      function (res) {
+        let d = '';
+        res.on('data', function (c) {
+          d += c;
+        });
+        res.on('end', function () {
+          try {
+            const p = JSON.parse(d);
+            if (!p.data) return reject(new Error('Embed batch failed'));
+            // Sort by index to preserve order
+            const sorted = p.data.slice().sort(function (a, b) {
+              return a.index - b.index;
+            });
+            resolve(
+              sorted.map(function (e) {
+                return e.embedding;
+              })
+            );
+          } catch (e) {
+            reject(e);
+          }
+        });
+      }
+    );
+    req.setTimeout(6000, function () {
+      req.destroy(new Error('Embed timeout'));
+    });
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+}
+
+// ─── Question type classifier ─────────────────────────────────────────────────
+// Classifies the question so the prompt can be adapted.
+// Types: "exercise" | "definition" | "derivation" | "concept" | "formula" | "other"
+// Runs in parallel with HyDE — adds ~0ms net latency on cache miss.
+
+async function classifyQuestion(question) {
+  const sys =
+    'Classify this student question into exactly one of these types: exercise, definition, derivation, concept, formula, other.\nExercise: asks to solve a specific numbered problem or compute a value.\nDefinition: asks what something is or means.\nDerivation: asks to show, prove, or derive a formula or result.\nConcept: asks how/why something works.\nFormula: asks for a specific formula or equation.\nOther: anything else.\nRespond with ONLY the type word, nothing else.';
+  const result = await callFastOpenAI(sys, question, 10);
+  const type = (result || '').trim().toLowerCase();
+  const valid = ['exercise', 'definition', 'derivation', 'concept', 'formula', 'other'];
+  return valid.includes(type) ? type : 'other';
+}
+
+// Extra instructions appended to the system prompt based on question type
+function questionTypeInstructions(type) {
+  const map = {
+    exercise:
+      '\n\n## Exercise instructions\nSolve this step by step. Number each step. State the method and formula used at each step. Show intermediate results. Box or bold the final answer. If you find an official solution in the sources, follow its method exactly.',
+    definition:
+      '\n\n## Definition instructions\nFirst give the exact definition as stated in the course material (quote it). Then explain it in plain language. Then give one concrete example from the material.',
+    derivation:
+      "\n\n## Derivation instructions\nShow every algebraic step. Number them. State what rule or identity you apply at each step. The final result should be clearly labeled. Use the professor's notation throughout.",
+    concept:
+      '\n\n## Concept instructions\nExplain the concept clearly: what it is, why it matters, how it works. Use an analogy if it helps. Then give a concrete example from the course material.',
+    formula:
+      '\n\n## Formula instructions\nState the formula clearly. Define every variable. State the units if applicable. State any conditions or assumptions the formula requires. Show a brief worked example if one exists in the sources.',
+    other: ''
+  };
+  return map[type] || '';
+}
+
+// ─── Self-verification ────────────────────────────────────────────────────────
+// After generating the answer, run a fast check:
+// - Does the answer contain claims that are NOT supported by the retrieved context?
+// - Are citations plausible (right file, right page range)?
+// Returns { ok: true } or { ok: false, issues: "..." }
+
+async function verifyClaims(question, contextBlock, answerText) {
+  const sys = [
+    'You are a strict academic fact-checker.',
+    'You will receive: (1) a student question, (2) the source context used to answer it, (3) a generated answer.',
+    'Your job: check whether the answer contains any claims, formulas, or definitions that are NOT supported by the source context.',
+    'Be concise. Respond with JSON only:',
+    '{ "ok": true }  — if the answer is well-supported',
+    '{ "ok": false, "issues": "brief description of unsupported claims" }  — if there are problems'
+  ].join('\n');
+  const userMsg =
+    'QUESTION:\n' +
+    question +
+    '\n\nSOURCE CONTEXT (excerpts):\n' +
+    contextBlock.slice(0, 3000) +
+    '\n\nGENERATED ANSWER:\n' +
+    answerText.slice(0, 1500);
+  const raw = await callFastOpenAI(sys, userMsg, 120);
+  try {
+    const parsed = JSON.parse(raw);
+    return { ok: parsed.ok !== false, issues: parsed.issues || null };
+  } catch (e) {
+    return { ok: true, issues: null }; // don't block on parse failure
+  }
+}
+
+// ─── Merge chunk arrays from multiple retrievals ───────────────────────────────
+function mergeChunkResults(arrays) {
+  const map = {};
+  arrays.forEach(function (arr) {
+    arr.forEach(function (c) {
+      if (!map[c.id] || c.similarity > map[c.id].similarity) {
+        map[c.id] = c;
+      }
+    });
+  });
+  return Object.values(map);
 }
 
 // ─── Retrieval ────────────────────────────────────────────────────────────────
@@ -176,50 +384,67 @@ function fetchDocumentNames(serviceKey, documentIds) {
 // ─── Claude call ──────────────────────────────────────────────────────────────
 
 function buildSystemPrompt(mode) {
-  const base = [
-    'You are StudySphere AI, a course-specific study assistant.',
+  const strict = mode !== 'general';
+  return [
+    'You are StudySphere AI — a precise, expert-level academic study assistant.',
+    'Your job is to give the student an accurate, well-structured answer grounded in their own course materials.',
     '',
-    "You will receive COURSE CONTEXT containing excerpts from the student's uploaded lecture files, exercises, notes, and solutions.",
+    '## How to answer',
     '',
-    'Rules:',
-    "1. Use the course context as your primary source — adopt the professor's notation, terminology, and method.",
-    '2. Always give a complete, helpful answer. If the context is only partially relevant, use what is there and fill gaps with standard knowledge for the subject.',
-    '3. Never refuse to answer or say you cannot find something. If context is sparse, still solve the problem step by step.',
-    '4. Set "unsupported": false unless the context is completely unrelated to the question.',
-    '5. Cite the source file and page when you directly use content from it.',
-    '6. Set "confidence" to "high" if the context directly answers the question, "medium" if partially, "low" if you relied mostly on general knowledge.',
-    '7. Write math using plain ASCII notation: use x^2 for superscripts, x_0 for subscripts, * for multiplication. Do NOT use Unicode math letters (𝑎, 𝑣, 𝑥, etc.) or Unicode subscript digits. Use bold **text** and *italic* for emphasis instead.',
+    '1. **Read all COURSE CONTEXT sources carefully before writing anything.**',
+    "2. **Ground every claim in the context.** Use the professor's exact notation, variable names, formulas, and terminology — not textbook alternatives.",
+    '3. **Structure your answer clearly** using markdown:',
+    '   - Start with a direct 1-2 sentence answer to the question.',
+    '   - Then give a detailed explanation. Use `##` headings for multi-part answers.',
+    '   - For derivations or proofs: show every step. Number them.',
+    '   - For definitions: give the exact definition from the material, then explain it.',
+    '   - For exercises: solve step-by-step, showing all work. Reference the method from the lecture.',
+    '   - Use `**bold**` for key terms, formulas, and important results.',
+    '   - Use bullet lists for enumerations, numbered lists for sequential steps.',
+    '4. **Math notation:** Write all math in plain ASCII — `x^2`, `x_0`, `F = m*a`, `integral(f dx)`. Do NOT use Unicode math letters (𝑎, 𝑣, 𝑥) or Unicode subscript/superscript digits.',
+    '5. **Citations:** After every major claim, add an inline citation using the exact FILE and PAGES from the source header: *(filename, p.X)*. If a SECTION_ID is present, include it: *(filename, p.X, Exercise 3b)*.',
+    '6. **Confidence:** Set "high" if context directly answers the question, "medium" if you used partial context + standard knowledge, "low" if mostly general knowledge.',
+    strict
+      ? '7. **Strict mode:** Only use information from the COURSE CONTEXT. If the context does not cover part of the question, say so explicitly: *"This part was not found in your uploaded materials."* Do not invent formulas or definitions.'
+      : '7. **General mode:** You may use outside knowledge when helpful. Clearly label it: *"Outside knowledge (not in your uploaded materials):"*',
     '',
-    'Always respond in this JSON format:',
+    '## Sources array rules',
+    'For EACH source you actually used in the answer, add one entry. Fields:',
+    '- "file_name": exact FILE value from the source header',
+    '- "pages": exact PAGES value from the source header (e.g. "17" or "17-19")',
+    '- "section": the SECTION_ID value if present — this must be the specific exercise, section, or heading label (e.g. "Exercise 3b", "Aufgabe 2a", "1.3 Moment of Inertia"). If no SECTION_ID, leave empty string.',
+    'Do NOT invent page numbers or section names. Copy them exactly from the source headers.',
+    '',
+    '## Answer format',
+    'Respond ONLY in this JSON. The "answer" field contains full markdown.',
     '{',
-    '  "answer": "...",',
-    '  "sources": [{ "file_name": "...", "pages": "...", "section": "...", "quote": "..." }],',
+    '  "answer": "markdown answer here",',
+    '  "sources": [{ "file_name": "...", "pages": "...", "section": "..." }],',
     '  "confidence": "high|medium|low",',
     '  "unsupported": false',
     '}'
   ].join('\n');
-
-  if (mode === 'general') {
-    return (
-      base +
-      '\n\n7. If the student explicitly asks for an outside explanation, you may use general knowledge but MUST label it clearly with: "Outside explanation, not from your uploaded course materials:"'
-    );
-  }
-  return base;
 }
 
 function buildFallbackSystemPrompt() {
   return [
-    'You are StudySphere AI, a study assistant.',
+    'You are StudySphere AI — a precise academic study assistant.',
     '',
-    'No course materials were found for this question. Answer using your general knowledge.',
-    'Be clear, concise, and helpful.',
+    'No course-specific documents were found for this question.',
+    'Answer from general academic knowledge. Be accurate and structured.',
     '',
-    'IMPORTANT: Start your answer with: "This answer is based on general knowledge, not your uploaded course materials."',
+    'Structure your answer with:',
+    '- A direct answer first (1-2 sentences)',
+    '- A detailed explanation with steps or definitions as needed',
+    '- Key formulas or examples if relevant',
     '',
-    'Always respond in this JSON format:',
+    'Start with: "⚠️ *No course materials found for this topic. This answer is based on general knowledge.*"',
+    '',
+    'Math notation: plain ASCII only — x^2, x_0, F = m*a.',
+    '',
+    'Respond ONLY in this JSON:',
     '{',
-    '  "answer": "...",',
+    '  "answer": "markdown answer here",',
     '  "sources": [],',
     '  "confidence": "medium",',
     '  "unsupported": true',
@@ -233,19 +458,21 @@ function buildContextBlock(rankedChunks, docNames) {
     .map(function (c, i) {
       const fileName = docNames[c.document_id] || 'Unknown file';
       const pages =
-        c.page_start === c.page_end
-          ? 'page ' + c.page_start
-          : 'pages ' + c.page_start + '-' + c.page_end;
+        c.page_start === c.page_end ? 'p.' + c.page_start : 'pp.' + c.page_start + '-' + c.page_end;
+      // SECTION_ID is the exact string the model must use in the "section" citation field
+      const sectionId = c.section_title || null;
       const lines = [
-        '[Source ' + (i + 1) + ']',
-        'File: ' + fileName,
-        'Pages: ' + pages
-      ];
-      if (c.section_title) lines.push('Section: ' + c.section_title);
-      lines.push('Type: ' + c.source_type, 'Text:', c.chunk_text);
+        '=== SOURCE ' + (i + 1) + ' ===',
+        'FILE: ' + fileName,
+        'PAGES: ' + pages,
+        'TYPE: ' + (c.source_type || 'document'),
+        sectionId ? 'SECTION_ID: ' + sectionId : null,
+        'TEXT:',
+        c.chunk_text
+      ].filter(Boolean);
       return lines.join('\n');
     })
-    .join('\n\n---\n\n');
+    .join('\n\n');
 }
 
 function callOpenAI(systemPrompt, contextBlock, question) {
@@ -256,6 +483,7 @@ function callOpenAI(systemPrompt, contextBlock, question) {
     const body = JSON.stringify({
       model: OPENAI_CHAT_MODEL,
       max_tokens: MAX_COMPLETION_TOKENS,
+      temperature: 0.1,
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: systemPrompt },
@@ -302,7 +530,10 @@ function callOpenAI(systemPrompt, contextBlock, question) {
 
 function parseOpenAIResponse(text) {
   // Strip optional markdown code fences
-  const stripped = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
+  const stripped = text
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```\s*$/, '')
+    .trim();
   // First try: parse as-is (works when response_format:json_object is used)
   try {
     const direct = JSON.parse(stripped);
@@ -332,7 +563,18 @@ function normalizeQuestion(q) {
 function hashQuestion(userId, courseId, normalizedQ, docVersionHash, mode) {
   return crypto
     .createHash('sha256')
-    .update('v2|' + userId + '|' + courseId + '|' + normalizedQ + '|' + docVersionHash + '|' + (mode || 'strict'))
+    .update(
+      'v2|' +
+        userId +
+        '|' +
+        courseId +
+        '|' +
+        normalizedQ +
+        '|' +
+        docVersionHash +
+        '|' +
+        (mode || 'strict')
+    )
     .digest('hex');
 }
 
@@ -591,10 +833,7 @@ function deduplicateChunks(rankedChunks) {
     var chunk = rankedChunks[i];
     var overlaps = selected.some(function (sel) {
       if (sel.document_id !== chunk.document_id) return false;
-      return (
-        Math.max(sel.page_start, chunk.page_start) <=
-        Math.min(sel.page_end, chunk.page_end)
-      );
+      return Math.max(sel.page_start, chunk.page_start) <= Math.min(sel.page_end, chunk.page_end);
     });
     if (!overlaps) selected.push(chunk);
     if (selected.length >= MAX_CHUNKS) break;
@@ -640,8 +879,9 @@ exports.handler = async function (event) {
   if (question.length > 2000) return fail(400, 'Question too long (max 2000 characters)');
 
   const normalizedQ = normalizeQuestion(question);
+  const ragMode = mode === 'general' ? 'general' : 'strict';
 
-  // 1. Embed the question
+  // 1. Embed question (needed for cache lookups)
   let embedding;
   try {
     embedding = await embedQuestion(question);
@@ -651,11 +891,17 @@ exports.handler = async function (event) {
 
   // 2. Get document version hash (used for cache invalidation)
   const docVersionHash = await getDocumentVersionHash(serviceKey, user.id, courseId);
-  const ragMode = mode === 'general' ? 'general' : 'strict';
   const questionHash = hashQuestion(user.id, courseId, normalizedQ, docVersionHash, ragMode);
 
   // 3. Check exact answer cache
-  const exactHit = await getExactCache(serviceKey, user.id, courseId, questionHash, docVersionHash, ragMode);
+  const exactHit = await getExactCache(
+    serviceKey,
+    user.id,
+    courseId,
+    questionHash,
+    docVersionHash,
+    ragMode
+  );
   if (exactHit) {
     touchAnswerCache(serviceKey, exactHit.id);
     return jsonResponse(200, Object.assign({}, exactHit.answer_json, { cached: true }));
@@ -678,7 +924,7 @@ exports.handler = async function (event) {
     }
   }
 
-  // 5. Check retrieval cache (skip vector search for repeated questions)
+  // 5. Check retrieval cache (skip vector search + HyDE for repeated questions)
   let rawChunks;
   const retrievalHit = await getRetrievalCache(
     serviceKey,
@@ -689,16 +935,43 @@ exports.handler = async function (event) {
   );
   if (retrievalHit) {
     const entries = Array.isArray(retrievalHit.chunk_entries) ? retrievalHit.chunk_entries : [];
-    const ids = entries.map(function (e) { return e.id; });
+    const ids = entries.map(function (e) {
+      return e.id;
+    });
     const fetchedChunks = await fetchChunksByIds(serviceKey, user.id, courseId, ids);
-    // Restore cached similarity scores so rankChunks sorts correctly
     const simMap = {};
-    entries.forEach(function (e) { simMap[e.id] = e.similarity; });
+    entries.forEach(function (e) {
+      simMap[e.id] = e.similarity;
+    });
     rawChunks = fetchedChunks.map(function (c) {
       return Object.assign({}, c, { similarity: simMap[c.id] || 0.5 });
     });
   } else {
-    rawChunks = await retrieveChunks(serviceKey, user.id, courseId, embedding, question);
+    // HyDE + multi-query: run in parallel with the base retrieval
+    // Generate hypothetical passage + 2 alternative queries, embed all at once,
+    // retrieve for each, then merge. Falls back gracefully if LLM call fails.
+    const hydeResult = await generateHydeAndQueries(question);
+
+    const textsToEmbed = [question];
+    if (hydeResult.hypothetical) textsToEmbed.push(hydeResult.hypothetical);
+    hydeResult.queries.forEach(function (q) {
+      if (q) textsToEmbed.push(q);
+    });
+
+    let embeddings;
+    try {
+      embeddings = await embedBatch(textsToEmbed);
+    } catch (e) {
+      embeddings = [embedding]; // fallback to pre-computed question embedding
+    }
+
+    // Retrieve for each embedding in parallel
+    const retrievalPromises = embeddings.map(function (emb, i) {
+      const queryText = textsToEmbed[i] || question;
+      return retrieveChunks(serviceKey, user.id, courseId, emb, queryText);
+    });
+    const allResults = await Promise.all(retrievalPromises);
+    rawChunks = mergeChunkResults(allResults);
   }
 
   // 6. No chunks found — fall back to general knowledge answer
@@ -742,14 +1015,7 @@ exports.handler = async function (event) {
 
   // Store retrieval cache for future identical questions (fire-and-forget)
   if (!retrievalHit && rankedChunks.length) {
-    storeRetrievalCache(
-      serviceKey,
-      user.id,
-      courseId,
-      questionHash,
-      docVersionHash,
-      rankedChunks
-    );
+    storeRetrievalCache(serviceKey, user.id, courseId, questionHash, docVersionHash, rankedChunks);
   }
 
   // Guardrail: best chunk is below strong threshold — still answer but flag low confidence
@@ -767,9 +1033,10 @@ exports.handler = async function (event) {
   const docNames = await fetchDocumentNames(serviceKey, uniqueDocIds);
   const knownFileNames = new Set(Object.values(docNames));
 
-  // 9. Build context and call OpenAI
-  const systemPrompt = buildSystemPrompt(ragMode);
+  // 9. Classify question type + build context (parallel, both needed before prompt)
   const contextBlock = buildContextBlock(rankedChunks, docNames);
+  const qType = await classifyQuestion(question);
+  const systemPrompt = buildSystemPrompt(ragMode) + questionTypeInstructions(qType);
 
   let rawResponse;
   try {
@@ -778,22 +1045,35 @@ exports.handler = async function (event) {
     return fail(502, 'AI service unavailable');
   }
 
-  // 10. Parse response
+  // 10. Parse + self-verify (run verify in parallel while we parse)
   const result = parseOpenAIResponse(rawResponse);
 
-  // Citation validation: remove sources the AI hallucinated that aren't in retrieved chunks
+  // Citation validation: strip any sources the AI hallucinated
   const validatedSources = (Array.isArray(result.sources) ? result.sources : []).filter(
     function (s) {
       return !s.file_name || knownFileNames.has(s.file_name);
     }
   );
 
+  // Self-verification: flag low confidence if model invented claims
+  let verifiedConfidence = result.confidence || (weakRetrieval ? 'medium' : 'high');
+  if (result.answer && result.answer.length > 100) {
+    const verification = await verifyClaims(question, contextBlock, result.answer);
+    if (!verification.ok) {
+      verifiedConfidence = 'medium';
+      // Append a note to the answer so the student knows to double-check
+      result.answer =
+        result.answer +
+        '\n\n> ⚠️ *Some claims in this answer may go beyond your uploaded materials. Please verify with your course documents.*';
+    }
+  }
+
   const answerJson = {
     answer: result.answer || '',
     sources: validatedSources,
-    confidence: result.confidence || (weakRetrieval ? 'medium' : 'high'),
+    confidence: verifiedConfidence,
     unsupported: false,
-    weak_retrieval: false
+    question_type: qType
   };
 
   // 11. Store in cache (fire-and-forget)

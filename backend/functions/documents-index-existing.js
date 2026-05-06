@@ -72,8 +72,16 @@ exports.handler = async function (event) {
   }
 
   const {
-    courseId, storageName, fileName, sourceType, folder,
-    professorName, lectureNumber, exerciseNumber, language, isOfficialProfMaterial
+    courseId,
+    storageName,
+    fileName,
+    sourceType,
+    folder,
+    professorName,
+    lectureNumber,
+    exerciseNumber,
+    language,
+    isOfficialProfMaterial
   } = body;
   if (!courseId || typeof courseId !== 'string') return fail(400, 'courseId is required');
   if (!storageName || typeof storageName !== 'string') return fail(400, 'storageName is required');

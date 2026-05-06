@@ -3059,7 +3059,9 @@ body.night .ai-scroll-btn {
   user-select: none;
   flex-shrink: 0;
 }
-.ai-mode-pill input[type="checkbox"] { display: none; }
+.ai-mode-pill input[type='checkbox'] {
+  display: none;
+}
 .ai-mode-pill .ai-mode-on,
 .ai-mode-pill .ai-mode-off {
   font-size: 0.62rem;
@@ -3069,12 +3071,18 @@ body.night .ai-scroll-btn {
   border: 1.5px solid rgba(155, 93, 229, 0.3);
   background: rgba(155, 93, 229, 0.09);
   color: var(--purple);
-  transition: background 0.15s, opacity 0.15s;
+  transition:
+    background 0.15s,
+    opacity 0.15s;
   white-space: nowrap;
 }
-.ai-mode-pill .ai-mode-off { display: none; }
+.ai-mode-pill .ai-mode-off {
+  display: none;
+}
 /* when unchecked (general mode) — swap labels */
-.ai-mode-pill input:not(:checked) ~ .ai-mode-on { display: none; }
+.ai-mode-pill input:not(:checked) ~ .ai-mode-on {
+  display: none;
+}
 .ai-mode-pill input:not(:checked) ~ .ai-mode-off {
   display: inline-flex;
   background: rgba(99, 179, 237, 0.1);

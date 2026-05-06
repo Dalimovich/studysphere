@@ -107,43 +107,12 @@ askAI = function (question, skipUserBubble) {
   sendBtn.classList.add('is-stop');
 
   var thinkWrap = document.createElement('div');
-  thinkWrap.className = 'ai-msg-wrap';
+  thinkWrap.className = 'ai-msg-wrap typing-wrap';
   thinkWrap.innerHTML =
     '<div class="msg-sender bot-sender"><span class="msg-sender-dot"></span>StudySphere AI</div>' +
-    '<div class="think-bubble">' +
-    '<span class="think-label">Thinking\u2026</span>' +
-    '<span class="think-text" id="thinkText"></span>' +
-    '</div>';
+    '<div class="typing-bubble"><span></span><span></span><span></span></div>';
   aiMsgs.appendChild(thinkWrap);
   aiMsgs.scrollTop = aiMsgs.scrollHeight;
-
-  var THOUGHTS = [
-    'Reading the document\u2026',
-    'Identifying key concepts\u2026',
-    'Checking formulas\u2026',
-    'Structuring a thorough explanation\u2026',
-    'Almost ready\u2026'
-  ];
-  var tIdx = 0;
-  function cycleThought() {
-    var el = document.getElementById('thinkText');
-    if (!el) return;
-    el.textContent = '';
-    var txt = THOUGHTS[tIdx % THOUGHTS.length];
-    tIdx++;
-    var i = 0;
-    var ti = setInterval(function () {
-      if (!document.getElementById('thinkText')) {
-        clearInterval(ti);
-        return;
-      }
-      document.getElementById('thinkText').textContent = txt.slice(0, i + 1);
-      i++;
-      if (i >= txt.length) clearInterval(ti);
-    }, 20);
-  }
-  cycleThought();
-  activeThinkTimer = setInterval(cycleThought, 1100);
 
   var msgContent;
   if (_imgs.length > 0) {
@@ -179,8 +148,6 @@ askAI = function (question, skipUserBubble) {
         thinkWrap.remove();
         return;
       }
-      clearInterval(activeThinkTimer);
-      activeThinkTimer = null;
       thinkWrap.style.transition = 'opacity .3s';
       thinkWrap.style.opacity = '0';
       setTimeout(function () {
@@ -314,8 +281,6 @@ askAI = function (question, skipUserBubble) {
       }, 340);
     })
     .catch(function (e) {
-      clearInterval(activeThinkTimer);
-      activeThinkTimer = null;
       thinkWrap.remove();
       addBotMsg('\u274C Error: ' + e.message);
       document.getElementById('aiSend').classList.remove('is-stop');
