@@ -341,9 +341,23 @@ export function initAskAI(state) {
               _openFileCtx = _rawText.slice(Math.max(0, _idx - 200), _idx + 3000);
             }
           }
-          // Follow-up sub-question ("now b)", "mach b") — reuse last exercise position
+          // Follow-up sub-question ("now b)", "mach b") — find the specific sub-question
+          // text within the exercise so the embedding has the right topic keywords.
+          // e.g. "now question b)" → find "b)" inside the exercise → context around that point
+          // gives "Montagevorspannkraft / F_M,min" instead of just the a) compliance keywords.
           if (!_openFileCtx && _subqMatch && window._lastExerciseIdx != null) {
-            _openFileCtx = _rawText.slice(Math.max(0, window._lastExerciseIdx - 200), window._lastExerciseIdx + 3000);
+            var _subqLetter = (_subqMatch[1] || _subqMatch[2] || '').toLowerCase();
+            var _exerciseSlice = _rawText.slice(window._lastExerciseIdx, window._lastExerciseIdx + 4000);
+            var _subqRel = _subqLetter
+              ? _exerciseSlice.search(new RegExp('\\b' + _subqLetter + '\\s*[\\)\\.]', 'i'))
+              : -1;
+            if (_subqRel > 0) {
+              var _subqAbs = window._lastExerciseIdx + _subqRel;
+              // Capture 300 chars before the sub-question label + 2500 chars after
+              _openFileCtx = _rawText.slice(Math.max(0, _subqAbs - 300), _subqAbs + 2500);
+            } else {
+              _openFileCtx = _rawText.slice(Math.max(0, window._lastExerciseIdx - 200), window._lastExerciseIdx + 3000);
+            }
           }
           // Final fallback: send first 3000 chars of the PDF
           if (!_openFileCtx) _openFileCtx = _rawText.slice(0, 3000);
