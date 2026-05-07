@@ -264,7 +264,7 @@ async function classifyQuestion(question) {
 function questionTypeInstructions(type) {
   const map = {
     exercise:
-      '\n\n## Exercise instructions\n1. **Solve ALL sub-questions** (a, b, c, d …) that appear in the exercise — do not stop after the first one.\n2. State what is given and what is asked for EACH sub-question.\n3. Check ALL source blocks — especially Formelsammlung / Zusammenfassung / summary blocks — for the required formulas before writing anything.\n4. If the solution PDF is present, follow it exactly. If it is NOT present, derive the answer yourself using formulas from the Formelsammlung and lecture material.\n5. Write the complete solution for each sub-question step by step, numbered.\n6. At each step state the formula or principle used in the professor\'s exact notation.\n7. Show every algebraic manipulation — do NOT skip steps.\n8. **Bold the final answer** with units for each sub-question.\nNEVER say "I cannot determine" or "not explicitly provided" — if you have the formulas, work it out.',
+      '\n\n## Exercise instructions\n1. **Solve ALL sub-questions** (a, b, c, d …) that appear in the exercise — do not stop after the first one.\n2. State what is given and what is asked for EACH sub-question.\n3. **FORMULAS: ONLY use formulas that appear verbatim in the COURSE CONTEXT (Formelsammlung / Zusammenfassung / lecture / solution SOURCE blocks). Do NOT invent, simplify, or substitute your own formulas — even if you think you know them. If the required formula is not in the course context, say: "Die benötigte Formel wurde im Kurs-Material nicht gefunden." and stop.**\n4. If the solution PDF is present, follow it step by step exactly. If it is NOT present, derive the answer yourself using only formulas found in the Formelsammlung source blocks.\n5. Write the complete solution for each sub-question step by step, numbered.\n6. At each step state the exact formula from the source block (quote the formula, cite the file and page).\n7. Show every algebraic manipulation and number substitution. Do NOT skip steps.\n8. **Bold the final answer** with units for each sub-question.',
     definition:
       '\n\n## Definition instructions\nFirst give the exact definition as stated in the course material (quote it). Then explain it in plain language. Then give one concrete example from the material.',
     derivation:
@@ -591,7 +591,7 @@ async function fetchSummaryChunks(serviceKey, userId, courseId) {
       '&course_id=eq.' + encodeURIComponent(courseId) +
       '&source_type=in.(summary,notes)' +
       '&select=id,document_id,chunk_text,page_start,page_end,source_type,section_title,is_official' +
-      '&order=chunk_index.asc&limit=10',
+      '&limit=30',
       null, serviceKey
     );
     if (!Array.isArray(result.body)) return [];

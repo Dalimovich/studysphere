@@ -112,14 +112,14 @@ export default async function handler(request, context) {
 
         const [allChunks, summaryInject] = await Promise.all([
           Promise.all(allEmbeddings.map((emb, i) => retrieveChunks(userId, courseId, emb, textsToEmbed[i] || question, SUPABASE_URL, SUPABASE_SERVICE_KEY, activeDocId))),
-          fetchSummaryChunks(userId, courseId, SUPABASE_URL, SUPABASE_SERVICE_KEY)
+          fetchSummaryChunks(userId, courseId, SUPABASE_URL, SUPABASE_SERVICE_KEY, baseEmbedding)
         ]);
         rawChunks = mergeChunks([...allChunks, summaryInject]);
       }
 
       // Always ensure summary/Formelzettel chunks are in the pool for cache-restored paths
       if (skipRerank) {
-        const summaryInject = await fetchSummaryChunks(userId, courseId, SUPABASE_URL, SUPABASE_SERVICE_KEY);
+        const summaryInject = await fetchSummaryChunks(userId, courseId, SUPABASE_URL, SUPABASE_SERVICE_KEY, baseEmbedding);
         if (summaryInject.length) rawChunks = mergeChunks([rawChunks, summaryInject]);
       }
 
@@ -676,28 +676,50 @@ function detectLang(question, chunks) {
 }
 
 // Always inject summary/notes chunks (Formelzettel, Zusammenfassung) into the candidate pool.
-// Source-type boosting in rank() can only help chunks that were already retrieved — without
-// this injection, formula sheets with low similarity to the question never reach the AI.
-async function fetchSummaryChunks(userId, courseId, supaUrl, serviceKey) {
+// Uses embedding similarity search so the most relevant formula chunks are retrieved,
+// not just the first N chunks by index.
+async function fetchSummaryChunks(userId, courseId, supaUrl, serviceKey, embedding) {
   try {
+    // If we have an embedding, use vector search filtered to summary/notes source types
+    if (embedding) {
+      const res = await fetch(supaUrl + '/rest/v1/rpc/match_chunks_hybrid', {
+        method: 'POST',
+        headers: { apikey: serviceKey, Authorization: 'Bearer ' + serviceKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query_embedding: embedding,
+          query_text: '',
+          p_user_id: userId,
+          p_course_id: courseId,
+          p_document_id: null,
+          match_count: 15,
+          rrf_k: 60
+        })
+      });
+      const data = await res.json();
+      if (Array.isArray(data) && data.length) {
+        // Keep only summary/notes chunks from the result
+        const filtered = data.filter(c => c.source_type === 'summary' || c.source_type === 'notes');
+        if (filtered.length) return filtered;
+      }
+    }
+    // Fallback: fetch all summary/notes chunks (up to 30, not ordered by index)
     const res = await fetch(
       supaUrl + '/rest/v1/document_chunks' +
       '?user_id=eq.' + userId +
       '&course_id=eq.' + encodeURIComponent(courseId) +
       '&source_type=in.(summary,notes)' +
       '&select=id,document_id,chunk_text,page_start,page_end,source_type,section_title,is_official' +
-      '&order=chunk_index.asc&limit=10',
+      '&limit=30',
       { headers: { apikey: serviceKey, Authorization: 'Bearer ' + serviceKey } }
     );
     const data = await res.json();
     if (!Array.isArray(data)) return [];
-    // Assign a base similarity so they participate in ranking (boosted further by qType in rank())
     return data.map(c => ({ ...c, similarity: 0.18 }));
   } catch (e) { return []; }
 }
 
 const TYPE_INSTRUCTIONS = {
-  exercise: '\n\n## Exercise rules\n1. **Solve ALL sub-questions** (a, b, c, d …) that appear in the exercise — do not stop after the first one.\n2. State what is given and what is asked for EACH sub-question.\n3. Check ALL source blocks — especially Formelsammlung / Zusammenfassung / summary blocks — for the required formulas before writing anything.\n4. If the solution PDF is present, follow it exactly. If it is NOT present, derive the answer yourself using formulas from the Formelsammlung and lecture material.\n5. Write the complete solution for each sub-question step by step, numbered.\n6. At each step state the formula or principle used in the professor\'s exact notation.\n7. Show every algebraic manipulation. Do NOT skip steps.\n8. **Bold the final answer** with units for each sub-question.\nNEVER say "I cannot determine" or "not explicitly provided" — if you have the formulas, work it out.',
+  exercise: '\n\n## Exercise rules\n1. **Solve ALL sub-questions** (a, b, c, d …) that appear in the exercise — do not stop after the first one.\n2. State what is given and what is asked for EACH sub-question.\n3. **FORMULAS: ONLY use formulas that appear verbatim in the COURSE CONTEXT (Formelsammlung / Zusammenfassung / lecture / solution SOURCE blocks). Do NOT invent, simplify, or substitute your own formulas — even if you think you know them. If the required formula is not in the course context, say: "Die benötigte Formel wurde im Kurs-Material nicht gefunden." and stop.**\n4. If the solution PDF is present, follow it step by step exactly. If it is NOT present, derive the answer yourself using only formulas found in the Formelsammlung source blocks.\n5. Write the complete solution for each sub-question step by step, numbered.\n6. At each step state the exact formula from the source block (quote the formula, cite the file and page).\n7. Show every algebraic manipulation and number substitution. Do NOT skip steps.\n8. **Bold the final answer** with units for each sub-question.',
   definition: '\n\nQuote the exact definition from the material first. Then explain it in plain language. Then give one example.',
   derivation: '\n\nShow every algebraic step numbered. State the rule applied at each step. Use the professor\'s notation.',
   concept: '\n\nExplain what it is, why it matters, how it works. Use a concrete example from the course material.',
