@@ -46,9 +46,18 @@ export function _resetScrollFollow() {
 export async function pdfToImages(maxPages) {
   var pdfDoc = window.pdfDoc;
   if (!pdfDoc) return [];
-  var pages = Math.min(pdfDoc.numPages, maxPages || 6);
+  var limit = maxPages || 6;
+  var total = pdfDoc.numPages;
+  // Centre the capture window on the currently viewed page so the AI sees
+  // what the user is looking at, not just the first N pages.
+  var currentPage = (window.pdfPage && window.pdfPage >= 1) ? window.pdfPage : 1;
+  var half = Math.floor(limit / 2);
+  var startPage = Math.max(1, currentPage - half);
+  var endPage = Math.min(total, startPage + limit - 1);
+  // Shift start back if we hit the end of the document
+  if (endPage - startPage + 1 < limit) startPage = Math.max(1, endPage - limit + 1);
   var imgs = [];
-  for (var i = 1; i <= pages; i++) {
+  for (var i = startPage; i <= endPage; i++) {
     try {
       var page = await pdfDoc.getPage(i);
       var vp = page.getViewport({ scale: 1.5 });
@@ -227,7 +236,7 @@ export function initAskAI(state) {
     _textReady
       .then(function () {
         var isHandwritten = pdfDoc && pdfFullText.trim().length < 100;
-        return isHandwritten ? pdfToImages(6) : [];
+        return isHandwritten ? pdfToImages(8) : [];
       })
       .then(async function (pageImages) {
         var userContent;
