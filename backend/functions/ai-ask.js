@@ -50,13 +50,14 @@ const AI_RATE_LIMIT_MAX = Number(optionalEnv('AI_RATE_LIMIT_MAX', '200'));
 const AI_RATE_LIMIT_WINDOW_MS = Number(optionalEnv('AI_RATE_LIMIT_WINDOW_MS', '3600000'));
 
 // Source type priority boost for ranking (added to cosine similarity)
+// summary = Formelsammlung / Zusammenfassung — highly valuable, never penalise
 const SOURCE_BOOST = {
   solution: 0.08,
   exercise: 0.08,
   lecture: 0.1,
   exam: 0.06,
-  notes: 0.02,
-  summary: -0.03,
+  notes: 0.04,
+  summary: 0.06,
   other: 0.0
 };
 
@@ -265,7 +266,7 @@ async function classifyQuestion(question) {
 function questionTypeInstructions(type) {
   const map = {
     exercise:
-      '\n\n## Exercise instructions\nThe COURSE CONTEXT contains the full solution — read every source block carefully, the answer IS there.\n1. State what is given and what is asked.\n2. Write out the complete solution step by step, numbered.\n3. At each step state the formula or principle used in the professor\'s exact notation.\n4. Show every algebraic manipulation — do NOT skip steps.\n5. **Bold the final answer** with units.\n6. If a solution PDF is cited, follow its steps exactly — reproduce them, not a generic approach.\nNEVER say the solution "is not explicitly provided" when sources from the document are retrieved — the content IS there; read it more carefully.',
+      '\n\n## Exercise instructions\nThe COURSE CONTEXT contains the full solution — read every source block carefully, the answer IS there.\n1. State what is given and what is asked.\n2. Check ALL source blocks — especially any Formelsammlung / Zusammenfassung / summary blocks — for the required formulas and definitions before writing the solution.\n3. Write out the complete solution step by step, numbered.\n4. At each step state the formula or principle used in the professor\'s exact notation.\n5. Show every algebraic manipulation — do NOT skip steps.\n6. **Bold the final answer** with units.\n7. If a solution PDF is cited, follow its steps exactly — reproduce them, not a generic approach.\nNEVER say the solution "is not explicitly provided" when sources from the document are retrieved — the content IS there; read it more carefully.',
     definition:
       '\n\n## Definition instructions\nFirst give the exact definition as stated in the course material (quote it). Then explain it in plain language. Then give one concrete example from the material.',
     derivation:
@@ -462,8 +463,10 @@ function rankChunks(chunks, qType, openDocId) {
       const sourceBoost = SOURCE_BOOST[c.source_type] || 0;
       const officialBoost = c.is_official ? 0.05 : 0;
       const exerciseBoost = (qType === 'exercise')
-        ? (c.source_type === 'solution' ? 0.18 : c.source_type === 'exercise' ? 0.12 : 0)
-        : 0;
+        ? (c.source_type === 'solution' ? 0.18 : c.source_type === 'exercise' ? 0.12 : c.source_type === 'summary' ? 0.10 : c.source_type === 'notes' ? 0.06 : 0)
+        : (qType === 'formula' || qType === 'derivation')
+          ? (c.source_type === 'summary' ? 0.18 : c.source_type === 'notes' ? 0.10 : c.source_type === 'lecture' ? 0.06 : 0)
+          : 0;
       const openBoost = (openDocId && c.document_id === openDocId) ? 0.06 : 0;
       const base = (c.rerank_score != null)
         ? (c.rerank_score * 0.6 + c.similarity * 0.4)

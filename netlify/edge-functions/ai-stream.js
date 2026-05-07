@@ -361,15 +361,20 @@ function mergeChunks(arrays) {
   return Object.values(map);
 }
 
-const SOURCE_BOOST = { solution: 0.08, exercise: 0.08, lecture: 0.1, exam: 0.06, notes: 0.02, summary: -0.03, other: 0.0 };
+// summary = Formelsammlung / Zusammenfassung — highly valuable, never penalise
+const SOURCE_BOOST = { solution: 0.08, exercise: 0.08, lecture: 0.1, exam: 0.06, notes: 0.04, summary: 0.06, other: 0.0 };
 
 function rank(chunks, qType, openDocId) {
   return chunks.map(c => {
     const sb = SOURCE_BOOST[c.source_type] || 0;
     const ob = c.is_official ? 0.05 : 0;
-    const eb = qType === 'exercise' ? (c.source_type === 'solution' ? 0.18 : c.source_type === 'exercise' ? 0.12 : 0) : 0;
+    // Exercise boost: solutions first, then exercises, then summaries (Formelsammlung)
+    const eb = qType === 'exercise'
+      ? (c.source_type === 'solution' ? 0.18 : c.source_type === 'exercise' ? 0.12 : c.source_type === 'summary' ? 0.10 : c.source_type === 'notes' ? 0.06 : 0)
+      : qType === 'formula' || qType === 'derivation'
+        ? (c.source_type === 'summary' ? 0.18 : c.source_type === 'notes' ? 0.10 : c.source_type === 'lecture' ? 0.06 : 0)
+        : 0;
     const openBoost = (openDocId && c.document_id === openDocId) ? 0.06 : 0;
-    // Use rerank_score if available (weighted blend with cosine similarity)
     const base = c.rerank_score != null ? (c.rerank_score * 0.6 + c.similarity * 0.4) : c.similarity;
     return { ...c, final_score: base + sb + ob + eb + openBoost };
   }).sort((a, b) => b.final_score - a.final_score);
@@ -644,7 +649,7 @@ function detectLang(chunks) {
 }
 
 const TYPE_INSTRUCTIONS = {
-  exercise: '\n\n## Exercise rules\nThe COURSE CONTEXT contains the full solution. Read every source block carefully.\n1. State what is given and what is asked.\n2. Write out the complete solution step by step, numbered.\n3. At each step state the formula or principle used, in the professor\'s exact notation.\n4. Show every algebraic manipulation. Do NOT skip steps.\n5. **Bold the final answer** with units.\n6. If a solution PDF is a source, follow it exactly — reproduce its steps.\nNEVER say the solution "is not explicitly provided" if sources are retrieved.',
+  exercise: '\n\n## Exercise rules\nThe COURSE CONTEXT contains the full solution. Read every source block carefully.\n1. State what is given and what is asked.\n2. Check ALL source blocks — especially Formelsammlung / Zusammenfassung / summary blocks — for the required formulas and definitions before writing the solution.\n3. Write out the complete solution step by step, numbered.\n4. At each step state the formula or principle used, in the professor\'s exact notation.\n5. Show every algebraic manipulation. Do NOT skip steps.\n6. **Bold the final answer** with units.\n7. If a solution PDF is a source, follow it exactly — reproduce its steps.\nNEVER say the solution "is not explicitly provided" if sources are retrieved.',
   definition: '\n\nQuote the exact definition from the material first. Then explain it in plain language. Then give one example.',
   derivation: '\n\nShow every algebraic step numbered. State the rule applied at each step. Use the professor\'s notation.',
   concept: '\n\nExplain what it is, why it matters, how it works. Use a concrete example from the course material.',
