@@ -101,8 +101,14 @@ export default async function handler(request, context) {
         rawChunks = fetched.map(c => ({ ...c, similarity: simMap[c.id] || 0.5, ...(rerankMap[c.id] != null ? { rerank_score: rerankMap[c.id] } : {}) }));
         skipRerank = true;
       } else {
-        const [hydeResult] = await Promise.all([generateHydeAndQueries(question, OPENAI_API_KEY)]);
-        const textsToEmbed = [question];
+        // Enrich the retrieval query with open PDF context so HyDE understands the actual exercise.
+        // "Löse 13.1" alone produces a weak embedding; prepending the extracted task context
+        // (topic, given values, keywords) makes HyDE generate a passage that matches Formelzettel chunks.
+        const enrichedQuestion = openCtx
+          ? 'Aufgabe-Kontext: ' + openCtx.slice(0, 500) + '\n\nFrage: ' + question
+          : question;
+        const [hydeResult] = await Promise.all([generateHydeAndQueries(enrichedQuestion, OPENAI_API_KEY)]);
+        const textsToEmbed = [enrichedQuestion];
         if (hydeResult.hypothetical) textsToEmbed.push(hydeResult.hypothetical);
         hydeResult.queries.forEach(q => { if (q) textsToEmbed.push(q); });
 
@@ -111,8 +117,10 @@ export default async function handler(request, context) {
           allEmbeddings = textsToEmbed.length > 1 ? await embedBatch(textsToEmbed, OPENAI_API_KEY) : [baseEmbedding];
         } catch (e) { allEmbeddings = [baseEmbedding]; }
 
+        // NEVER restrict main retrieval to activeDocId — the Formelzettel is a different file.
+        // activeDocId is used only for ranking boosts, not for filtering retrieval.
         const [allChunks, summaryInject] = await Promise.all([
-          Promise.all(allEmbeddings.map((emb, i) => retrieveChunks(userId, courseId, emb, textsToEmbed[i] || question, SUPABASE_URL, SUPABASE_SERVICE_KEY, activeDocId))),
+          Promise.all(allEmbeddings.map((emb, i) => retrieveChunks(userId, courseId, emb, textsToEmbed[i] || enrichedQuestion, SUPABASE_URL, SUPABASE_SERVICE_KEY, null))),
           fetchSummaryChunks(userId, courseId, SUPABASE_URL, SUPABASE_SERVICE_KEY, baseEmbedding)
         ]);
         rawChunks = mergeChunks([...allChunks, summaryInject]);
@@ -160,11 +168,22 @@ export default async function handler(request, context) {
       }
 
       // 6. Classify + fetch doc names in parallel
+      // Pass open PDF context to classifier so "Löse 13.1" with an Aufgabe open → 'exercise'
+      const classifyInput = openCtx
+        ? question + '\n\nOpen PDF context: ' + openCtx.slice(0, 300)
+        : question;
       const [qTypeResult, docNames] = await Promise.all([
-        classifyQuestion(question, OPENAI_API_KEY),
+        classifyQuestion(classifyInput, OPENAI_API_KEY),
         fetchDocNames([...new Set(rawChunks.map(c => c.document_id))], SUPABASE_URL, SUPABASE_SERVICE_KEY)
       ]);
       qType = qTypeResult;
+      // Force exercise type when the open PDF clearly contains an exercise — catches short
+      // queries like "mach a" or "13.1 bitte" that the classifier sees as 'other'
+      if (qType === 'other' && openCtx) {
+        const _ctx = (question + ' ' + openCtx).toLowerCase();
+        if (/aufgabe|übung|uebung|gegeben|gesucht|berechne|bestimme|ermittle|prüfe|löse|solve|calculate|determine/.test(_ctx))
+          qType = 'exercise';
+      }
 
       const openDocId = openFileName
         ? Object.entries(docNames).find(([, name]) => name === openFileName || name.toLowerCase() === openFileName.toLowerCase())?.[0] || null
@@ -184,7 +203,7 @@ export default async function handler(request, context) {
       }
 
       // 9. Rank with source-type + open-file boosting, then deduplicate
-      const ranked = deduplicate(rank(rawChunks, qType, openDocId));
+      const ranked = deduplicate(rank(rawChunks, qType, openDocId, docNames));
       const topScore = ranked[0] ? ranked[0].final_score : 0;
       const weakRetrieval = topScore < 0.3;
 
@@ -392,7 +411,7 @@ function mergeChunks(arrays) {
 // summary = Formelsammlung / Zusammenfassung — highly valuable, never penalise
 const SOURCE_BOOST = { solution: 0.08, exercise: 0.08, lecture: 0.1, exam: 0.06, notes: 0.04, summary: 0.06, other: 0.0 };
 
-function rank(chunks, qType, openDocId) {
+function rank(chunks, qType, openDocId, docNames) {
   return chunks.map(c => {
     const sb = SOURCE_BOOST[c.source_type] || 0;
     const ob = c.is_official ? 0.05 : 0;
@@ -402,9 +421,11 @@ function rank(chunks, qType, openDocId) {
       : qType === 'formula' || qType === 'derivation'
         ? (c.source_type === 'summary' ? 0.18 : c.source_type === 'notes' ? 0.10 : c.source_type === 'lecture' ? 0.06 : 0)
         : 0;
+    // Filename-based formula sheet boost — catches Formelzettel uploaded as 'lecture' or 'other'
+    const fnBoost = isFormulaSheetName(docNames && docNames[c.document_id]) ? 0.08 : 0;
     const openBoost = (openDocId && c.document_id === openDocId) ? 0.06 : 0;
     const base = c.rerank_score != null ? (c.rerank_score * 0.6 + c.similarity * 0.4) : c.similarity;
-    return { ...c, final_score: base + sb + ob + eb + openBoost };
+    return { ...c, final_score: base + sb + ob + eb + fnBoost + openBoost };
   }).sort((a, b) => b.final_score - a.final_score);
 }
 
@@ -689,39 +710,61 @@ function detectLang(question, chunks) {
   return 'de'; // default: German university context
 }
 
-// Always inject summary/notes chunks (Formelzettel, Zusammenfassung) into the candidate pool.
-// Uses embedding similarity search so the most relevant formula chunks are retrieved,
-// not just the first N chunks by index.
+// Detect Formelzettel/formula sheets by filename — regardless of stored source_type.
+// Users often upload these as 'lecture' or 'other', so source_type alone is unreliable.
+function isFormulaSheetName(name) {
+  if (!name) return false;
+  const n = name.toLowerCase();
+  return n.includes('formel') || n.includes('zusammenfassung') || n.includes('tabelle') ||
+         n.includes('tabellenbuch') || n.includes('cheatsheet') || n.includes('cheat') ||
+         n.includes('formula') || n.includes('merkblatt') || n.includes('summary') ||
+         n.includes('überblick') || n.includes('uberblick');
+}
+
+// Always inject Formelzettel/summary chunks into the candidate pool.
+// Detects formula sheets by BOTH source_type AND filename so misclassified uploads are caught.
 async function fetchSummaryChunks(userId, courseId, supaUrl, serviceKey, embedding) {
   try {
-    // If we have an embedding, use vector search filtered to summary/notes source types
+    // Step 1: find all formula-sheet documents in this course (by source_type OR filename)
+    const docsRes = await fetch(
+      supaUrl + '/rest/v1/documents?user_id=eq.' + userId +
+      '&course_id=eq.' + encodeURIComponent(courseId) +
+      '&processing_status=eq.ready&select=id,file_name,source_type',
+      { headers: { apikey: serviceKey, Authorization: 'Bearer ' + serviceKey } }
+    );
+    const docs = await docsRes.json();
+    const formulaDocIds = Array.isArray(docs)
+      ? docs.filter(d => d.source_type === 'summary' || d.source_type === 'notes' || isFormulaSheetName(d.file_name))
+             .map(d => d.id)
+      : [];
+
+    if (!formulaDocIds.length) return [];
+
+    // Step 2: if we have an embedding, vector-search within those documents
     if (embedding) {
-      const res = await fetch(supaUrl + '/rest/v1/rpc/match_chunks_hybrid', {
-        method: 'POST',
-        headers: { apikey: serviceKey, Authorization: 'Bearer ' + serviceKey, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          query_embedding: embedding,
-          query_text: '',
-          p_user_id: userId,
-          p_course_id: courseId,
-          p_document_id: null,
-          match_count: 15,
-          rrf_k: 60
-        })
-      });
-      const data = await res.json();
-      if (Array.isArray(data) && data.length) {
-        // Keep only summary/notes chunks from the result
-        const filtered = data.filter(c => c.source_type === 'summary' || c.source_type === 'notes');
-        if (filtered.length) return filtered;
-      }
+      const results = await Promise.all(formulaDocIds.map(docId =>
+        fetch(supaUrl + '/rest/v1/rpc/match_chunks_hybrid', {
+          method: 'POST',
+          headers: { apikey: serviceKey, Authorization: 'Bearer ' + serviceKey, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            p_user_id: userId, p_course_id: courseId,
+            p_embedding: '[' + embedding.join(',') + ']',
+            p_query: '', p_match_count: 8, p_threshold: 0.05,
+            p_document_id: docId
+          })
+        }).then(r => r.json()).then(d => Array.isArray(d) ? d : []).catch(() => [])
+      ));
+      const merged = mergeChunks(results);
+      if (merged.length) return merged;
     }
-    // Fallback: fetch all summary/notes chunks (up to 30, not ordered by index)
+
+    // Step 3: fallback — fetch up to 30 chunks from formula-sheet documents
+    const idStr = formulaDocIds.map(id => '"' + id + '"').join(',');
     const res = await fetch(
       supaUrl + '/rest/v1/document_chunks' +
       '?user_id=eq.' + userId +
       '&course_id=eq.' + encodeURIComponent(courseId) +
-      '&source_type=in.(summary,notes)' +
+      '&document_id=in.(' + idStr + ')' +
       '&select=id,document_id,chunk_text,page_start,page_end,source_type,section_title,is_official' +
       '&limit=30',
       { headers: { apikey: serviceKey, Authorization: 'Bearer ' + serviceKey } }
