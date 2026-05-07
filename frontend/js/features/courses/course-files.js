@@ -1077,6 +1077,18 @@ async function _bindRagStatus(co, course) {
       // In-progress — show current status and poll; do NOT re-trigger, which
       // would reset the DB row and waste the processing already in flight.
       _setRagStatus(el, doc.processing_status);
+      // Stuck-blue recovery: if the row hasn't been touched in >7 minutes,
+      // the worker likely crashed (Lambda timeout, unhandled exception).
+      // Auto-retry once per page load — the user wants this to be seamless.
+      var stuckSince = doc.updated_at || doc.created_at;
+      var stuckMs = stuckSince ? Date.now() - new Date(stuckSince).getTime() : 0;
+      if (stuckMs > 7 * 60 * 1000 && f && !window['_ragRetried_' + doc.id]) {
+        window['_ragRetried_' + doc.id] = true;
+        _ragEnqueue(function () {
+          return _triggerRagIndex(el, fname, f, course, courseId);
+        });
+        return;
+      }
       _pollRagStatus(el, courseId, doc.id);
     } else if (f) {
       // Not indexed yet — auto-start
