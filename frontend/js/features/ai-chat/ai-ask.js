@@ -113,21 +113,12 @@ function _saveCourseHistory(courseId, pairs) {
 
 function _appendCourseHistory(courseId, question, answer) {
   var pairs = _loadCourseHistory(courseId);
-  // Cap answer size — very long answers (heavy math) can overflow localStorage quota,
-  // causing JSON.parse to return [] on restore and the answer to appear deleted.
-  var _a = answer.length > 8000 ? answer.slice(0, 8000) + '\n\n*(answer truncated for storage)*' : answer;
-  pairs.push({ q: question, a: _a, ts: Date.now() });
+  pairs.push({ q: question, a: answer, ts: Date.now() });
   _saveCourseHistory(courseId, pairs);
 }
 
-export function restoreCourseHistory(courseId) {
-  if (!courseId) return;
-  var pairs = _loadCourseHistory(courseId);
-  if (!pairs.length) return;
-  var aiMsgs = document.getElementById('aiMsgs') || document.querySelector('.ai-msgs');
-  if (!aiMsgs) return;
-  // Only restore if the panel is currently empty (no prior messages besides system)
-  if (aiMsgs.querySelectorAll('.ai-msg-wrap:not(.typing-wrap)').length > 0) return;
+function _renderHistoryPairs(pairs, aiMsgs) {
+  if (!pairs || !pairs.length) return;
   pairs.forEach(function (pair) {
     if (window.addUserMsg) window.addUserMsg(pair.q, true /* skipSave */);
     var wrap = document.createElement('div');
@@ -138,8 +129,6 @@ export function restoreCourseHistory(courseId) {
     var bubble = wrap.querySelector('.ai-bubble.bot');
     if (bubble) {
       bubble.setAttribute('data-raw', pair.a);
-      // Always render inside _ssEnsureKatex so renderMarkdown and renderMath both run
-      // with katex loaded — avoids double-processing when katex arrives after initial render.
       var _bEl = bubble;
       var _rawA = pair.a;
       function _doRender() {
@@ -156,6 +145,42 @@ export function restoreCourseHistory(courseId) {
     aiMsgs.appendChild(wrap);
   });
   aiMsgs.scrollTop = aiMsgs.scrollHeight;
+}
+
+export function restoreCourseHistory(courseId) {
+  if (!courseId) return;
+  var aiMsgs = document.getElementById('aiMsgs') || document.querySelector('.ai-msgs');
+  if (!aiMsgs) return;
+  // Only restore if the panel is currently empty (no prior messages besides system)
+  if (aiMsgs.querySelectorAll('.ai-msg-wrap:not(.typing-wrap)').length > 0) return;
+
+  var _supaUrl = window._SUPA || '';
+  var _token = window._sbToken || '';
+  if (_supaUrl && _token) {
+    fetch(_supaUrl + '/rest/v1/chat_history?course_id=eq.' + encodeURIComponent(courseId) +
+      '&order=created_at.asc&limit=40', {
+      headers: {
+        'apikey': window._SAKEY || '',
+        'Authorization': 'Bearer ' + _token
+      }
+    }).then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+      .then(function (rows) {
+        if (rows && rows.length) {
+          var pairs = rows.map(function (r) { return { q: r.question, a: r.answer }; });
+          _renderHistoryPairs(pairs, aiMsgs);
+        } else {
+          // No DB rows — fall back to localStorage
+          var localPairs = _loadCourseHistory(courseId);
+          _renderHistoryPairs(localPairs, aiMsgs);
+        }
+      }).catch(function () {
+        var localPairs = _loadCourseHistory(courseId);
+        _renderHistoryPairs(localPairs, aiMsgs);
+      });
+  } else {
+    var pairs = _loadCourseHistory(courseId);
+    _renderHistoryPairs(pairs, aiMsgs);
+  }
 }
 
 export function clearCourseHistory(courseId) {

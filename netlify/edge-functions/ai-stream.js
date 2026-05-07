@@ -307,6 +307,20 @@ export default async function handler(request, context) {
       // 13. Self-verify + store answer cache in parallel
       const cleanAnswer = fullText.replace(/<!--META-->[\s\S]*?<!--\/META-->/, '').trim();
 
+      // Fire-and-forget: persist Q&A to chat_history table
+      if (userId && courseId && question && cleanAnswer) {
+        fetch(SUPABASE_URL + '/rest/v1/chat_history', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_SERVICE_KEY,
+            'Authorization': 'Bearer ' + SUPABASE_SERVICE_KEY,
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify({ user_id: userId, course_id: courseId, question, answer: cleanAnswer })
+        }).catch(() => {});
+      }
+
       // Never cache an empty answer — it would poison every future ask of this question
       if (!cleanAnswer) {
         send({ error: 'AI returned an empty response. Please try again.' });
