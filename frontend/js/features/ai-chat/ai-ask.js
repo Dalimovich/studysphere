@@ -160,7 +160,16 @@ export function initAskAI(state) {
     var _aiSendBtn = document.getElementById('aiSend');
     var _stopBtn = document.getElementById('stopBtn');
     if (_aiSendBtn) _aiSendBtn.disabled = true;
-    if (_stopBtn) _stopBtn.style.display = 'flex';
+    if (_stopBtn) {
+      _stopBtn.style.display = 'flex';
+      // Bind abort once per button instance so stop truly cancels the backend request
+      if (!_stopBtn.__ssAbortBound) {
+        _stopBtn.addEventListener('click', function () {
+          if (window._abortCurrentStream) window._abortCurrentStream();
+        });
+        _stopBtn.__ssAbortBound = true;
+      }
+    }
 
     var aiMsgs = document.getElementById('aiMsgs');
     var aiPanel = document.getElementById('aiPanel');
@@ -436,9 +445,13 @@ export function initAskAI(state) {
               bubble = ansWrap.querySelector('.ai-bubble.bot');
             }
 
+            var _streamController = new AbortController();
+            window._abortCurrentStream = function () { _streamController.abort(); };
+
             fetch(BACKEND_URL + '/api/ai/stream', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+              signal: _streamController.signal,
               body: JSON.stringify({
                 courseId: _courseId,
                 question: question,
@@ -478,7 +491,14 @@ export function initAskAI(state) {
                 }).catch(function () { fallbackToRag(); });
               }
               read();
-            }).catch(function () { fallbackToRag(); });
+            }).catch(function (err) {
+              if (err && err.name === 'AbortError') {
+                if (thinkWrap && thinkWrap.parentNode) thinkWrap.remove();
+                var _sb = document.getElementById('aiSend'); if (_sb) _sb.disabled = false;
+                var _st = document.getElementById('stopBtn'); if (_st) _st.style.display = 'none';
+                resolve({ content: [{ text: '' }] });
+              } else { fallbackToRag(); }
+            });
 
             function fallbackToRag() {
               // Stream failed — fall back to non-streaming ai-ask endpoint
@@ -539,7 +559,8 @@ export function initAskAI(state) {
               }
               fullAnswer += '\n\n' + footer;
 
-              window._lastRagMeta = { courseId: _courseId, question: question, answerCacheId: null };
+              var _cacheId = (meta && meta.answerCacheId) || null;
+              window._lastRagMeta = { courseId: _courseId, question: question, answerCacheId: _cacheId };
 
               // Persist Q&A to localStorage for history restoration
               _appendCourseHistory(_courseId, question, fullAnswer);
@@ -549,6 +570,12 @@ export function initAskAI(state) {
 
               // Render all remaining blocks with markdown+KaTeX
               fullRender(fullAnswer);
+
+              // Feedback bar for streaming answers (uses cacheId so ratings are properly linked)
+              if (ansWrap && !ansWrap.querySelector('.rag-feedback-bar')) {
+                var _mb = ansWrap.querySelector('.msg-body');
+                if (_mb) _mb.appendChild(_buildRagFeedbackBar({ courseId: _courseId, question: question, answerCacheId: _cacheId }));
+              }
 
               resolve({ content: [{ text: fullAnswer }], _streamWrap: ansWrap, _ragData: meta });
             }

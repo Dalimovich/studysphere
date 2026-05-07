@@ -609,8 +609,8 @@ function buildSystemPrompt(mode, lang, openFileName) {
     '6. **Confidence:** Set "high" when the COURSE CONTEXT directly supports the answer — even if you added a minor "(not explicitly in uploaded materials)" label for a small detail. Set "medium" ONLY when a substantial portion of the answer relies on general knowledge not in the context. Set "low" when the answer is mostly general knowledge.',
     '7. **CRITICAL:** Do NOT include confidence indicators, emoji, or source lists anywhere in your markdown answer text. ONLY put them in the JSON response fields (sources, confidence). Never write 🟢🟡🔴 or "Confidence:" in the answer itself.',
     strict
-      ? '8. **Strict mode:** ALWAYS write a COMPLETE, DETAILED answer — never refuse, never truncate. Read ALL source blocks first. Use the COURSE CONTEXT as primary source. If a source is cited it means content was retrieved — use it fully. Only label something "(not explicitly in uploaded materials)" when genuinely absent from ALL sources. Never use that label as an excuse to avoid solving the problem.'
-      : '8. **General mode:** Use the COURSE CONTEXT first, then supplement freely with outside knowledge. Label outside knowledge clearly: *"(outside knowledge)"*.',
+      ? '8. **COURSE MODE:** Only answer from the COURSE CONTEXT. If the course materials do not contain sufficient information, respond: "I could not find enough information in your uploaded course materials for this. Please check that the relevant lecture, exercise, or solution PDF is indexed for this course." Do NOT use general knowledge in Course Mode — if the answer is in the sources, use it fully.'
+      : '8. **TUTOR MODE:** Use COURSE CONTEXT as primary source. You may supplement with general academic knowledge only after exhausting course materials. Label all general knowledge clearly with *(general knowledge)*.',
     '',
     '## Sources array rules',
     'For EACH source you actually used in the answer, add one entry. Fields:',
@@ -1208,39 +1208,31 @@ exports.handler = async function (event) {
     rawChunks = mergeChunkResults(allResults);
   }
 
-  // 6. No chunks found — fall back to general knowledge answer
+  // 6. No chunks found
   if (!rawChunks.length) {
+    if (ragMode === 'strict') {
+      // Course Mode: don't fall back to general knowledge
+      return jsonResponse(200, {
+        answer: "I couldn't find relevant information in your uploaded course materials for this question. Please make sure the relevant lecture, exercise, or solution files are indexed for this course.",
+        sources: [], confidence: 'low', unsupported: true, cached: false
+      });
+    }
+    // Tutor Mode: use general knowledge
     let fallbackResponse;
     try {
       fallbackResponse = await callOpenAI(buildFallbackSystemPrompt(), '', question);
     } catch (e) {
       return jsonResponse(200, {
-        answer:
-          'I could not find this in your uploaded course materials. Please make sure you have uploaded the relevant lecture or exercise files for this course.',
-        sources: [],
-        confidence: 'low',
-        unsupported: true,
-        cached: false
+        answer: 'I could not find this in your uploaded course materials. Please make sure you have uploaded the relevant lecture or exercise files for this course.',
+        sources: [], confidence: 'low', unsupported: true, cached: false
       });
     }
     const fallbackResult = parseOpenAIResponse(fallbackResponse);
     const fallbackJson = {
       answer: fallbackResult.answer || '',
-      sources: [],
-      confidence: 'low',
-      unsupported: true,
-      cached: false
+      sources: [], confidence: 'low', unsupported: true, cached: false
     };
-    storeAnswerCache(
-      serviceKey,
-      user.id,
-      courseId,
-      questionHash,
-      normalizedQ,
-      docVersionHash,
-      ragMode,
-      fallbackJson
-    ).catch(function () {});
+    storeAnswerCache(serviceKey, user.id, courseId, questionHash, normalizedQ, docVersionHash, ragMode, fallbackJson).catch(function () {});
     return jsonResponse(200, fallbackJson);
   }
 
