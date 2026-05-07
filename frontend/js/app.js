@@ -1,6 +1,7 @@
 // StudySphere app.js ? build 1774335018 ? async fixes
 
 import { escapeHtml } from './utils/escape-html.js';
+import { Store } from './core/state.js';
 import { exposeLegacyVar, publishLegacyGlobals } from './core/globals.js';
 import { initStatePersistence } from './core/state-persistence.js';
 import { bindIf as _bindIf, initPortalUi } from './core/portal-ui.js';
@@ -65,14 +66,9 @@ var pinAI = function () {};
 var showSelectionBanner = function () {};
 
 // ── NIGHT MODE (global — referenced by supabase.js before DOMContentLoaded) ──
-var nightOn = true;
+var nightOn = Store.getState().settings.darkMode;
 (function () {
-  var _sd = localStorage.getItem('ss_dark'); // localStorage so preference survives browser restart
-  if (_sd !== null) {
-    nightOn = _sd === '1';
-    document.body.classList.toggle('night', nightOn);
-  }
-  // else: keep default dark (nightOn=true, body has class "night")
+  document.body.classList.toggle('night', nightOn);
 })();
 
 // deferredSave declared globally so ss-ready can wrap it

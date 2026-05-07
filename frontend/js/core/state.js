@@ -9,7 +9,7 @@ const state = {
     activeCourseSection: 'files',
     isAiGenerating: false,
     settings: {
-        darkMode: false,
+        darkMode: localStorage.getItem('ss_dark') !== '0', // Default to true (Night)
         language: localStorage.getItem('ss_lang') || 'en'
     }
 };

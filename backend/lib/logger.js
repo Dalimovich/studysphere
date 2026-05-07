@@ -17,7 +17,9 @@ async function logSecurityEvent(serviceKey, userId, eventType, metadata) {
       serviceKey,
       { Prefer: 'return=minimal' }
     );
-  } catch (e) {}
+  } catch (e) {
+    console.error('[Security Logger Error]:', e.message);
+  }
 }
 
 module.exports = { logSecurityEvent };
