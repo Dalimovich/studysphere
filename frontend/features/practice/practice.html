@@ -150,6 +150,43 @@
       </div>
     </div>
 
+    <!-- Interactive study tools -->
+    <div class="gl-study-tools" id="glStudyTools">
+      <div class="gl-study-header">
+        <div>
+          <div class="widget-title" id="glStudyTitle">Study tools</div>
+          <div class="gl-study-sub" id="glStudySub">Quiz yourself or flip through flashcards</div>
+        </div>
+        <div class="gl-study-tabs" role="tablist" aria-label="Study tool mode">
+          <button
+            class="gl-study-tab active"
+            id="glQuizTab"
+            type="button"
+            role="tab"
+            aria-selected="true"
+          >
+            Quiz
+          </button>
+          <button
+            class="gl-study-tab"
+            id="glCardsTab"
+            type="button"
+            role="tab"
+            aria-selected="false"
+          >
+            Flashcards
+          </button>
+        </div>
+      </div>
+      <div class="gl-study-actions">
+        <button class="gl-tool-btn gl-tool-btn-primary" id="glGenerateQuiz" type="button">
+          Generate quiz
+        </button>
+        <button class="gl-tool-btn" id="glGenerateCards" type="button">Generate cards</button>
+      </div>
+      <div id="glStudyToolBody" class="gl-study-body"></div>
+    </div>
+
     <!-- File AI results -->
     <div class="widget-card" id="glAIPanel" style="display: none; margin-top: 8px">
       <div

@@ -2,6 +2,7 @@ import {
   sendAiRequest,
   sendRagRequest,
   courseHasRagDocs,
+  listCourseDocuments,
   submitRagFeedback
 } from '../../services/ai-service.js';
 import { extractPdfText } from '../pdf-viewer/pdf-text-extraction.js';
@@ -12,6 +13,34 @@ function _getTime() {
   return (
     d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0')
   );
+}
+
+// ── Auto-scroll controller ──────────────────────────────────────────────────
+// Tracks whether the user has scrolled up to read while the AI is still writing.
+// While they're scrolled up, we DO NOT yank them back to the bottom on every
+// token. As soon as they scroll back near the bottom, auto-follow resumes.
+var _userScrolledUp = false;
+var _scrollListenerAttached = false;
+function _ensureScrollTracker() {
+  if (_scrollListenerAttached) return;
+  var el = document.getElementById('aiMsgs') || document.querySelector('.ai-msgs');
+  if (!el) return;
+  el.addEventListener('scroll', function () {
+    var dist = el.scrollHeight - el.scrollTop - el.clientHeight;
+    _userScrolledUp = dist > 60;
+  });
+  _scrollListenerAttached = true;
+}
+function _autoScroll(el) {
+  if (!el) return;
+  if (_userScrolledUp) return; // user is reading — do not interrupt
+  el.scrollTop = el.scrollHeight;
+}
+// Exported so callers (e.g. user-action handlers) can force a scroll-to-bottom.
+export function _resetScrollFollow() {
+  _userScrolledUp = false;
+  var el = document.getElementById('aiMsgs') || document.querySelector('.ai-msgs');
+  if (el) el.scrollTop = el.scrollHeight;
 }
 
 export async function pdfToImages(maxPages) {
@@ -40,13 +69,15 @@ export async function pdfToImages(maxPages) {
 export function addTyping() {
   var aiMsgs = document.getElementById('aiMsgs') || document.querySelector('.ai-msgs');
   if (!aiMsgs) return null;
+  _ensureScrollTracker();
   var wrap = document.createElement('div');
   wrap.className = 'ai-msg-wrap typing-wrap';
   wrap.innerHTML =
     '<div class="msg-sender bot-sender"><span class="msg-sender-dot"></span>StudySphere AI</div>' +
     '<div class="typing-bubble"><span></span><span></span><span></span></div>';
   aiMsgs.appendChild(wrap);
-  aiMsgs.scrollTop = aiMsgs.scrollHeight;
+  // Initial typing dots appear: stick to bottom unless user already scrolled up
+  _autoScroll(aiMsgs);
   return wrap;
 }
 
@@ -72,6 +103,9 @@ export function initAskAI(state) {
 
     var aiMsgs = document.getElementById('aiMsgs');
     var aiPanel = document.getElementById('aiPanel');
+    _ensureScrollTracker();
+    // New question: reset auto-follow so the user sees the start of the answer.
+    _userScrolledUp = false;
 
     var thinkWrap = document.createElement('div');
     thinkWrap.className = 'ai-msg-wrap typing-wrap';
@@ -140,52 +174,304 @@ export function initAskAI(state) {
 
         // Use RAG if this course has indexed documents
         var _courseId = window.activeCourseId || window.currentCourseId || '';
-        var _hasRag = _courseId ? await courseHasRagDocs(_courseId) : false;
+        var _hasRag = false;
+        var _activeDocId = window.activeRagDocumentId || null;
+        if (_courseId) {
+          try {
+            var _docs = await listCourseDocuments(_courseId);
+            var _readyDocs = _docs.filter(function (d) { return d.processing_status === 'ready'; });
+            _hasRag = _readyDocs.length > 0;
+            // If the student has a specific file open, pin retrieval to that document
+            if (!_activeDocId && window.activeFileName && _readyDocs.length > 0) {
+              var _matchDoc = _readyDocs.find(function (d) {
+                return d.file_name === window.activeFileName ||
+                  (window.activeFileName && d.file_name && d.file_name.toLowerCase() === window.activeFileName.toLowerCase());
+              });
+              if (_matchDoc) _activeDocId = _matchDoc.id;
+            }
+          } catch (e) { _hasRag = false; }
+        }
 
         if (_hasRag) {
           var _modeToggle = document.getElementById('aiModeStrict');
           var _ragMode = !_modeToggle || _modeToggle.checked ? 'strict' : 'general';
-          return sendRagRequest(_courseId, question, _ragMode).then(function (data) {
-            var answer = data.answer || 'No answer found.';
 
-            // Confidence badge
-            var confEmoji =
-              data.confidence === 'high' ? '🟢' : data.confidence === 'medium' ? '🟡' : '🔴';
-            var confLabel = confEmoji + ' Confidence: ' + (data.confidence || 'unknown');
+          // Use streaming endpoint — renders tokens progressively
+          return new Promise(function (resolve) {
+            var BACKEND_URL = window.BACKEND_URL || '';
+            var token = window._sbToken || '';
 
-            // Only warn when the AI had zero course context and fell back to general knowledge
-            if (data.unsupported && (!data.sources || !data.sources.length)) {
-              answer =
-                '⚠️ *No matching course materials found — answering from general knowledge.*\n\n' +
-                answer;
+            // Keep typing dots visible until the first token arrives
+            var ansWrap = null;
+            var bubble = null;
+            var rawText = '';
+            var metaPattern = /<!--META-->[\s\S]*?<!--\/META-->/g;
+            // Token render queue — drains at ~40ms per token so text flows naturally.
+            // pendingMeta is set when the SSE 'done' event arrives; the queue keeps
+            // draining at the same pace and calls finalize only when empty.
+            var _tokenQueue = [];
+            var _renderTimer = null;
+            var _pendingMeta = undefined;
+            var CFG = window.AI_TYPING || {};
+            var TOKEN_INTERVAL = CFG.streamTokenInterval || 38;
+
+            // ── Block-by-block rendering ──────────────────────────────────────
+            // Split accumulated text into logical blocks (paragraphs, math, code,
+            // headings, lists). Completed blocks are rendered with markdown+KaTeX.
+            // The block currently being typed shows as plain text.
+            // KaTeX never sees partial text, so expressions always render correctly.
+
+            var _renderedBlockCount = 0; // how many blocks already have a rendered div
+
+            function splitBlocks(text) {
+              // Split on double newline boundaries but keep fenced code, $$ and \[..\] together
+              var blocks = [];
+              var lines = text.split('\n');
+              var buf = [];
+              var inCode = false;
+              var inMath = false; // $$ block
+              var inLatex = false; // \[ block
+
+              for (var i = 0; i < lines.length; i++) {
+                var line = lines[i];
+                if (!inCode && /^```/.test(line)) inCode = true;
+                else if (inCode && /^```/.test(line)) { buf.push(line); inCode = false; blocks.push(buf.join('\n')); buf = []; continue; }
+                if (!inLatex && /^\s*\\\[/.test(line)) inLatex = true;
+                else if (inLatex && /\\\]/.test(line)) { buf.push(line); inLatex = false; blocks.push(buf.join('\n')); buf = []; continue; }
+                if (!inMath && /^\s*\$\$/.test(line) && !/\$\$.*\$\$/.test(line)) inMath = true;
+                else if (inMath && /\$\$/.test(line)) { buf.push(line); inMath = false; blocks.push(buf.join('\n')); buf = []; continue; }
+
+                if (!inCode && !inMath && !inLatex && line.trim() === '' && buf.length) {
+                  blocks.push(buf.join('\n'));
+                  buf = [];
+                } else {
+                  buf.push(line);
+                }
+              }
+              if (buf.length) blocks.push(buf.join('\n'));
+              return blocks.filter(function (b) { return b.trim(); });
             }
 
-            // Sources block
-            if (data.sources && data.sources.length) {
-              answer +=
-                '\n\n**Sources:**\n' +
-                data.sources
-                  .map(function (s) {
-                    var line = '- ' + s.file_name;
-                    if (s.pages) line += ', p.' + s.pages;
-                    if (s.section) line += ' · *' + s.section + '*';
-                    if (s.quote) line += ' — *"' + s.quote.slice(0, 80) + '…"*';
-                    return line;
-                  })
-                  .join('\n');
+            function renderBlock(text) {
+              // Render a single completed block with markdown+KaTeX, faded in
+              var div = document.createElement('div');
+              div.className = 'ss-rendered-block';
+              div.style.opacity = '0';
+              div.style.transition = 'opacity 0.2s ease';
+              div.innerHTML = window.renderMarkdown ? window.renderMarkdown(text) : text;
+              return div;
             }
 
-            var _modeLabel = _ragMode === 'general' ? ' · 🌐 general mode' : '';
-            answer += '\n\n' + confLabel + (data.cached ? ' · ⚡ cached' : '') + _modeLabel;
+            function applyKatexToBlock(div) {
+              if (window._ssEnsureKatex) {
+                window._ssEnsureKatex().then(function () {
+                  if (window._renderMath && div) {
+                    window._renderMath(div);
+                    div.style.opacity = '1';
+                    _autoScroll(aiMsgs);
+                  }
+                }).catch(function () { div.style.opacity = '1'; });
+              } else {
+                div.style.opacity = '1';
+              }
+            }
 
-            // Attach feedback metadata to window for the feedback buttons
-            window._lastRagMeta = {
-              courseId: _courseId,
-              question: question,
-              answerCacheId: data.id || null
+            function updateBlockRender() {
+              if (!bubble) return;
+              var display = rawText.replace(metaPattern, '').trimEnd();
+              var blocks = splitBlocks(display);
+              // blocks[0..n-2] = completed, blocks[n-1] = currently typing
+
+              // Add rendered divs for newly completed blocks
+              var completedCount = blocks.length - 1; // last block still in progress
+              while (_renderedBlockCount < completedCount) {
+                var div = renderBlock(blocks[_renderedBlockCount]);
+                bubble.insertBefore(div, bubble.lastChild); // insert before the typing span
+                applyKatexToBlock(div);
+                _renderedBlockCount++;
+              }
+
+              // Update the plain-text typing span (always the last child)
+              var typingSpan = bubble.lastChild;
+              if (!typingSpan || typingSpan.nodeType !== 1 || !typingSpan.classList.contains('ss-typing-span')) {
+                typingSpan = document.createElement('span');
+                typingSpan.className = 'ss-typing-span';
+                typingSpan.style.whiteSpace = 'pre-wrap';
+                bubble.appendChild(typingSpan);
+              }
+              typingSpan.textContent = blocks[blocks.length - 1] || '';
+              _autoScroll(aiMsgs);
+            }
+
+            // Final render: flush remaining block + render everything
+            function fullRender(text) {
+              if (!bubble) return;
+              var display = text.replace(metaPattern, '').trim();
+              var blocks = splitBlocks(display);
+
+              // Render any remaining unrendered blocks (including the last one)
+              while (_renderedBlockCount < blocks.length) {
+                var div = renderBlock(blocks[_renderedBlockCount]);
+                bubble.insertBefore(div, bubble.lastChild);
+                applyKatexToBlock(div);
+                _renderedBlockCount++;
+              }
+
+              // Remove the typing span
+              var typingSpan = bubble.querySelector('.ss-typing-span');
+              if (typingSpan) typingSpan.remove();
+              _autoScroll(aiMsgs);
+            }
+
+            function drainQueue() {
+              if (!_tokenQueue.length) {
+                _renderTimer = null;
+                if (_pendingMeta !== undefined) finalize(_pendingMeta);
+                return;
+              }
+              var tok = _tokenQueue.shift();
+              rawText += tok;
+              if (bubble) updateBlockRender();
+              _renderTimer = setTimeout(drainQueue, TOKEN_INTERVAL);
+            }
+
+            function queueToken(tok) {
+              _tokenQueue.push(tok);
+              if (!_renderTimer) _renderTimer = setTimeout(drainQueue, TOKEN_INTERVAL);
+            }
+
+            // Expose so stopGeneration can trigger a final render on interrupt
+            window._activeStreamRender = function () {
+              if (_renderTimer) { clearTimeout(_renderTimer); _renderTimer = null; }
+              while (_tokenQueue.length) rawText += _tokenQueue.shift();
+              fullRender(rawText);
             };
 
-            return { content: [{ text: answer }], _ragData: data };
+            function ensureBubble() {
+              if (ansWrap) return;
+              // Fade out dots, insert answer bubble
+              thinkWrap.style.transition = 'opacity .15s';
+              thinkWrap.style.opacity = '0';
+              setTimeout(function () { thinkWrap.remove(); }, 160);
+
+              ansWrap = document.createElement('div');
+              ansWrap.className = 'ai-msg-wrap';
+              ansWrap.innerHTML =
+                '<div class="msg-sender bot-sender"><span class="msg-sender-dot"></span>StudySphere AI</div>' +
+                '<div class="msg-body"><div class="ai-bubble bot" style="min-height:20px"></div></div>';
+              aiMsgs.appendChild(ansWrap);
+              _autoScroll(aiMsgs);
+              // Scope to ansWrap — id="streamBubble" was non-unique across multiple answers,
+              // causing follow-up questions to stream into the FIRST (oldest) bubble.
+              bubble = ansWrap.querySelector('.ai-bubble.bot');
+            }
+
+            fetch(BACKEND_URL + '/api/ai/stream', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+              body: JSON.stringify({ courseId: _courseId, question: question, mode: _ragMode, documentId: _activeDocId || undefined })
+            }).then(function (res) {
+              if (!res.ok) { fallbackToRag(); return; }
+              var reader = res.body.getReader();
+              var decoder = new TextDecoder();
+              var sseBuffer = '';
+
+              function read() {
+                reader.read().then(function (result) {
+                  if (result.done) { finalize(null); return; }
+                  sseBuffer += decoder.decode(result.value, { stream: true });
+                  var lines = sseBuffer.split('\n');
+                  sseBuffer = lines.pop();
+                  lines.forEach(function (line) {
+                    if (!line.startsWith('data: ')) return;
+                    try {
+                      var evt = JSON.parse(line.slice(6));
+                      if (evt.t) {
+                        ensureBubble(); // swap dots → bubble on first token
+                        queueToken(evt.t);
+                      }
+                      if (evt.done) {
+                        _pendingMeta = evt;
+                        if (!_renderTimer && !_tokenQueue.length) finalize(_pendingMeta);
+                      }
+                      if (evt.error) { fallbackToRag(); }
+                    } catch (e) {}
+                  });
+                  read();
+                }).catch(function () { fallbackToRag(); });
+              }
+              read();
+            }).catch(function () { fallbackToRag(); });
+
+            function fallbackToRag() {
+              // Stream failed — fall back to non-streaming ai-ask endpoint
+              if (ansWrap) ansWrap.remove();
+              if (thinkWrap && !thinkWrap.parentNode) {
+                thinkWrap.className = 'ai-msg-wrap typing-wrap';
+                thinkWrap.innerHTML =
+                  '<div class="msg-sender bot-sender"><span class="msg-sender-dot"></span>StudySphere AI</div>' +
+                  '<div class="typing-bubble"><span></span><span></span><span></span></div>';
+                aiMsgs.appendChild(thinkWrap);
+              }
+              sendRagRequest(_courseId, question, _ragMode, _activeDocId || undefined).then(function (data) {
+                if (thinkWrap && thinkWrap.parentNode) thinkWrap.remove();
+                var answer = data.answer || 'No answer found.';
+                var confEmoji = data.confidence === 'high' ? '🟢' : data.confidence === 'medium' ? '🟡' : '🔴';
+                if (data.sources && data.sources.length) {
+                  answer += '\n\n**Sources:**\n' + data.sources.map(function (s) {
+                    var l = '- ' + s.file_name;
+                    if (s.pages) l += ', p.' + s.pages;
+                    if (s.section) l += ' · *' + s.section + '*';
+                    return l;
+                  }).join('\n');
+                }
+                answer += '\n\n' + confEmoji + ' Confidence: ' + (data.confidence || 'medium');
+                resolve({ content: [{ text: answer }], _ragData: data });
+              }).catch(function () {
+                if (thinkWrap && thinkWrap.parentNode) thinkWrap.remove();
+                resolve({ content: [{ text: '❌ Could not reach the AI. Please try again.' }] });
+              });
+            }
+
+            function finalize(meta) {
+              window._activeStreamRender = null; // no longer stoppable
+              var sources = (meta && meta.sources) || [];
+              var confidence = (meta && meta.confidence) || 'medium';
+              var qType = (meta && meta.question_type) || '';
+              var unsupported = !!(meta && meta.unsupported);
+
+              // Final rendered text — strip META tag then apply markdown
+              var cleanText = rawText.replace(metaPattern, '').trim();
+              if (!cleanText) cleanText = 'No answer received.';
+
+              var confEmoji = confidence === 'high' ? '🟢' : confidence === 'medium' ? '🟡' : '🔴';
+              var footer = confEmoji + ' Confidence: ' + confidence;
+              if (_ragMode === 'general') footer += ' · 🌐 general mode';
+
+              var fullAnswer = cleanText;
+              if (unsupported && !sources.length) {
+                fullAnswer = '⚠️ *No matching course materials found — answering from general knowledge.*\n\n' + fullAnswer;
+              }
+              if (sources.length) {
+                fullAnswer += '\n\n**Sources:**\n' + sources.map(function (s) {
+                  var line = '- ' + s.file_name;
+                  if (s.pages) line += ', p.' + s.pages;
+                  if (s.section) line += ' · *' + s.section + '*';
+                  return line;
+                }).join('\n');
+              }
+              fullAnswer += '\n\n' + footer;
+
+              window._lastRagMeta = { courseId: _courseId, question: question, answerCacheId: null };
+
+              // Store raw markdown on bubble so serializeChatDOM can read it correctly
+              if (bubble) bubble.setAttribute('data-raw', fullAnswer);
+
+              // Render all remaining blocks with markdown+KaTeX
+              fullRender(fullAnswer);
+
+              resolve({ content: [{ text: fullAnswer }], _streamWrap: ansWrap, _ragData: meta });
+            }
           });
         }
 
@@ -203,14 +489,47 @@ export function initAskAI(state) {
       })
       .then(function (data) {
         if (myGenId !== state.currentGenId) {
-          thinkWrap.remove();
+          if (!data._streamWrap) thinkWrap.remove();
           return;
         }
-        thinkWrap.style.transition = 'opacity .3s';
-        thinkWrap.style.opacity = '0';
-        setTimeout(function () {
-          thinkWrap.remove();
-        }, 320);
+
+        // Streaming path already rendered the bubble — just do final markdown render
+        if (data._streamWrap) {
+          var streamBubble = data._streamWrap.querySelector('.ai-bubble.bot');
+          var rawFinal = data.content ? data.content.map(function (b) { return b.text || ''; }).join('') : '';
+          // fullRender was already called inside finalize's queue drain.
+          // Just ensure the typing span is cleaned up and math is applied.
+          if (streamBubble) {
+            var _typingSpan = streamBubble.querySelector('.ss-typing-span');
+            if (_typingSpan) _typingSpan.remove();
+            if (window._ssEnsureKatex) {
+              var _sbEl = streamBubble;
+              window._ssEnsureKatex().then(function () {
+                if (window._renderMath && _sbEl) window._renderMath(_sbEl);
+                _sbEl.querySelectorAll('.ss-rendered-block').forEach(function (d) { d.style.opacity = '1'; });
+                _autoScroll(aiMsgs);
+              }).catch(function () {});
+            }
+          }
+          if (window._aiResponseActions && rawFinal && !data._streamWrap.querySelector('.ai-action-bar')) {
+            var mb = data._streamWrap.querySelector('.msg-body');
+            if (mb) mb.appendChild(window._aiResponseActions(rawFinal, 'panel'));
+          }
+          var _sb0 = document.getElementById('aiSend');
+          if (_sb0) _sb0.disabled = false;
+          var _st0 = document.getElementById('stopBtn');
+          if (_st0) _st0.style.display = 'none';
+          if (window.spawnConfetti) window.spawnConfetti();
+          _autoScroll(aiMsgs);
+          return;
+        }
+
+        // Non-streaming fallback: dots still showing, fade them out now
+        if (thinkWrap && thinkWrap.parentNode) {
+          thinkWrap.style.transition = 'opacity .3s';
+          thinkWrap.style.opacity = '0';
+          setTimeout(function () { thinkWrap.remove(); }, 320);
+        }
 
         var _ragMeta = data._ragData
           ? {
@@ -236,8 +555,8 @@ export function initAskAI(state) {
         ansWrap.innerHTML =
           '<div class="msg-sender bot-sender"><span class="msg-sender-dot"></span>StudySphere AI</div>' +
           '<div class="msg-body">' +
-          '<div class="ai-bubble bot" id="streamBubble" style="min-height:20px"></div>' +
-          '<div class="msg-meta" id="streamMeta" style="display:none">' +
+          '<div class="ai-bubble bot" style="min-height:20px"></div>' +
+          '<div class="msg-meta" style="display:none">' +
           '<span class="msg-time">' +
           t +
           '</span>' +
@@ -248,7 +567,7 @@ export function initAskAI(state) {
           '</div>';
         bindMessageActionButtons(ansWrap);
         aiMsgs.appendChild(ansWrap);
-        aiMsgs.scrollTop = aiMsgs.scrollHeight;
+        _autoScroll(aiMsgs);
 
         setTimeout(function () {
           var bubble = ansWrap.querySelector('.ai-bubble.bot');
@@ -256,7 +575,9 @@ export function initAskAI(state) {
           var tokens = rawText.match(/\S+\s*/g) || [];
           var idx = 0;
           var displayed = '';
-          var WORDS_PER_FRAME = 3;
+          var _fbCfg = window.AI_TYPING || {};
+          var WORDS_PER_FRAME = _fbCfg.fallbackWordsPerFrame || 1;
+          var FRAME_INTERVAL = _fbCfg.fallbackFrameInterval || 38;
 
           function frame() {
             if (state.generationStopped || myGenId !== state.currentGenId) {
@@ -303,10 +624,10 @@ export function initAskAI(state) {
               (idx < tokens.length ? '<span class="stream-cursor">▋</span>' : '');
             if (!panelHidden && aiMsgs.scrollHeight - aiMsgs.scrollTop - aiMsgs.clientHeight < 80)
               aiMsgs.scrollTop = aiMsgs.scrollHeight;
-            state.activeTypeTimer = setTimeout(frame, panelHidden ? 0 : 16);
+            state.activeTypeTimer = setTimeout(frame, panelHidden ? 0 : FRAME_INTERVAL);
           }
 
-          state.activeTypeTimer = setTimeout(frame, 16);
+          state.activeTypeTimer = setTimeout(frame, FRAME_INTERVAL);
         }, 60);
       })
       .catch(function (e) {

@@ -62,6 +62,7 @@ askAI = function (question, skipUserBubble) {
   // Snapshot + clear images before anything else
   var _imgs = _attachedImages.slice();
   _attachedImages = [];
+  window._attachedImages = _attachedImages;
   _renderImgPreviews();
 
   if (!skipUserBubble) {
@@ -580,6 +581,7 @@ function _renderImgPreviews() {
       (function (i) {
         return function () {
           _attachedImages.splice(i, 1);
+          window._attachedImages = _attachedImages;
           _renderImgPreviews();
         };
       })(idx)
@@ -597,6 +599,7 @@ function _addAttachedImage(img) {
     return;
   }
   _attachedImages.push(img);
+  window._attachedImages = _attachedImages; // keep global in sync
   _renderImgPreviews();
 }
 

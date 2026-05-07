@@ -22,7 +22,7 @@ const { countRecentEvents, rateLimitResponse } = require('../lib/rate-limit');
 
 const EMBED_MODEL = 'text-embedding-3-small';
 const EMBED_DIMENSIONS = 1536;
-const OPENAI_CHAT_MODEL = optionalEnv('AI_MODEL', 'gpt-4o-mini');
+const OPENAI_CHAT_MODEL = optionalEnv('OPENAI_GENERATE_MODEL', 'gpt-4o-mini');
 const MIN_SIMILARITY = 0.12;
 const MAX_CHUNKS = 8;
 
@@ -64,7 +64,9 @@ function embedText(text) {
         res.on('end', function () {
           try {
             const p = JSON.parse(d);
-            if (!p.data || !p.data[0]) return reject(new Error('Embed failed'));
+            if (res.statusCode < 200 || res.statusCode >= 300)
+              return reject(new Error('Embedding failed (' + res.statusCode + '): ' + d));
+            if (!p.data || !p.data[0]) return reject(new Error('Embedding failed: ' + d));
             resolve(p.data[0].embedding);
           } catch (e) {
             reject(e);
@@ -73,7 +75,7 @@ function embedText(text) {
       }
     );
     req.setTimeout(5000, function () {
-      req.destroy(new Error('Embed request timed out'));
+      req.destroy(new Error('Embedding request timed out'));
     });
     req.on('error', reject);
     req.write(body);
@@ -112,23 +114,38 @@ function callOpenAI(systemPrompt, userMessage) {
         res.on('end', function () {
           try {
             const p = JSON.parse(d);
+            if (res.statusCode < 200 || res.statusCode >= 300)
+              return reject(new Error('OpenAI failed (' + res.statusCode + '): ' + d));
             const text =
               p.choices && p.choices[0] && p.choices[0].message && p.choices[0].message.content;
-            if (!text) return reject(new Error('Empty OpenAI response'));
-            resolve(JSON.parse(text));
+            if (!text) return reject(new Error('Empty OpenAI response: ' + d));
+            resolve(parseJsonObject(text));
           } catch (e) {
             reject(e);
           }
         });
       }
     );
-    req.setTimeout(8000, function () {
+    req.setTimeout(20000, function () {
       req.destroy(new Error('OpenAI request timed out'));
     });
     req.on('error', reject);
     req.write(body);
     req.end();
   });
+}
+
+function parseJsonObject(text) {
+  const stripped = String(text || '')
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```\s*$/i, '')
+    .trim();
+  try {
+    return JSON.parse(stripped);
+  } catch (e) {}
+  const match = stripped.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error('OpenAI response was not JSON');
+  return JSON.parse(match[0]);
 }
 
 // ─── Retrieval ────────────────────────────────────────────────────────────────
@@ -355,7 +372,14 @@ exports.handler = async function (event) {
   try {
     embedding = await embedText(query);
   } catch (e) {
-    return fail(502, 'Embedding service unavailable');
+    console.error('ai-generate embedding error:', e && e.message ? e.message : e);
+    return jsonResponse(200, {
+      tool,
+      items: [],
+      text: '',
+      sources: [],
+      error: 'AI generation is temporarily unavailable. Please try again in a moment.'
+    });
   }
 
   // Retrieve and rank chunks
@@ -395,7 +419,14 @@ exports.handler = async function (event) {
   try {
     result = await callOpenAI(sysPrompt, userMessage);
   } catch (e) {
-    return fail(502, 'AI service unavailable');
+    console.error('ai-generate OpenAI error:', e && e.message ? e.message : e);
+    return jsonResponse(200, {
+      tool,
+      items: [],
+      text: '',
+      sources: [],
+      error: 'AI generation is temporarily unavailable. Please try again in a moment.'
+    });
   }
 
   // Build deduplicated sources list

@@ -223,3 +223,400 @@
   font-style: italic;
   padding: 4px 0;
 }
+
+/* Interactive quiz and flashcards */
+.gl-study-tools {
+  margin-top: 10px;
+  padding: 18px;
+  background:
+    radial-gradient(circle at top left, rgba(244, 114, 182, 0.16), transparent 32%),
+    rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 20px;
+}
+.gl-study-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.gl-study-header .widget-title {
+  margin: 0;
+}
+.gl-study-sub {
+  margin-top: 3px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.38);
+}
+.gl-study-tabs {
+  display: inline-flex;
+  padding: 4px;
+  background: rgba(10, 12, 22, 0.42);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  flex-shrink: 0;
+}
+.gl-study-tab {
+  min-height: 34px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.58);
+  font-family: 'Nunito', sans-serif;
+  font-weight: 900;
+  cursor: pointer;
+}
+.gl-study-tab.active {
+  background: linear-gradient(135deg, #fb7185, #fb923c);
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(251, 113, 133, 0.22);
+}
+.gl-study-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.gl-tool-btn {
+  min-height: 38px;
+  padding: 0 16px;
+  border-radius: 13px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.055);
+  color: rgba(255, 255, 255, 0.78);
+  font-family: 'Nunito', sans-serif;
+  font-weight: 900;
+  cursor: pointer;
+  transition:
+    transform 0.18s,
+    background 0.18s,
+    border-color 0.18s;
+}
+.gl-tool-btn:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+.gl-tool-btn-primary {
+  border: none;
+  background: linear-gradient(135deg, #fb7185, #fb923c);
+  color: #fff;
+}
+.gl-study-body {
+  display: flex;
+  justify-content: center;
+}
+.gl-quiz-shell {
+  width: min(100%, 560px);
+  padding: 18px;
+  border-radius: 24px;
+  background: linear-gradient(180deg, #fff7fb 0%, #fff 100%);
+  color: #30162f;
+  box-shadow: 0 18px 45px rgba(20, 13, 37, 0.24);
+}
+.gl-quiz-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #fff0f6;
+  border: 1px solid #ffd1e3;
+  color: #b4235a;
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+.gl-quiz-category {
+  margin-top: 14px;
+  font-size: 0.72rem;
+  font-weight: 1000;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8b5cf6;
+}
+.gl-quiz-question {
+  margin: 8px 0 14px;
+  font-family: 'Fredoka One', cursive;
+  font-size: clamp(1.18rem, 2vw, 1.55rem);
+  line-height: 1.25;
+  color: #26112b;
+}
+.gl-quiz-options {
+  display: grid;
+  gap: 9px;
+}
+.gl-quiz-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 12px;
+  border-radius: 15px;
+  border: 2px solid #f4d7fa;
+  background: #fff3fb;
+  color: #37213b;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 900;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform 0.16s,
+    border-color 0.16s,
+    background 0.16s;
+}
+.gl-quiz-option:hover:not(:disabled),
+.gl-quiz-option:focus-visible {
+  transform: scale(1.01);
+  border-color: #f0a5cd;
+  outline: none;
+}
+.gl-option-letter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  background: #f7dff8;
+  color: #7c3aed;
+  flex-shrink: 0;
+}
+.gl-option-status {
+  margin-left: auto;
+  font-size: 0.72rem;
+  font-weight: 1000;
+  color: inherit;
+  white-space: nowrap;
+}
+.gl-quiz-option.correct {
+  border-color: #22c55e;
+  background: #dcfce7;
+  color: #166534;
+}
+.gl-quiz-option.correct .gl-option-letter {
+  background: #22c55e;
+  color: #fff;
+}
+.gl-quiz-option.incorrect {
+  border-color: #fb7185;
+  background: #ffe4e6;
+  color: #be123c;
+}
+.gl-quiz-option.incorrect .gl-option-letter {
+  background: #fb7185;
+  color: #fff;
+}
+.gl-quiz-option:disabled {
+  cursor: default;
+}
+.gl-explanation {
+  margin-top: 14px;
+  padding: 13px 14px;
+  border-radius: 16px;
+  background: #fff7dd;
+  border: 1px solid #fde68a;
+  color: #4a3411;
+  font-size: 0.9rem;
+  font-weight: 800;
+  line-height: 1.5;
+  animation: glFadeIn 0.24s ease both;
+}
+.gl-continue-btn {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 14px;
+  border: none;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #fb7185, #fb923c);
+  color: #fff;
+  font-family: 'Nunito', sans-serif;
+  font-size: 0.96rem;
+  font-weight: 1000;
+  cursor: pointer;
+  box-shadow: 0 13px 28px rgba(251, 113, 133, 0.28);
+  transition:
+    transform 0.16s,
+    box-shadow 0.16s;
+}
+.gl-continue-btn:hover,
+.gl-continue-btn:focus-visible {
+  transform: translateY(-1px);
+  outline: none;
+  box-shadow: 0 16px 34px rgba(251, 113, 133, 0.34);
+}
+.gl-flash-shell {
+  position: relative;
+  width: min(100%, 680px);
+  padding: 18px;
+  border-radius: 20px;
+  background: #10131b;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  color: #f8fafc;
+}
+.gl-flash-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.gl-flash-label {
+  font-size: 0.78rem;
+  font-weight: 1000;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+.gl-flash-icons {
+  display: flex;
+  gap: 7px;
+}
+.gl-flash-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(255, 255, 255, 0.045);
+  color: #cbd5e1;
+  cursor: pointer;
+  font-weight: 900;
+}
+.gl-flash-icon.active {
+  background: rgba(34, 197, 94, 0.14);
+  border-color: rgba(34, 197, 94, 0.42);
+  color: #86efac;
+}
+.gl-flash-icon.review.active {
+  background: rgba(251, 113, 133, 0.14);
+  border-color: rgba(251, 113, 133, 0.42);
+  color: #fda4af;
+}
+.gl-flash-icon.bookmark.active {
+  background: rgba(250, 204, 21, 0.14);
+  border-color: rgba(250, 204, 21, 0.42);
+  color: #fde047;
+}
+.gl-flash-stage {
+  perspective: 1200px;
+}
+.gl-flash-card {
+  position: relative;
+  min-height: 260px;
+  border-radius: 18px;
+  transform-style: preserve-3d;
+  transition: transform 0.52s ease;
+  cursor: pointer;
+}
+.gl-flash-card.flipped {
+  transform: rotateY(180deg);
+}
+.gl-flash-side {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+  border-radius: 18px;
+  background: #1f2430;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  backface-visibility: hidden;
+  text-align: center;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+.gl-flash-side.back {
+  transform: rotateY(180deg);
+}
+.gl-flash-text {
+  font-family: 'Fredoka One', cursive;
+  font-size: clamp(1.35rem, 3vw, 2rem);
+  line-height: 1.35;
+  color: #f8fafc;
+}
+.gl-flash-side.back .gl-flash-text {
+  font-family: 'Nunito', sans-serif;
+  font-size: clamp(1.02rem, 2vw, 1.32rem);
+  font-weight: 900;
+  color: #e2e8f0;
+}
+.gl-flash-controls {
+  display: flex;
+  justify-content: center;
+  gap: 9px;
+  margin-top: 14px;
+}
+.gl-flash-control {
+  min-height: 40px;
+  padding: 0 15px;
+  border-radius: 13px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(255, 255, 255, 0.055);
+  color: #e2e8f0;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 1000;
+  cursor: pointer;
+}
+.gl-study-empty {
+  width: 100%;
+  padding: 22px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px dashed rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 800;
+  text-align: center;
+}
+@keyframes glFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (max-width: 600px) {
+  .gl-study-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .gl-study-tabs,
+  .gl-study-tab {
+    width: 100%;
+  }
+  .gl-study-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .gl-quiz-shell,
+  .gl-flash-shell {
+    padding: 14px;
+  }
+  .gl-flash-card {
+    min-height: 230px;
+  }
+  .gl-flash-controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+  .gl-flash-control {
+    padding: 0 8px;
+  }
+  .gl-option-status {
+    white-space: normal;
+    text-align: right;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gl-study-tools *,
+  .gl-study-tools *::before,
+  .gl-study-tools *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

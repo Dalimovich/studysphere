@@ -146,4 +146,7 @@
   window._ssEnsurePdfExportDeps = ensurePdfExportDeps;
   window._ssEnsurePayPalSdk = ensurePayPalSdk;
   window._ssEnsureKatex = ensureKatex;
+
+  // Pre-load KaTeX immediately so math renders without delay on first answer
+  ensureKatex().catch(function () {});
 })();

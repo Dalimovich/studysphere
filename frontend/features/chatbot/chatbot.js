@@ -1016,7 +1016,7 @@
               row.appendChild(_aiResponseActions(partial, 'chatbot'));
             _releaseBusy();
             var m = document.getElementById('aipMsgs');
-            if (m) m.scrollTop = m.scrollHeight;
+            if (m && !_userScrolledUp) m.scrollTop = m.scrollHeight;
             return;
           }
           if (i >= raw.length) {
@@ -1026,7 +1026,7 @@
               row.appendChild(_aiResponseActions(raw, 'chatbot'));
             _releaseBusy();
             var m = document.getElementById('aipMsgs');
-            if (m) m.scrollTop = m.scrollHeight;
+            if (m && !_userScrolledUp) m.scrollTop = m.scrollHeight;
             return;
           }
           var sec = document.getElementById('psec-aipage');
@@ -1042,7 +1042,8 @@
           i++;
           var m = document.getElementById('aipMsgs');
           if (m && !_userScrolledUp) m.scrollTop = m.scrollHeight;
-          _typeTimer = setTimeout(typeNext, 14 + (Math.random() > 0.93 ? 50 : 0));
+          var _cbInterval = (window.AI_TYPING && window.AI_TYPING.chatbotCharInterval) || 6;
+          _typeTimer = setTimeout(typeNext, _cbInterval + (Math.random() > 0.93 ? 30 : 0));
         }
         typeNext();
       })

@@ -71,11 +71,12 @@ export function addBotMsg(text) {
   var wrap = document.createElement('div');
   wrap.className = 'ai-msg-wrap';
   var t = getTime();
+  var _botHtml = typeof window.renderMarkdown === 'function' ? window.renderMarkdown(text) : text;
   wrap.innerHTML =
     '<div class="msg-sender bot-sender"><span class="msg-sender-dot"></span>StudySphere AI</div>' +
     '<div class="msg-body">' +
     '<div class="ai-bubble bot">' +
-    (typeof window.renderMarkdown === 'function' ? window.renderMarkdown(text) : text) +
+    _botHtml +
     '</div>' +
     '<div class="msg-meta">' +
     '<span class="msg-time">' +
@@ -88,6 +89,17 @@ export function addBotMsg(text) {
     '</div>';
   bindMessageActionButtons(wrap);
   aiMsgs.appendChild(wrap);
+  // Store raw markdown so serializeChatDOM reads text, not KaTeX HTML
+  var _botBubble = wrap.querySelector('.ai-bubble.bot');
+  if (_botBubble) {
+    _botBubble.setAttribute('data-raw', text);
+    // Apply KaTeX to any math in this message
+    if (window._ssEnsureKatex) {
+      window._ssEnsureKatex().then(function () {
+        if (window._renderMath && _botBubble) window._renderMath(_botBubble);
+      }).catch(function () {});
+    }
+  }
   var msgBody = wrap.querySelector('.msg-body');
   if (msgBody && typeof window._aiResponseActions === 'function')
     msgBody.appendChild(window._aiResponseActions(text, 'panel'));
@@ -158,7 +170,8 @@ export function serializeChatDOM() {
     var bubble = wrap.querySelector('.ai-bubble');
     if (!bubble) return;
     var role = bubble.classList.contains('user') ? 'user' : 'assistant';
-    var text = (bubble.innerText || bubble.textContent || '').trim();
+    // Prefer data-raw (original markdown) over innerText which is garbled by KaTeX HTML
+    var text = (bubble.getAttribute('data-raw') || bubble.innerText || bubble.textContent || '').trim();
     if (text) msgs.push({ role: role, text: text });
   });
   return msgs;

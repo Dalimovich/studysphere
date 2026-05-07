@@ -13,16 +13,18 @@ export async function sendAiRequest(payload) {
 }
 
 // RAG ask — uses uploaded course documents as context
-export async function sendRagRequest(courseId, question, mode) {
+export async function sendRagRequest(courseId, question, mode, documentId) {
   var BACKEND_URL = window.BACKEND_URL || '';
   var token = window._sbToken || '';
+  var payload = { courseId: courseId, question: question, mode: mode || 'strict' };
+  if (documentId) payload.documentId = documentId;
   var response = await fetch(BACKEND_URL + '/api/ai/ask', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: 'Bearer ' + token
     },
-    body: JSON.stringify({ courseId: courseId, question: question, mode: mode || 'strict' })
+    body: JSON.stringify(payload)
   });
   return response.json();
 }
@@ -118,6 +120,7 @@ export async function indexExistingDocument(
     if (meta.language) payload.language = meta.language;
     if (meta.isOfficialProfMaterial != null)
       payload.isOfficialProfMaterial = !!meta.isOfficialProfMaterial;
+    if (meta.forceReindex) payload.forceReindex = true;
   }
   try {
     var response = await fetch(BACKEND_URL + '/api/documents/index-existing', {

@@ -63,6 +63,13 @@
       ]
     };
     var _glActiveSkill = '';
+    var _glToolMode = 'quiz';
+    var _glQuizItems = [];
+    var _glQuizIndex = 0;
+    var _glSelectedOption = null;
+    var _glCards = [];
+    var _glCardIndex = 0;
+    var _glCardFlipped = false;
 
     // Refresh hero badge/chip from globals set by app.js profile load
     function _glRefreshHero() {
@@ -120,6 +127,50 @@
         if (panel) panel.style.display = 'none';
       });
 
+    var glQuizTab = document.getElementById('glQuizTab');
+    var glCardsTab = document.getElementById('glCardsTab');
+    var glGenerateQuiz = document.getElementById('glGenerateQuiz');
+    var glGenerateCards = document.getElementById('glGenerateCards');
+    if (glQuizTab)
+      glQuizTab.addEventListener('click', function () {
+        _glSetToolMode('quiz');
+      });
+    if (glCardsTab)
+      glCardsTab.addEventListener('click', function () {
+        _glSetToolMode('cards');
+      });
+    if (glGenerateQuiz)
+      glGenerateQuiz.addEventListener('click', function () {
+        _glGenerateStudyTool('quiz');
+      });
+    if (glGenerateCards)
+      glGenerateCards.addEventListener('click', function () {
+        _glGenerateStudyTool('flashcards');
+      });
+
+    document.addEventListener('keydown', function (e) {
+      var detail = document.getElementById('glSkillView');
+      if (!detail || detail.style.display === 'none') return;
+      if (e.target && ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(e.target.tagName)) return;
+      if (_glToolMode === 'cards') {
+        if (e.key === ' ') {
+          e.preventDefault();
+          _glFlipCard();
+        } else if (e.key === 'ArrowLeft') {
+          _glMoveCard(-1);
+        } else if (e.key === 'ArrowRight') {
+          _glMoveCard(1);
+        }
+      } else if (
+        _glToolMode === 'quiz' &&
+        _glSelectedOption &&
+        (e.key === 'Enter' || e.key === ' ')
+      ) {
+        e.preventDefault();
+        _glNextQuestion();
+      }
+    });
+
     window._glOpenSkill = function (skill) {
       _glActiveSkill = skill;
 
@@ -134,6 +185,8 @@
       var subEl = document.getElementById('glSkillSub');
       if (titleEl) titleEl.textContent = _glSkillNames[skill] || skill;
       if (subEl) subEl.textContent = _glSkillSubs[skill] || '';
+      _glLoadSampleTools(skill);
+      _glRenderStudyTools();
 
       // Swap AI chips
       var aiChipsEl = document.querySelector('.ai-chips');
@@ -237,6 +290,351 @@
       if (bytes < 1024) return bytes + ' B';
       if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
       return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    function _glEscape(value) {
+      return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function _glSampleTools(skill) {
+      var title = _glSkillNames[skill] || 'German Practice';
+      var sharedCards = [
+        {
+          front: 'Was bedeutet "trotzdem"?',
+          back: '"Trotzdem" means "nevertheless" or "even so" and links two contrasting ideas.'
+        },
+        {
+          front: 'Konjunktiv II',
+          back: 'Konjunktiv II is used for polite requests, hypothetical situations, and wishes.'
+        },
+        {
+          front: 'Nebensatz word order',
+          back: 'In a subordinate clause, the conjugated verb usually moves to the end.'
+        }
+      ];
+      return {
+        quiz: [
+          {
+            category: title,
+            question: 'Which sentence uses correct subordinate-clause word order?',
+            options: {
+              A: 'Ich bleibe zu Hause, weil ich krank bin.',
+              B: 'Ich bleibe zu Hause, weil bin ich krank.',
+              C: 'Ich bleibe zu Hause, weil ich bin krank.',
+              D: 'Ich bleibe zu Hause, weil krank ich bin.'
+            },
+            answer: 'A',
+            explanation:
+              'After "weil", the conjugated verb moves to the end of the subordinate clause.'
+          },
+          {
+            category: title,
+            question: 'What is the best meaning of "sich bewerben"?',
+            options: {
+              A: 'to complain',
+              B: 'to apply',
+              C: 'to repeat',
+              D: 'to compare'
+            },
+            answer: 'B',
+            explanation:
+              '"Sich bewerben" is commonly used for applying for a job, university place, or program.'
+          },
+          {
+            category: title,
+            question: 'Which connector expresses contrast?',
+            options: {
+              A: 'deshalb',
+              B: 'außerdem',
+              C: 'trotzdem',
+              D: 'zuerst'
+            },
+            answer: 'C',
+            explanation: '"Trotzdem" signals contrast: something happens despite the previous idea.'
+          }
+        ],
+        cards: sharedCards
+      };
+    }
+
+    function _glLoadSampleTools(skill) {
+      var sample = _glSampleTools(skill);
+      _glQuizItems = sample.quiz;
+      _glCards = sample.cards.map(function (card) {
+        return Object.assign({ bookmarked: false, confidence: null }, card);
+      });
+      _glQuizIndex = 0;
+      _glSelectedOption = null;
+      _glCardIndex = 0;
+      _glCardFlipped = false;
+    }
+
+    function _glSetToolMode(mode) {
+      _glToolMode = mode === 'cards' ? 'cards' : 'quiz';
+      var quizTab = document.getElementById('glQuizTab');
+      var cardsTab = document.getElementById('glCardsTab');
+      if (quizTab) {
+        quizTab.classList.toggle('active', _glToolMode === 'quiz');
+        quizTab.setAttribute('aria-selected', _glToolMode === 'quiz' ? 'true' : 'false');
+      }
+      if (cardsTab) {
+        cardsTab.classList.toggle('active', _glToolMode === 'cards');
+        cardsTab.setAttribute('aria-selected', _glToolMode === 'cards' ? 'true' : 'false');
+      }
+      _glRenderStudyTools();
+    }
+
+    function _glNormalizeQuizItem(item, idx) {
+      var rawOptions = item.options || {};
+      var opts = {};
+      if (Array.isArray(rawOptions)) {
+        rawOptions.forEach(function (option, i) {
+          var letter = option.id || ['A', 'B', 'C', 'D'][i];
+          if (letter) opts[letter] = option.text || option.label || String(option);
+        });
+      } else {
+        ['A', 'B', 'C', 'D'].forEach(function (letter) {
+          if (rawOptions[letter]) opts[letter] = rawOptions[letter];
+        });
+      }
+      return {
+        category: item.category || item.source || _glSkillNames[_glActiveSkill] || 'Practice',
+        question: item.question || 'Question ' + (idx + 1),
+        options: opts,
+        answer: item.answer || item.correctOptionId || 'A',
+        explanation: item.explanation || 'Review the correct answer and continue when ready.'
+      };
+    }
+
+    function _glRenderStudyTools() {
+      var body = document.getElementById('glStudyToolBody');
+      if (!body) return;
+      if (_glToolMode === 'cards') {
+        _glRenderFlashcards(body);
+      } else {
+        _glRenderQuiz(body);
+      }
+    }
+
+    function _glRenderQuiz(body) {
+      if (!_glQuizItems.length) {
+        body.innerHTML =
+          '<div class="gl-study-empty">Generate a quiz from your study material.</div>';
+        return;
+      }
+      var item = _glNormalizeQuizItem(_glQuizItems[_glQuizIndex], _glQuizIndex);
+      var answered = !!_glSelectedOption;
+      var optionHtml = ['A', 'B', 'C', 'D']
+        .filter(function (letter) {
+          return item.options[letter];
+        })
+        .map(function (letter) {
+          var state = '';
+          var status = '';
+          if (answered && letter === item.answer) {
+            state = ' correct';
+            status = '<span class="gl-option-status">Correct answer</span>';
+          } else if (answered && letter === _glSelectedOption) {
+            state = ' incorrect';
+            status = '<span class="gl-option-status">Your answer</span>';
+          }
+          return (
+            '<button class="gl-quiz-option' +
+            state +
+            '" type="button" data-option="' +
+            letter +
+            '"' +
+            (answered ? ' disabled' : '') +
+            ' aria-label="' +
+            _glEscape(letter + '. ' + item.options[letter]) +
+            '">' +
+            '<span class="gl-option-letter">' +
+            letter +
+            '</span>' +
+            '<span>' +
+            _glEscape(item.options[letter]) +
+            '</span>' +
+            status +
+            '</button>'
+          );
+        })
+        .join('');
+      body.innerHTML =
+        '<section class="gl-quiz-shell" aria-live="polite">' +
+        '<div class="gl-quiz-badge">Big Match ' +
+        (_glQuizIndex + 1) +
+        ' / ' +
+        _glQuizItems.length +
+        '</div>' +
+        '<div class="gl-quiz-category">' +
+        _glEscape(item.category) +
+        '</div>' +
+        '<div class="gl-quiz-question">' +
+        _glEscape(item.question) +
+        '</div>' +
+        '<div class="gl-quiz-options">' +
+        optionHtml +
+        '</div>' +
+        (answered
+          ? '<div class="gl-explanation"><strong>Explanation:</strong> ' +
+            _glEscape(item.explanation) +
+            '</div><button class="gl-continue-btn" id="glContinueQuiz" type="button">Got it, keep going</button>'
+          : '') +
+        '</section>';
+
+      body.querySelectorAll('.gl-quiz-option').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          _glSelectedOption = btn.getAttribute('data-option');
+          _glRenderStudyTools();
+        });
+      });
+      var continueBtn = document.getElementById('glContinueQuiz');
+      if (continueBtn) continueBtn.addEventListener('click', _glNextQuestion);
+    }
+
+    function _glNextQuestion() {
+      if (!_glQuizItems.length) return;
+      _glQuizIndex = (_glQuizIndex + 1) % _glQuizItems.length;
+      _glSelectedOption = null;
+      _glRenderStudyTools();
+    }
+
+    function _glRenderFlashcards(body) {
+      if (!_glCards.length) {
+        body.innerHTML =
+          '<div class="gl-study-empty">Generate flashcards from your study material.</div>';
+        return;
+      }
+      var card = _glCards[_glCardIndex];
+      body.innerHTML =
+        '<section class="gl-flash-shell" aria-live="polite">' +
+        '<div class="gl-flash-top">' +
+        '<div><div class="gl-flash-label">' +
+        (_glCardFlipped ? 'Definition' : 'Begriff') +
+        '</div><div class="gl-study-sub">Card ' +
+        (_glCardIndex + 1) +
+        ' / ' +
+        _glCards.length +
+        '</div></div>' +
+        '<div class="gl-flash-icons" aria-label="Flashcard feedback">' +
+        '<button class="gl-flash-icon know' +
+        (card.confidence === 'known' ? ' active' : '') +
+        '" type="button" data-feedback="known" title="I know this">+</button>' +
+        '<button class="gl-flash-icon review' +
+        (card.confidence === 'review' ? ' active' : '') +
+        '" type="button" data-feedback="review" title="Needs review">-</button>' +
+        '<button class="gl-flash-icon bookmark' +
+        (card.bookmarked ? ' active' : '') +
+        '" type="button" data-feedback="bookmark" title="Bookmark">*</button>' +
+        '</div></div>' +
+        '<div class="gl-flash-stage">' +
+        '<button class="gl-flash-card' +
+        (_glCardFlipped ? ' flipped' : '') +
+        '" id="glFlashCard" type="button" aria-label="Flashcard, ' +
+        (_glCardFlipped ? 'back side visible' : 'front side visible') +
+        '">' +
+        '<span class="gl-flash-side front"><span class="gl-flash-text">' +
+        _glEscape(card.front || card.term || 'Card front') +
+        '</span></span>' +
+        '<span class="gl-flash-side back"><span class="gl-flash-text">' +
+        _glEscape(card.back || card.definition || 'Card back') +
+        '</span></span>' +
+        '</button></div>' +
+        '<div class="gl-flash-controls">' +
+        '<button class="gl-flash-control" type="button" data-move="-1">Back</button>' +
+        '<button class="gl-flash-control" type="button" id="glFlipBtn">Flip</button>' +
+        '<button class="gl-flash-control" type="button" data-move="1">Next</button>' +
+        '</div>' +
+        '</section>';
+      var flashCard = document.getElementById('glFlashCard');
+      var flipBtn = document.getElementById('glFlipBtn');
+      if (flashCard) flashCard.addEventListener('click', _glFlipCard);
+      if (flipBtn) flipBtn.addEventListener('click', _glFlipCard);
+      body.querySelectorAll('[data-move]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          _glMoveCard(parseInt(btn.getAttribute('data-move'), 10));
+        });
+      });
+      body.querySelectorAll('[data-feedback]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var type = btn.getAttribute('data-feedback');
+          if (type === 'bookmark') card.bookmarked = !card.bookmarked;
+          else card.confidence = card.confidence === type ? null : type;
+          _glRenderStudyTools();
+        });
+      });
+    }
+
+    function _glFlipCard() {
+      if (!_glCards.length) return;
+      _glCardFlipped = !_glCardFlipped;
+      _glRenderStudyTools();
+    }
+
+    function _glMoveCard(delta) {
+      if (!_glCards.length) return;
+      _glCardIndex = (_glCardIndex + delta + _glCards.length) % _glCards.length;
+      _glCardFlipped = false;
+      _glRenderStudyTools();
+    }
+
+    async function _glGenerateStudyTool(tool) {
+      var targetMode = tool === 'flashcards' ? 'cards' : 'quiz';
+      _glSetToolMode(targetMode);
+      var body = document.getElementById('glStudyToolBody');
+      if (body)
+        body.innerHTML = '<div class="gl-study-empty">Generating from your material...</div>';
+      try {
+        var resp = await fetch(BACKEND_URL + '/api/ai/generate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer ' + (window._sbToken || '')
+          },
+          body: JSON.stringify({
+            courseId: _glCourse().id,
+            tool: tool,
+            count: tool === 'quiz' ? 5 : 8,
+            difficulty: 'medium',
+            topic: _glSkillNames[_glActiveSkill] || _glActiveSkill || null
+          })
+        });
+        var data = await resp.json();
+        if (data && data.items && data.items.length) {
+          if (tool === 'quiz') {
+            _glQuizItems = data.items;
+            _glQuizIndex = 0;
+            _glSelectedOption = null;
+          } else {
+            _glCards = data.items.map(function (card) {
+              return {
+                front: card.front,
+                back: card.back,
+                source: card.source || '',
+                bookmarked: false,
+                confidence: null
+              };
+            });
+            _glCardIndex = 0;
+            _glCardFlipped = false;
+          }
+        } else {
+          if (typeof showToast === 'function')
+            showToast(
+              'Using sample tools',
+              data.error || 'Upload indexed course files to generate more.'
+            );
+        }
+      } catch (e) {
+        if (typeof showToast === 'function')
+          showToast('Generation failed', 'Showing sample tools for now.');
+      }
+      _glRenderStudyTools();
     }
 
     function _glFileIcon(name) {

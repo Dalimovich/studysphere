@@ -81,7 +81,8 @@ exports.handler = async function (event) {
     lectureNumber,
     exerciseNumber,
     language,
-    isOfficialProfMaterial
+    isOfficialProfMaterial,
+    forceReindex
   } = body;
   if (!courseId || typeof courseId !== 'string') return fail(400, 'courseId is required');
   if (!storageName || typeof storageName !== 'string') return fail(400, 'storageName is required');
@@ -119,7 +120,10 @@ exports.handler = async function (event) {
   );
   if (Array.isArray(existing.body) && existing.body[0]) {
     const doc = existing.body[0];
-    if (doc.processing_status === 'ready' && doc.storage_path === docStoragePath) {
+    // Without forceReindex, a doc that's already ready and at the same storage
+    // path is a no-op. With forceReindex=true (new), we always reset and re-process
+    // — this lets users re-index after PDF-extraction improvements.
+    if (!forceReindex && doc.processing_status === 'ready' && doc.storage_path === docStoragePath) {
       return jsonResponse(200, {
         alreadyIndexed: true,
         documentId: doc.id,

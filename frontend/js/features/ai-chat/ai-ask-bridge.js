@@ -15,6 +15,11 @@ export function initAiAskBridge(state) {
   function stopGeneration() {
     state.generationStopped = true;
     state.currentGenId++;
+    // If a stream is in progress, flush queue and do final markdown+KaTeX render
+    if (typeof window._activeStreamRender === 'function') {
+      window._activeStreamRender();
+      window._activeStreamRender = null;
+    }
     if (state.activeTypeTimer) {
       clearTimeout(state.activeTypeTimer);
       state.activeTypeTimer = null;

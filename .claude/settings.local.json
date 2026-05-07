@@ -1,5 +1,9 @@
 {
   "permissions": {
-    "allow": ["Bash(python -c \":*)"]
+    "allow": [
+      "Bash(python -c \":*)",
+      "mcp__claude-flow__system_health",
+      "mcp__claude-flow__memory_search"
+    ]
   }
 }
