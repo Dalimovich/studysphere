@@ -59,10 +59,18 @@ export default async function handler(request, context) {
   // Run async pipeline — don't await, let it run while we return the stream
   (async () => {
     try {
-      // 1. Base embedding (needed for cache lookups + as retrieval fallback)
+      // Build enriched query early — used for base embedding AND all downstream retrieval.
+      // If the open PDF context is available, prepend it so every embedding/HyDE call
+      // reflects the actual exercise topic rather than just "Löse 13.1".
+      const enrichedQuestion = openCtx
+        ? 'Aufgabe-Kontext: ' + openCtx.slice(0, 500) + '\n\nFrage: ' + question
+        : question;
+
+      // 1. Base embedding — embed the enriched question so cache lookups, fetchSummaryChunks,
+      //    and all fallback retrievals use the topic-rich query, not the short student message.
       let baseEmbedding;
       try {
-        const _be = await embedBatch([question], OPENAI_API_KEY);
+        const _be = await embedBatch([enrichedQuestion], OPENAI_API_KEY);
         baseEmbedding = _be[0];
       } catch (e) {
         send({ error: 'Embedding service unavailable' });
@@ -91,10 +99,6 @@ export default async function handler(request, context) {
       let rawChunks;
       let qType = null;
       let skipRerank = false;
-      // Enriched question is built once here so the reranker can also use it
-      const enrichedQuestion = openCtx
-        ? 'Aufgabe-Kontext: ' + openCtx.slice(0, 500) + '\n\nFrage: ' + question
-        : question;
 
       const retrievalHit = !forceRefresh && await getRetrievalCache(questionHash, docVersionHash, SUPABASE_URL, SUPABASE_SERVICE_KEY);
       if (retrievalHit) {
