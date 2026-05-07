@@ -397,6 +397,23 @@
       };
     }
 
+    function _showGeneratingOverlay() {
+      var el = document.createElement('div');
+      el.id = 'qzGenOverlay';
+      el.className = 'gen-overlay';
+      el.innerHTML =
+        '<div class="gen-overlay-box">' +
+          '<div class="gen-overlay-spinner"></div>' +
+          '<div class="gen-overlay-title">Generating quiz…</div>' +
+          '<div class="gen-overlay-sub">Reading your course files and building questions</div>' +
+        '</div>';
+      document.body.appendChild(el);
+    }
+    function _hideGeneratingOverlay() {
+      var el = document.getElementById('qzGenOverlay');
+      if (el) el.remove();
+    }
+
     function doGenerate(documentIds) {
       if (!options.generate) {
         _toast('Generation unavailable', 'Generator function not injected.');
@@ -407,6 +424,7 @@
         els.generate._origLabel = els.generate.innerHTML;
         els.generate.innerHTML = '<span class="qz-btn-icon">&#x23F3;</span> Generating…';
       }
+      _showGeneratingOverlay();
       var genOpts = { count: 10, difficulty: 'medium', topic: (course && course.name) || null };
       if (documentIds && documentIds.length) genOpts.documentIds = documentIds;
       options.generate(courseId, 'quiz', genOpts)
@@ -460,6 +478,7 @@
           _toast('Generation failed', 'Try again, or reindex your PDFs first.');
         })
         .finally(function () {
+          _hideGeneratingOverlay();
           if (els.generate) {
             els.generate.disabled = false;
             els.generate.innerHTML = els.generate._origLabel ||

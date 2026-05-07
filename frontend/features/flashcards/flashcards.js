@@ -299,6 +299,23 @@
       };
     }
 
+    function _showGeneratingOverlay() {
+      var el = document.createElement('div');
+      el.id = 'fcGenOverlay';
+      el.className = 'gen-overlay';
+      el.innerHTML =
+        '<div class="gen-overlay-box">' +
+          '<div class="gen-overlay-spinner"></div>' +
+          '<div class="gen-overlay-title">Generating flashcards…</div>' +
+          '<div class="gen-overlay-sub">Reading your course files and building cards</div>' +
+        '</div>';
+      document.body.appendChild(el);
+    }
+    function _hideGeneratingOverlay() {
+      var el = document.getElementById('fcGenOverlay');
+      if (el) el.remove();
+    }
+
     function doGenerate(documentIds) {
       if (!options.generate) {
         _toast('Generation unavailable', 'Generator function not injected.');
@@ -307,6 +324,7 @@
       els.generate.disabled = true;
       var origLabel = els.generate.innerHTML;
       els.generate.innerHTML = '<span class="fc-btn-icon">&#x23F3;</span> Generating…';
+      _showGeneratingOverlay();
       var genOpts = { count: 12, difficulty: 'medium', topic: (course && course.name) || null };
       if (documentIds && documentIds.length) genOpts.documentIds = documentIds;
       options.generate(course.id, 'flashcards', genOpts).then(function (result) {
@@ -333,6 +351,7 @@
         console.error('flashcard generate error:', err);
         _toast('Generation failed', 'Try again, or reindex your PDFs first.');
       }).finally(function () {
+        _hideGeneratingOverlay();
         els.generate.disabled = false;
         els.generate.innerHTML = origLabel;
       });
