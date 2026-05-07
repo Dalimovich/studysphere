@@ -2538,6 +2538,105 @@ body.night .sb-acc-chev-btn {
   max-width: 1280px;
   align-items: stretch;
 }
+/* ── Source picker modal (quiz & flashcard generation) ───────────────────── */
+.qzsp-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.qzsp-modal {
+  background: #1a1330;
+  border: 1px solid rgba(155, 93, 229, 0.35);
+  border-radius: 20px;
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+  color: rgba(255, 255, 255, 0.9);
+}
+.qzsp-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.qzsp-title {
+  font-size: 1rem;
+  font-weight: 800;
+}
+.qzsp-close {
+  background: transparent;
+  border: 0;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 8px;
+}
+.qzsp-close:hover { color: #fff; background: rgba(255,255,255,0.08); }
+.qzsp-sub {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.55);
+  margin: -8px 0 0;
+}
+.qzsp-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.qzsp-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.qzsp-item:hover { background: rgba(155, 93, 229, 0.1); border-color: rgba(155, 93, 229, 0.3); }
+.qzsp-cb { accent-color: #c084fc; width: 16px; height: 16px; flex-shrink: 0; cursor: pointer; }
+.qzsp-name { font-size: 0.84rem; font-weight: 600; }
+.qzsp-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.qzsp-btn-ghost {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+.qzsp-btn-ghost:hover { background: rgba(255,255,255,0.09); }
+.qzsp-btn-primary {
+  flex: 1;
+  background: linear-gradient(135deg, #c084fc, #f0abfc);
+  border: 0;
+  border-radius: 12px;
+  color: #1a1330;
+  font-size: 0.84rem;
+  font-weight: 800;
+  padding: 10px 20px;
+  cursor: pointer;
+  text-align: center;
+}
+.qzsp-btn-primary:hover { filter: brightness(1.08); }
+
 /* Fallback for browsers without :has() — JS adds .co-inner-wide */
 .co-inner.co-inner-wide {
   max-width: 1280px;

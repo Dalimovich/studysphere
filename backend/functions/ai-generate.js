@@ -147,17 +147,19 @@ function parseJsonObject(text) {
 
 // ─── Retrieval ────────────────────────────────────────────────────────────────
 
-function retrieveChunks(serviceKey, userId, courseId, embedding, query) {
+function retrieveChunks(serviceKey, userId, courseId, embedding, query, docIds) {
   return new Promise(function (resolve) {
     const supaUrl = requireEnv('SUPABASE_URL');
-    const body = JSON.stringify({
+    const payload = {
       p_user_id: userId,
       p_course_id: courseId,
       p_embedding: '[' + embedding.join(',') + ']',
       p_query: query || '',
       p_match_count: MAX_CHUNKS,
       p_threshold: MIN_SIMILARITY
-    });
+    };
+    if (docIds && docIds.length) payload.p_document_ids = docIds;
+    const body = JSON.stringify(payload);
     const req = https.request(
       {
         hostname: new URL(supaUrl).hostname,
@@ -341,10 +343,11 @@ exports.handler = async function (event) {
     return fail(400, 'Invalid JSON');
   }
 
-  const { courseId, tool, topic, count, difficulty } = body;
+  const { courseId, tool, topic, count, difficulty, documentIds } = body;
   if (!courseId || typeof courseId !== 'string') return fail(400, 'courseId is required');
   if (!['flashcards', 'quiz', 'summary'].includes(tool))
     return fail(400, 'tool must be flashcards, quiz, or summary');
+  const docIds = Array.isArray(documentIds) && documentIds.length ? documentIds : null;
 
   const itemCount = Math.min(Math.max(parseInt(count) || 6, 3), 10);
   const diff = ['easy', 'medium', 'hard'].includes(difficulty) ? difficulty : 'medium';
@@ -372,7 +375,7 @@ exports.handler = async function (event) {
   }
 
   // Retrieve and rank chunks
-  const rawChunks = await retrieveChunks(serviceKey, user.id, courseId, embedding, query);
+  const rawChunks = await retrieveChunks(serviceKey, user.id, courseId, embedding, query, docIds);
   if (!rawChunks.length) {
     return jsonResponse(200, {
       tool,

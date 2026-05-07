@@ -332,7 +332,72 @@
       return (course && course.name ? course.name : 'Quiz') + ' — Set ' + (state.quizzes.length + 1);
     }
 
-    function doGenerate() {
+    function _pickSourcesThenGenerate() {
+      if (!options.generate) { _toast('Generation unavailable', 'Generator function not injected.'); return; }
+      var BACKEND_URL = window.BACKEND_URL || '';
+      var token = window._sbToken || '';
+      fetch(BACKEND_URL + '/api/documents/list?courseId=' + encodeURIComponent(courseId), {
+        headers: { Authorization: 'Bearer ' + token }
+      })
+        .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+        .then(function (data) {
+          var docs = (data.documents || []).filter(function (d) { return d.processing_status === 'ready'; });
+          if (!docs.length) { _toast('No indexed files', 'Upload and index PDFs first.'); return; }
+          _showSourcePicker(docs, function (selectedIds) { doGenerate(selectedIds); });
+        })
+        .catch(function () { doGenerate(null); });
+    }
+
+    function _showSourcePicker(docs, onConfirm) {
+      var existing = document.getElementById('qzSourcePickerOverlay');
+      if (existing) existing.remove();
+
+      var selected = new Set(docs.map(function (d) { return d.id; }));
+
+      var listHtml = docs.map(function (d) {
+        return '<label class="qzsp-item">' +
+          '<input type="checkbox" class="qzsp-cb" value="' + _esc(d.id) + '" checked>' +
+          '<span class="qzsp-name">' + _esc(d.file_name || d.fileName || 'Untitled') + '</span>' +
+        '</label>';
+      }).join('');
+
+      var overlay = document.createElement('div');
+      overlay.id = 'qzSourcePickerOverlay';
+      overlay.className = 'qzsp-overlay';
+      overlay.innerHTML =
+        '<div class="qzsp-modal">' +
+          '<div class="qzsp-head"><span class="qzsp-title">&#x1F4C2; Choose source files</span>' +
+            '<button class="qzsp-close" type="button">&#x2715;</button></div>' +
+          '<p class="qzsp-sub">Select which indexed files to use for quiz generation.</p>' +
+          '<div class="qzsp-list">' + listHtml + '</div>' +
+          '<div class="qzsp-actions">' +
+            '<button class="qzsp-btn-ghost" id="qzspSelectAll" type="button">Select all</button>' +
+            '<button class="qzsp-btn-ghost" id="qzspClearAll" type="button">Clear</button>' +
+            '<button class="qzsp-btn-primary" id="qzspConfirm" type="button">&#x2728; Generate from selected</button>' +
+          '</div>' +
+        '</div>';
+
+      document.body.appendChild(overlay);
+
+      overlay.querySelector('.qzsp-close').onclick = function () { overlay.remove(); };
+      overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.remove(); });
+
+      overlay.querySelector('#qzspSelectAll').onclick = function () {
+        overlay.querySelectorAll('.qzsp-cb').forEach(function (cb) { cb.checked = true; });
+      };
+      overlay.querySelector('#qzspClearAll').onclick = function () {
+        overlay.querySelectorAll('.qzsp-cb').forEach(function (cb) { cb.checked = false; });
+      };
+      overlay.querySelector('#qzspConfirm').onclick = function () {
+        var ids = [];
+        overlay.querySelectorAll('.qzsp-cb:checked').forEach(function (cb) { ids.push(cb.value); });
+        overlay.remove();
+        if (!ids.length) { _toast('No files selected', 'Select at least one file.'); return; }
+        onConfirm(ids);
+      };
+    }
+
+    function doGenerate(documentIds) {
       if (!options.generate) {
         _toast('Generation unavailable', 'Generator function not injected.');
         return;
@@ -342,7 +407,9 @@
         els.generate._origLabel = els.generate.innerHTML;
         els.generate.innerHTML = '<span class="qz-btn-icon">&#x23F3;</span> Generating…';
       }
-      options.generate(courseId, 'quiz', { count: 10, difficulty: 'medium', topic: (course && course.name) || null })
+      var genOpts = { count: 10, difficulty: 'medium', topic: (course && course.name) || null };
+      if (documentIds && documentIds.length) genOpts.documentIds = documentIds;
+      options.generate(courseId, 'quiz', genOpts)
         .then(function (result) {
           if (!result || !result.items || !result.items.length) {
             _toast('Nothing generated', (result && result.error) || 'No indexed content yet — upload and index a PDF first.');
@@ -401,7 +468,7 @@
         });
     }
 
-    if (els.generate) els.generate.addEventListener('click', doGenerate);
+    if (els.generate) els.generate.addEventListener('click', _pickSourcesThenGenerate);
 
     if (els.newQuiz) els.newQuiz.addEventListener('click', function () {
       var name = window.prompt('Name for new quiz', defaultName());
