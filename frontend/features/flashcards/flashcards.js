@@ -9,8 +9,51 @@
   var TEMPLATE_URL = 'features/flashcards/flashcards.html';
   var _templatePromise = null;
 
-  // courseId -> { decks: [{id, name, cards, createdAt, lastStudied, progress, flipped}], activeId }
+  // courseId -> { decks: [{id, name, cards, createdAt, lastStudied, progress, flipped, _dbId}], activeId, _loaded }
   var _state = {};
+
+  // ── DB helpers ───────────────────────────────────────────────────────────────
+  function _supaHeaders() {
+    var token = window._sbToken || '';
+    var key = window._SAKEY || '';
+    return { 'Content-Type': 'application/json', 'apikey': key, 'Authorization': 'Bearer ' + token };
+  }
+  function _supaUrl() { return (window._SUPA || '').replace(/\/$/, ''); }
+  function _userId() {
+    try {
+      var p = (window._sbToken || '').split('.')[1];
+      return JSON.parse(atob(p.replace(/-/g,'+').replace(/_/g,'/'))).sub || null;
+    } catch(e) { return null; }
+  }
+
+  function _dbLoadDecks(courseId) {
+    var url = _supaUrl() + '/rest/v1/flashcard_decks?course_id=eq.' + encodeURIComponent(courseId) + '&order=created_at.desc&limit=50';
+    return fetch(url, { headers: _supaHeaders() })
+      .then(function(r) { return r.ok ? r.json() : []; })
+      .catch(function() { return []; });
+  }
+
+  function _dbSaveDeck(courseId, deck) {
+    var uid = _userId();
+    if (!uid) return Promise.resolve(null);
+    var payload = { user_id: uid, course_id: courseId, name: deck.name, cards: deck.cards };
+    return fetch(_supaUrl() + '/rest/v1/flashcard_decks', {
+      method: 'POST',
+      headers: Object.assign({}, _supaHeaders(), { 'Prefer': 'return=representation' }),
+      body: JSON.stringify(payload)
+    }).then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(rows) { return rows && rows[0] ? rows[0].id : null; })
+      .catch(function() { return null; });
+  }
+
+  function _dbUpdateDeck(dbId, patch) {
+    if (!dbId) return;
+    fetch(_supaUrl() + '/rest/v1/flashcard_decks?id=eq.' + dbId, {
+      method: 'PATCH',
+      headers: Object.assign({}, _supaHeaders(), { 'Prefer': 'return=minimal' }),
+      body: JSON.stringify(patch)
+    }).catch(function() {});
+  }
 
   function _loadTemplate() {
     if (_templatePromise) return _templatePromise;
@@ -347,6 +390,9 @@
         state.activeId = deck.id;
         _toast('Deck generated', deck.cards.length + ' cards from indexed material.');
         renderAll();
+        _dbSaveDeck(course.id, deck).then(function(dbId) {
+          if (dbId) { deck.id = dbId; deck._dbId = dbId; state.activeId = dbId; }
+        });
       }).catch(function (err) {
         console.error('flashcard generate error:', err);
         _toast('Generation failed', 'Try again, or reindex your PDFs first.');
@@ -360,6 +406,7 @@
     // ── Study controls ──
     function bumpStudied(d) {
       d.lastStudied = new Date().toISOString();
+      _dbUpdateDeck(d._dbId, { last_studied_at: d.lastStudied, study_progress: d.progress || 0, updated_at: d.lastStudied });
     }
     if (els.flip) els.flip.addEventListener('click', function () {
       var d = state.decks.find(function (x) { return x.id === state.activeId; });
@@ -414,6 +461,28 @@
       });
     });
 
-    renderAll();
+    // Load from DB then render
+    if (!state._loaded) {
+      if (els.grid) els.grid.innerHTML = '<div class="fc-empty">Loading decks…</div>';
+      _dbLoadDecks(course.id).then(function(rows) {
+        state._loaded = true;
+        state.decks = rows.map(function(r) {
+          return {
+            id: r.id,
+            _dbId: r.id,
+            name: r.name,
+            cards: r.cards || [],
+            createdAt: new Date(r.created_at).getTime(),
+            lastStudied: r.last_studied_at || null,
+            progress: r.study_progress || 0,
+            flipped: false
+          };
+        });
+        if (state.decks.length) state.activeId = state.decks[0].id;
+        renderAll();
+      });
+    } else {
+      renderAll();
+    }
   }
 })();

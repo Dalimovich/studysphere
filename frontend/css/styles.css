@@ -2538,6 +2538,42 @@ body.night .sb-acc-chev-btn {
   max-width: 1280px;
   align-items: stretch;
 }
+/* ── Quiz score popup (shown inside the study pane) ─────────────────────── */
+.qz-score-popup {
+  position: absolute;
+  inset: 0;
+  border-radius: 20px;
+  background: rgba(15, 10, 30, 0.92);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+.qz-score-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  padding: 32px 28px;
+  color: rgba(255, 255, 255, 0.92);
+}
+.qz-score-emoji { font-size: 2.8rem; line-height: 1; }
+.qz-score-title { font-size: 1rem; font-weight: 800; opacity: 0.75; }
+.qz-score-num { font-size: 2.4rem; font-weight: 900; color: #c084fc; line-height: 1; }
+.qz-score-pct { font-size: 1rem; font-weight: 700; opacity: 0.65; }
+.qz-score-grade { font-size: 0.9rem; font-weight: 700; }
+.qz-score-retry { margin-top: 10px; }
+.qz-score-close {
+  position: absolute;
+  top: 12px; right: 14px;
+  background: transparent; border: 0;
+  color: rgba(255,255,255,0.45); font-size: 1rem;
+  cursor: pointer; padding: 4px 8px; border-radius: 8px;
+}
+.qz-score-close:hover { color: #fff; background: rgba(255,255,255,0.08); }
+
 /* ── Generating overlay (quiz & flashcard generation) ───────────────────── */
 .gen-overlay {
   position: fixed;

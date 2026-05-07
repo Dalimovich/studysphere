@@ -4,8 +4,51 @@
   var TEMPLATE_URL = 'features/quiz/quiz.html';
   var _templatePromise = null;
 
-  // courseId -> { quizzes: [{id,name,items,answers,submitted,createdAt,lastTaken,progress,bestScore}], activeId }
+  // courseId -> { quizzes: [{id,name,items,answers,submitted,createdAt,lastTaken,progress,bestScore,_dbId}], activeId, _loaded }
   var _state = {};
+
+  // ── DB helpers ───────────────────────────────────────────────────────────────
+  function _supaHeaders() {
+    var token = window._sbToken || '';
+    var key = window._SAKEY || '';
+    return { 'Content-Type': 'application/json', 'apikey': key, 'Authorization': 'Bearer ' + token };
+  }
+  function _supaUrl() { return (window._SUPA || '').replace(/\/$/, ''); }
+  function _userId() {
+    try {
+      var p = (window._sbToken || '').split('.')[1];
+      return JSON.parse(atob(p.replace(/-/g,'+').replace(/_/g,'/'))).sub || null;
+    } catch(e) { return null; }
+  }
+
+  function _dbLoadQuizzes(courseId) {
+    var url = _supaUrl() + '/rest/v1/quiz_runs?course_id=eq.' + encodeURIComponent(courseId) + '&order=created_at.desc&limit=50';
+    return fetch(url, { headers: _supaHeaders() })
+      .then(function(r) { return r.ok ? r.json() : []; })
+      .catch(function() { return []; });
+  }
+
+  function _dbSaveQuiz(courseId, quiz) {
+    var uid = _userId();
+    if (!uid) return Promise.resolve(null);
+    var payload = { user_id: uid, course_id: courseId, name: quiz.name, items: quiz.items };
+    return fetch(_supaUrl() + '/rest/v1/quiz_runs', {
+      method: 'POST',
+      headers: Object.assign({}, _supaHeaders(), { 'Prefer': 'return=representation' }),
+      body: JSON.stringify(payload)
+    }).then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(rows) { return rows && rows[0] ? rows[0].id : null; })
+      .catch(function() { return null; });
+  }
+
+  function _dbUpdateQuiz(dbId, patch) {
+    if (!dbId) return;
+    fetch(_supaUrl() + '/rest/v1/quiz_runs?id=eq.' + dbId, {
+      method: 'PATCH',
+      headers: Object.assign({}, _supaHeaders(), { 'Prefer': 'return=minimal' }),
+      body: JSON.stringify(patch)
+    }).catch(function() {});
+  }
 
   function _loadTemplate() {
     if (_templatePromise) return _templatePromise;
@@ -54,6 +97,33 @@
     if (diff < 172800000) return { cls: 'stale', text: 'Last taken yesterday' };
     var days = Math.floor(diff / 86400000);
     return { cls: 'stale', text: 'Last taken ' + days + ' days ago' };
+  }
+
+  function _showScorePopup(root, q, correct, onRetry) {
+    var existing = root.querySelector('.qz-score-popup');
+    if (existing) existing.remove();
+    var total = q.items.length;
+    var pct = Math.round((correct / total) * 100);
+    var grade = pct >= 90 ? '&#x1F3C6; Excellent!' : pct >= 70 ? '&#x1F44D; Good job!' : pct >= 50 ? '&#x1F4DA; Keep studying' : '&#x1F4AA; Try again';
+    var popup = document.createElement('div');
+    popup.className = 'qz-score-popup';
+    popup.innerHTML =
+      '<div class="qz-score-inner">' +
+        '<button class="qz-score-close" type="button">&#x2715;</button>' +
+        '<div class="qz-score-emoji">' + (pct >= 70 ? '&#x1F389;' : '&#x1F4D6;') + '</div>' +
+        '<div class="qz-score-title">Quiz complete!</div>' +
+        '<div class="qz-score-num">' + correct + ' / ' + total + '</div>' +
+        '<div class="qz-score-pct">' + pct + '%</div>' +
+        '<div class="qz-score-grade">' + grade + '</div>' +
+        '<button class="qz-score-retry qz-btn qz-btn-primary" type="button">&#x1F501; Retry quiz</button>' +
+      '</div>';
+    var pane = root.querySelector('#qzStudyPane');
+    if (pane) pane.appendChild(popup);
+    popup.querySelector('.qz-score-close').onclick = function() { popup.remove(); };
+    popup.querySelector('.qz-score-retry').onclick = function() {
+      popup.remove();
+      if (onRetry) onRetry();
+    };
   }
 
   function _initShell(root, course, options) {
@@ -314,6 +384,25 @@
       });
       if (q.bestScore == null || correct > q.bestScore) q.bestScore = correct;
       renderAll();
+
+      // Check if all questions submitted — save to DB and show score popup
+      var allDone = q.items.every(function(_, k) { return !!q.submitted[k]; });
+      if (allDone) {
+        var score = correct / q.items.length;
+        _dbUpdateQuiz(q._dbId, {
+          answers: q.answers,
+          score: score,
+          completed_at: q.lastTaken,
+          updated_at: new Date().toISOString()
+        });
+        _showScorePopup(root, q, correct, function() {
+          q.progress = 0; q.answers = {}; q.submitted = {};
+          renderAll();
+        });
+      } else {
+        // Save partial progress
+        _dbUpdateQuiz(q._dbId, { answers: q.answers, updated_at: new Date().toISOString() });
+      }
     });
 
     if (els.settingsBtn) els.settingsBtn.addEventListener('click', function () {
@@ -472,6 +561,10 @@
           state.activeId = quiz.id;
           _toast('Quiz generated ✨', quiz.items.length + ' questions ready.');
           renderAll();
+          // Save to DB and update local ID with UUID
+          _dbSaveQuiz(courseId, quiz).then(function(dbId) {
+            if (dbId) { quiz.id = dbId; quiz._dbId = dbId; state.activeId = dbId; }
+          });
         })
         .catch(function (err) {
           console.error('quiz generate error:', err);
@@ -511,6 +604,33 @@
     if (els.search) els.search.addEventListener('input', renderGrid);
     if (els.sort)   els.sort.addEventListener('change', renderGrid);
 
-    renderAll();
+    // Load from DB then render
+    if (!state._loaded) {
+      if (els.grid) els.grid.innerHTML = '<div class="qz-empty">Loading quizzes…</div>';
+      _dbLoadQuizzes(courseId).then(function(rows) {
+        state._loaded = true;
+        state.quizzes = rows.map(function(r) {
+          var answered = r.answers || {};
+          var submitted = {};
+          Object.keys(answered).forEach(function(k) { submitted[k] = true; });
+          return {
+            id: r.id,
+            _dbId: r.id,
+            name: r.name,
+            items: r.items || [],
+            answers: answered,
+            submitted: submitted,
+            progress: 0,
+            createdAt: new Date(r.created_at).getTime(),
+            lastTaken: r.completed_at || null,
+            bestScore: r.score != null ? Math.round(r.score * (r.items || []).length) : null
+          };
+        });
+        if (state.quizzes.length) state.activeId = state.quizzes[0].id;
+        renderAll();
+      });
+    } else {
+      renderAll();
+    }
   }
 })();
