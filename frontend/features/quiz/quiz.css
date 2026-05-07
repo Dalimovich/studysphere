@@ -303,6 +303,14 @@
   font-size: 0.78rem;
   flex-shrink: 0;
 }
+.qz-option.selected {
+  background: rgba(155, 93, 229, 0.15);
+  border-color: rgba(192, 132, 252, 0.6);
+}
+.qz-option.selected .qz-option-letter {
+  background: rgba(155, 93, 229, 0.4);
+  color: #fff;
+}
 .qz-option.correct {
   background: rgba(6, 214, 160, 0.12);
   border-color: rgba(6, 214, 160, 0.5);
