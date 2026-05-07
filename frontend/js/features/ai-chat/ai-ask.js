@@ -361,24 +361,27 @@ export function initAskAI(state) {
               var blocks = splitBlocks(display);
               // blocks[0..n-2] = completed, blocks[n-1] = currently typing
 
-              // Add rendered divs for newly completed blocks
-              var completedCount = blocks.length - 1; // last block still in progress
-              while (_renderedBlockCount < completedCount) {
-                var div = renderBlock(blocks[_renderedBlockCount]);
-                bubble.insertBefore(div, bubble.lastChild); // insert before the typing span
-                applyKatexToBlock(div);
-                _renderedBlockCount++;
-              }
-
-              // Update the plain-text typing span (always the last child)
-              var typingSpan = bubble.lastChild;
-              if (!typingSpan || typingSpan.nodeType !== 1 || !typingSpan.classList.contains('ss-typing-span')) {
+              // Ensure typing span exists BEFORE inserting completed blocks
+              var typingSpan = bubble.querySelector('.ss-typing-span');
+              if (!typingSpan) {
                 typingSpan = document.createElement('span');
                 typingSpan.className = 'ss-typing-span';
                 typingSpan.style.whiteSpace = 'pre-wrap';
                 bubble.appendChild(typingSpan);
               }
-              typingSpan.textContent = blocks[blocks.length - 1] || '';
+
+              // Add rendered divs for newly completed blocks, always before typing span
+              var completedCount = blocks.length - 1; // last block still in progress
+              while (_renderedBlockCount < completedCount) {
+                var div = renderBlock(blocks[_renderedBlockCount]);
+                bubble.insertBefore(div, typingSpan);
+                applyKatexToBlock(div);
+                _renderedBlockCount++;
+              }
+
+              // Strip any partial META block before showing in typing span
+              var typingText = (blocks[blocks.length - 1] || '').replace(/<!--META-->[\s\S]*$/, '');
+              typingSpan.textContent = typingText;
               _autoScroll(aiMsgs);
             }
 
@@ -389,9 +392,11 @@ export function initAskAI(state) {
               var blocks = splitBlocks(display);
 
               // Render any remaining unrendered blocks (including the last one)
+              var _fTypingSpan = bubble.querySelector('.ss-typing-span');
               while (_renderedBlockCount < blocks.length) {
                 var div = renderBlock(blocks[_renderedBlockCount]);
-                bubble.insertBefore(div, bubble.lastChild);
+                if (_fTypingSpan) bubble.insertBefore(div, _fTypingSpan);
+                else bubble.appendChild(div);
                 applyKatexToBlock(div);
                 _renderedBlockCount++;
               }
