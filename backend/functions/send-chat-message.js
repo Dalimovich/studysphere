@@ -3,11 +3,8 @@ const { jsonResponse, fail, handleOptions } = require('../lib/responses');
 const { supaRequest } = require('../lib/supabase-admin');
 const { verifySupabaseToken, extractBearerToken } = require('../lib/supabase-auth');
 const { logSecurityEvent } = require('../lib/logger');
-const { countRecentMessages, rateLimitResponse } = require('../lib/rate-limit');
 const { isUuid, cleanText } = require('../lib/validation');
 
-const RATE_LIMIT_WINDOW_MS = Number(optionalEnv('CHAT_RATE_LIMIT_WINDOW_MS', '60000'));
-const RATE_LIMIT_MAX = Number(optionalEnv('CHAT_RATE_LIMIT_MAX', '8'));
 
 function dmUsers(roomId) {
   const match = String(roomId || '').match(/^dm_([0-9a-f-]{36})_([0-9a-f-]{36})$/i);
@@ -77,10 +74,6 @@ async function userCanSendToRoom(userId, roomId, serviceKey) {
   return Array.isArray(res.body) && res.body.length > 0;
 }
 
-async function assertUnderRateLimit(userId, serviceKey) {
-  const count = await countRecentMessages(serviceKey, userId, RATE_LIMIT_WINDOW_MS);
-  return count < RATE_LIMIT_MAX;
-}
 
 exports.handler = async function (event) {
   if (event.httpMethod === 'OPTIONS') return handleOptions();
@@ -121,15 +114,6 @@ exports.handler = async function (event) {
     if (!canSend) {
       await logSecurityEvent(serviceKey, user.id, 'chat_send_denied', { room_id: roomId });
       return fail(403, 'Not allowed in this room');
-    }
-
-    const underLimit = await assertUnderRateLimit(user.id, serviceKey);
-    if (!underLimit) {
-      await logSecurityEvent(serviceKey, user.id, 'chat_rate_limit_exceeded', {
-        room_id: roomId,
-        window_ms: RATE_LIMIT_WINDOW_MS
-      });
-      return rateLimitResponse(RATE_LIMIT_WINDOW_MS, 'Slow down before sending another message');
     }
 
     const payload = { room_id: roomId, user_id: user.id, display_name: displayName, content };

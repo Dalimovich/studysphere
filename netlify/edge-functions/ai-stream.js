@@ -46,17 +46,6 @@ export default async function handler(request, context) {
 
   const ragMode = mode === 'general' ? 'general' : 'strict';
 
-  // ── Rate limiting ─────────────────────────────────────────────────────────
-  const RATE_LIMIT_MAX = Number(Deno.env.get('AI_RATE_LIMIT_MAX') || '200');
-  if (RATE_LIMIT_MAX > 0) {
-    const _rateLimitOk = await checkAndRecordRateLimit(userId, SUPABASE_URL, SUPABASE_SERVICE_KEY, RATE_LIMIT_MAX);
-    if (!_rateLimitOk) {
-      return new Response(JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }), {
-        status: 429, headers: { 'Content-Type': 'application/json', ...corsHeaders() }
-      });
-    }
-  }
-
   // ── Build SSE stream ──────────────────────────────────────────────────────
   const { readable, writable } = new TransformStream();
   const writer = writable.getWriter();

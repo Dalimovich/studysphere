@@ -15,7 +15,6 @@ const { requireEnv, optionalEnv } = require('../lib/env');
 const { jsonResponse, fail, handleOptions } = require('../lib/responses');
 const { verifySupabaseToken, extractBearerToken } = require('../lib/supabase-auth');
 const { supaRequest } = require('../lib/supabase-admin');
-const { countRecentEvents, rateLimitResponse } = require('../lib/rate-limit');
 
 const EMBED_MODEL = 'text-embedding-3-small';
 const EMBED_DIMENSIONS = 1536;
@@ -47,8 +46,6 @@ function _breakerNoteFailure() {
   }
 }
 
-const AI_RATE_LIMIT_MAX = Number(optionalEnv('AI_RATE_LIMIT_MAX', '200'));
-const AI_RATE_LIMIT_WINDOW_MS = Number(optionalEnv('AI_RATE_LIMIT_WINDOW_MS', '3600000'));
 
 // Source type priority boost for ranking (added to cosine similarity)
 // summary = Formelsammlung / Zusammenfassung — highly valuable, never penalise
@@ -1138,17 +1135,6 @@ exports.handler = async function (event) {
   if (!user) return fail(401, 'Invalid or expired token');
 
   const serviceKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
-
-  // Rate limit
-  const recentCount = await countRecentEvents(
-    serviceKey,
-    user.id,
-    'ai_ask',
-    AI_RATE_LIMIT_WINDOW_MS
-  );
-  if (AI_RATE_LIMIT_MAX > 0 && recentCount >= AI_RATE_LIMIT_MAX) {
-    return rateLimitResponse();
-  }
 
   let body;
   try {

@@ -3,13 +3,8 @@ const { requireEnv } = require('../lib/env');
 const { jsonResponse, fail, handleOptions } = require('../lib/responses');
 const { verifySupabaseToken, extractBearerToken } = require('../lib/supabase-auth');
 const { logSecurityEvent } = require('../lib/logger');
-const { countRecentEvents, rateLimitResponse } = require('../lib/rate-limit');
-
 const MAX_BODY_BYTES = 2 * 1024 * 1024;
-const { optionalEnv } = require('../lib/env');
-const AI_RATE_LIMIT_MAX = Number(optionalEnv('AI_RATE_LIMIT_MAX', '20'));
-const AI_RATE_LIMIT_WINDOW_MS = Number(optionalEnv('AI_RATE_LIMIT_WINDOW_MS', '3600000'));
-const MAX_MESSAGES = 20;
+const MAX_MESSAGES = 200;
 const MAX_SYSTEM_CHARS = 120000;
 const MAX_TEXT_CHARS = 120000;
 const MAX_IMAGE_BLOCKS = 5;
@@ -23,10 +18,6 @@ const ALLOWED_IMAGE_MEDIA_TYPES = {
   'image/webp': true,
   'image/gif': true
 };
-
-async function countRecentAiRequests(serviceKey, userId) {
-  return countRecentEvents(serviceKey, userId, 'ai_request', AI_RATE_LIMIT_WINDOW_MS);
-}
 
 function requestShapeSummary(incoming) {
   const messages = Array.isArray(incoming && incoming.messages) ? incoming.messages : [];
@@ -192,15 +183,6 @@ exports.handler = async function (event) {
       }
     } catch (e) {
       return rejectAndLog(400, 'Invalid JSON body', serviceKey, user.id, 'invalid_json');
-    }
-
-    const usageCount = await countRecentAiRequests(serviceKey, user.id);
-    if (usageCount >= AI_RATE_LIMIT_MAX) {
-      await logSecurityEvent(serviceKey, user.id, 'ai_rate_limited', {
-        window_ms: AI_RATE_LIMIT_WINDOW_MS,
-        limit: AI_RATE_LIMIT_MAX
-      });
-      return rateLimitResponse(AI_RATE_LIMIT_WINDOW_MS, 'AI rate limit exceeded. Try again soon.');
     }
 
     const openaiMessages = buildOpenAiMessages(incoming);
