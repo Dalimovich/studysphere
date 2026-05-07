@@ -215,11 +215,12 @@ export default async function handler(request, context) {
                     { type: 'text', text:
                         'COURSE CONTEXT (Formelsammlung and lecture material):\n\n' + contextText +
                         '\n\n---\n\n' +
-                        'HANDWRITTEN DOCUMENT PAGES (images below): The student has a handwritten or scanned document open. ' +
-                        'These pages ARE the primary source — they contain the exercise statement, given values, and/or the worked solution. ' +
-                        'Read every handwritten value, formula, variable, subscript, and number from the images carefully and accurately. ' +
-                        'Use the exact given values shown in the handwriting (do NOT substitute your own assumptions). ' +
-                        'If the images show a worked solution, follow it step by step exactly.\n\n' +
+                        'OPEN PDF PAGES (images below): The student has a PDF open showing these pages. ' +
+                        'The PDF may contain handwritten solutions, worked examples, or diagrams alongside printed text. ' +
+                        'CRITICAL: If any image shows a worked solution with explicit numerical values (e.g. F_M,min = 90,942.88 N), ' +
+                        'you MUST use those exact values — do NOT recalculate from scratch with different formulas. ' +
+                        'Read every handwritten value, formula, subscript, and number carefully. ' +
+                        'If the images show a step-by-step solution, reproduce it exactly.\n\n' +
                         'STUDENT QUESTION: ' + question
                     },
                     ...handwrittenImages.map(b64 => ({ type: 'image_url', image_url: { url: 'data:image/jpeg;base64,' + b64 } }))
@@ -746,7 +747,7 @@ function buildPrompt(mode, lang, qType, openFileName, hasHandwritten) {
     ? 'The student is currently reading **' + openFileName + '**. The OPEN FILE block contains the problem/exercise text from that file. Use it to understand exactly what is being asked. Look in ALL other course documents (lectures, solution sheets) for the explanation and full solution.'
     : '';
   const handwrittenLine = hasHandwritten
-    ? '⚠️ HANDWRITTEN DOCUMENT: The student has a handwritten/scanned PDF open. Page images are included in the user message. These images are the PRIMARY source — they show the exercise, given values, and/or the worked solution. READ THE IMAGES CAREFULLY. Use the exact values, formulas, and steps shown in the handwriting. Do NOT ignore the images or substitute your own assumptions.'
+    ? '⚠️ OPEN PDF WITH PAGE IMAGES: The student has a PDF open. Page images are included in the user message. The PDF may have printed text AND handwritten solutions. CRITICAL RULE: If any image shows a worked solution with explicit numerical results (e.g. F_M,min = 90,942.88 N), you MUST reproduce those exact numbers — do NOT recalculate from scratch. Read images carefully for handwritten values, formulas, and subscripts.'
     : '';
   return [
     'You are StudySphere AI — a precise, expert-level academic study assistant.', langLine,

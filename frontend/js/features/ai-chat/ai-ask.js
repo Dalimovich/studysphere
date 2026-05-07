@@ -235,14 +235,22 @@ export function initAskAI(state) {
 
     _textReady
       .then(function () {
-        var isHandwritten = pdfDoc && pdfFullText.trim().length < 100;
-        return isHandwritten ? pdfToImages(8) : [];
+        // Always send page images when a PDF is open — many PDFs have printed exercise text
+        // but handwritten solution pages (like AG_9.1_BIS_9.3.pdf). The < 100 char threshold
+        // missed those because the exercise statement is printed, not handwritten.
+        return pdfDoc ? pdfToImages(8) : [];
       })
       .then(async function (pageImages) {
         var userContent;
+        var isHandwritten = pdfFullText.trim().length < 100;
         if (pageImages.length) {
-          sysPrompt +=
-            '\n\nThis document is handwritten or scanned. Pages are provided as images — read all handwritten text, equations, and diagrams carefully.';
+          if (isHandwritten) {
+            sysPrompt +=
+              '\n\nThis document is handwritten or scanned. Pages are provided as images — read all handwritten text, equations, and diagrams carefully.';
+          } else {
+            sysPrompt +=
+              '\n\nThe open PDF pages are included as images below. The document may contain handwritten solutions, diagrams, or worked examples alongside printed text. Read both the extracted text AND the images — if the images show a worked solution with specific values, use those exact values.';
+          }
           userContent = [{ type: 'text', text: question }].concat(
             pageImages.map(function (b64) {
               return { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,' + b64 } };
