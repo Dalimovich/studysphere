@@ -71,7 +71,7 @@ function embedText(text) {
         });
       }
     );
-    req.setTimeout(5000, function () {
+    req.setTimeout(15000, function () {
       req.destroy(new Error('Embedding request timed out'));
     });
     req.on('error', reject);
@@ -379,13 +379,14 @@ exports.handler = async function (event) {
   try {
     embedding = await embedText(query);
   } catch (e) {
-    console.error('ai-generate embedding error:', e && e.message ? e.message : e);
+    const msg = e && e.message ? e.message : String(e);
+    console.error('ai-generate embedding error:', msg);
     return jsonResponse(200, {
       tool,
       items: [],
       text: '',
       sources: [],
-      error: 'AI generation is temporarily unavailable. Please try again in a moment.'
+      error: 'AI generation is temporarily unavailable: ' + msg
     });
   }
 
