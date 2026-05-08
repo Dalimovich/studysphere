@@ -621,6 +621,21 @@
       if (typeof orig === 'function') orig(f, course);
       setTimeout(function () { _onFileOpen(f && f.name, course); }, 50);
     };
+
+    // If router already opened a file before we loaded, pick up the active context now
+    setTimeout(function () {
+      var toolbar = document.getElementById('pdfToolbar');
+      var hasFile = window.activeFileName || window.pdfDoc;
+      if (toolbar && hasFile && !document.getElementById('pdfNotesToggle')) {
+        _ctx.courseId   = window.activeCourseId || (window.activeCourseRef && window.activeCourseRef.id) || null;
+        _ctx.fileName   = window.activeFileName || null;
+        _createPanel();
+        _injectToolbarButton();
+        if (_ctx.courseId && _ctx.fileName) {
+          _resolveDocumentId(_ctx.fileName, _ctx.courseId);
+        }
+      }
+    }, 500);
   }
 
   // ── Init ──────────────────────────────────────────────────────────────────
