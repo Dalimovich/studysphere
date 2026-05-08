@@ -21,3 +21,8 @@ build/
 .DS_Store
 Thumbs.db
 .vscode/
+
+# Playwright
+tests/e2e/.auth/
+tests/e2e/report/
+test-results/
