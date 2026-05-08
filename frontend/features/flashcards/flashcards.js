@@ -67,6 +67,7 @@
       })
       .catch(function (err) {
         console.error('flashcards template load error:', err);
+        _templatePromise = null;
         return '<div class="fc-empty">Failed to load flashcards UI.</div>';
       });
     return _templatePromise;

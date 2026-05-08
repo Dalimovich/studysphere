@@ -60,7 +60,7 @@
         var root = tmp.querySelector('[data-quiz-root]');
         return root ? root.outerHTML : html;
       })
-      .catch(function () { return '<div class="qz-empty">Failed to load quiz UI.</div>'; });
+      .catch(function () { _templatePromise = null; return '<div class="qz-empty">Failed to load quiz UI.</div>'; });
     return _templatePromise;
   }
 
