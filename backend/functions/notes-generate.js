@@ -30,59 +30,56 @@ function langInstr(lang) {
 // ── Prompts ───────────────────────────────────────────────────────────────────
 
 function notesPrompt(lang) {
-  return `You are generating detailed, exam-ready study notes from a PDF lecture slide or page.
+  return `You are generating detailed, exam-ready study notes from university lecture PDF slides.
 
 ${langInstr(lang)}
 
-CRITICAL RULES — READ BEFORE GENERATING:
-- Use ONLY the provided PDF text. Do NOT invent facts or use outside knowledge.
-- Do NOT write a generic summary. This is DETAILED NOTES mode.
-- Do NOT write vague bullets like "Overview of methods" or "Various casting techniques".
-- If the PDF contains a list → reproduce the COMPLETE list with ALL items preserved.
-- If the PDF contains a definition-like sentence → include it verbatim or near-verbatim.
-- If the PDF contains a formula → capture it using KaTeX: inline $...$, display $$...$$, explain every variable.
-- If the PDF describes a process → extract every step or characteristic in order.
-- Every important technical term from the source must appear in the notes.
-- Notes must be detailed enough for studying WITHOUT reopening the PDF.
-- If something is unclear in the source, write: *(Nicht klar aus dem PDF.)* or *(Not clearly stated.)*
+IGNORE completely: author names, institute names, semester labels, university logos, slide numbers, copyright lines, and any administrative text that is not course content.
 
-REQUIRED STRUCTURE — include every section that has content in the source:
+CRITICAL RULES:
+- Use ONLY the provided PDF text. Do NOT invent facts.
+- This is DETAILED NOTES mode — not a summary. Be exhaustive.
+- Do NOT write vague bullets like "Overview of methods" or "Various casting techniques" — name every specific method, material, step, and property found in the source.
+- Every method or process named in the source → dedicate a ### subsection with: what it is, how it works, materials used, all listed advantages, all listed disadvantages/limitations.
+- Every definition-like sentence → quote it verbatim or near-verbatim under Definitions.
+- Every list in the PDF → reproduce it COMPLETELY with ALL items — do not shorten.
+- Every formula → KaTeX inline $...$ or display $$...$$, explain every variable and unit.
+- Section headings in the PDF (bold text, capitalized titles) → use those as ### headings in your notes.
+- Notes must be detailed enough to study from WITHOUT reopening the PDF.
 
-# [Exact topic title from the slide/page]
+STRUCTURE — follow the order of topics as they appear in the source:
 
-## Was ist das? / What is this?
-2–4 sentences of context and explanation.
+# [Main topic from the PDF title or first major heading]
 
-## Wichtige Definitionen / Important Definitions
-- **Term**: exact explanation from the source
+## Definitionen / Definitions
+- **Term**: exact source definition with page ref *(S. X)*
 
-## Technische Begriffe / Technical Terms
-All important technical vocabulary with explanation.
+## Einteilungen und Normen / Classifications and Standards
+All classification schemes (e.g. DIN norms), complete with ALL listed categories.
+
+## Verfahren / Methods and Processes
+For EACH method named in the source, create a subsection:
+### [Method Name] *(S. X)*
+- **Prinzip**: how it works
+- **Werkstoffe / Materials**: what materials are used
+- **Vorteile**: every advantage listed in the source
+- **Nachteile / Grenzen**: every disadvantage or limitation
+- **Anwendungen**: applications if mentioned
 
 ## Formeln / Formulas
-KaTeX formulas with variable explanations.
+KaTeX with variable explanations.
 
-## Prozessschritte / Process Steps
-Numbered steps or bulleted characteristics — exactly as described in source.
-
-## Listen aus dem PDF / Lists from the PDF
-All lists preserved in FULL with all items. Add a one-line explanation per item if useful.
-
-## Vergleiche / Vergleiche / Comparisons
-Tables or lists for comparisons, advantages/disadvantages if present.
+## Vergleiche / Comparisons
+Comparison tables or side-by-side lists for methods/materials.
 
 ## Prüfungsrelevanz / Exam Focus
-What to memorize. What is likely to be tested.
+Concrete exam-likely questions and answers based on the source content.
 
-## Quellenangabe / Source
-Page reference for each section, e.g. *(S. 19)* or *(p. 19)*.
-
-Formatting rules:
-- Use # for title, ## for major sections, ### for subsections
-- Use bullet points and numbered lists
-- Use tables for comparisons
-- Minimum 5–10 useful bullets per main topic
-- Every sentence must add information — no filler`;
+Rules:
+- Minimum one ### subsection per named method/process in the source
+- Use tables for comparisons (Markdown table syntax)
+- Cite page numbers: *(S. X)* or *(S. X–Y)*
+- Every sentence must add information — no filler, no repetition`;
 }
 
 function summaryPrompt(lang) {
@@ -197,20 +194,36 @@ function validateNotes(markdown, contextText) {
 
 // ── Chunk retrieval ───────────────────────────────────────────────────────────
 
+var METADATA_NOISE = [
+  'institut für', 'technische universität', 'prof.', 'dr.-ing.', 'wintersemester',
+  'sommersemester', 'lehrstuhl', 'fachgebiet', 'vorlesung', 'folien', 'slides',
+  'copyright', '©', 'all rights reserved', 'tu braunschweig', 'tu berlin'
+];
+
+function isMetadataChunk(text) {
+  if (!text || text.length > 400) return false;
+  var lower = text.toLowerCase();
+  var hits = METADATA_NOISE.filter(function (t) { return lower.includes(t); }).length;
+  return hits >= 2;
+}
+
 async function fetchChunks(serviceKey, userId, courseId, documentId, pageStart, pageEnd) {
+  var limit = (pageStart == null && pageEnd == null) ? 150 : 80;
   var path = 'document_chunks' +
     '?select=chunk_text,page_start,page_end,section_title,source_type' +
     '&user_id=eq.' + encodeURIComponent(userId) +
     '&course_id=eq.' + encodeURIComponent(courseId) +
     '&document_id=eq.' + encodeURIComponent(documentId) +
     '&order=page_start.asc,id.asc' +
-    '&limit=80';
+    '&limit=' + limit;
   // Overlap filter: include chunks that overlap with [pageStart, pageEnd]
   if (pageEnd   != null) path += '&page_start=lte.' + pageEnd;
   if (pageStart != null) path += '&page_end=gte.'   + pageStart;
 
   var result = await supaRequest('GET', path, null, serviceKey);
-  return Array.isArray(result.body) ? result.body : [];
+  var chunks = Array.isArray(result.body) ? result.body : [];
+  // Remove short metadata-only chunks (title slides, author info)
+  return chunks.filter(function (c) { return !isMetadataChunk(c.chunk_text); });
 }
 
 // ── Context builder ───────────────────────────────────────────────────────────

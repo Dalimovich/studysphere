@@ -401,6 +401,101 @@
   font-weight: 600;
 }
 
+/* ── Range row ─────────────────────────────────────────────────────────────── */
+.np-range-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  background: rgba(0,0,0,0.15);
+  flex-shrink: 0;
+}
+
+.np-range-input {
+  width: 52px;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 6px;
+  color: #e9d5ff;
+  font-size: 0.82rem;
+  padding: 3px 6px;
+  outline: none;
+  text-align: center;
+}
+
+.np-range-input:focus { border-color: rgba(168,85,247,0.55); }
+.np-range-sep { color: rgba(255,255,255,0.35); font-size: 0.82rem; }
+
+/* ── Saved notes list ──────────────────────────────────────────────────────── */
+.np-saved-list {
+  flex: 1;
+  overflow-y: auto;
+  flex-direction: column;
+  gap: 0;
+  padding: 6px 0;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(168,85,247,0.3) transparent;
+}
+
+.np-saved-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  cursor: pointer;
+  transition: background 0.12s;
+  position: relative;
+}
+
+.np-saved-item:hover { background: rgba(168,85,247,0.08); }
+
+.np-saved-item-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #e9d5ff;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.np-saved-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.np-saved-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 20px;
+  text-transform: uppercase;
+}
+
+.np-saved-badge-notes   { background: rgba(168,85,247,0.2); color: #c084fc; }
+.np-saved-badge-summary { background: rgba(34,211,238,0.15); color: #67e8f9; }
+
+.np-saved-pages { font-size: 0.72rem; color: rgba(255,255,255,0.35); }
+.np-saved-date  { font-size: 0.72rem; color: rgba(255,255,255,0.25); }
+
+.np-saved-delete {
+  background: transparent;
+  border: none;
+  color: rgba(255,255,255,0.2);
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 2px 4px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  transition: color 0.12s;
+}
+
+.np-saved-delete:hover { color: #fca5a5; }
+
 /* ── Notes toggle button in PDF toolbar ────────────────────────────────────── */
 .pdf-notes-toggle-btn {
   padding: 4px 12px;
