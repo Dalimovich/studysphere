@@ -83,6 +83,12 @@
     });
   };
 
+  window.resetFlashcardsToGrid = function (target) {
+    if (!target) return;
+    var root = target.querySelector('[data-flashcards-root]');
+    if (root && root._resetToGrid) root._resetToGrid();
+  };
+
   function _getStateFor(courseId) {
     if (!_state[courseId]) _state[courseId] = { decks: [], activeId: null };
     return _state[courseId];
@@ -571,6 +577,8 @@
     });
     if (els.search) els.search.addEventListener('input', renderDeckGrid);
     if (els.sort) els.sort.addEventListener('change', renderDeckGrid);
+
+    root._resetToGrid = function () { state.activeId = null; renderAll(); };
     els.viewBtns.forEach(function (btn) {
       btn.addEventListener('click', function () {
         els.viewBtns.forEach(function (b) { b.classList.remove('active'); });

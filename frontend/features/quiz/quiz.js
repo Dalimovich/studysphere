@@ -75,6 +75,12 @@
     });
   };
 
+  window.resetQuizToGrid = function (target) {
+    if (!target) return;
+    var root = target.querySelector('[data-quiz-root]');
+    if (root && root._resetToGrid) root._resetToGrid();
+  };
+
   function _getStateFor(courseId) {
     if (!_state[courseId]) _state[courseId] = { quizzes: [], activeId: null };
     return _state[courseId];
@@ -718,6 +724,8 @@
 
     if (els.search) els.search.addEventListener('input', renderGrid);
     if (els.sort)   els.sort.addEventListener('change', renderGrid);
+
+    root._resetToGrid = function () { state.activeId = null; renderAll(); };
 
     // Load from DB then render
     if (!state._loaded) {

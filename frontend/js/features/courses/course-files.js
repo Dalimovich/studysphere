@@ -753,6 +753,8 @@ function setCourseStudyMode(co, course, mode) {
     if (flashPanel && !flashPanel.dataset.fcMounted) {
       flashPanel.dataset.fcMounted = '1';
       window.mountFlashcards(flashPanel, course, { generate: generateStudyTool });
+    } else if (flashPanel && typeof window.resetFlashcardsToGrid === 'function') {
+      window.resetFlashcardsToGrid(flashPanel);
     }
     return;
   }
@@ -761,6 +763,8 @@ function setCourseStudyMode(co, course, mode) {
     if (quizPanel && !quizPanel.dataset.qzMounted) {
       quizPanel.dataset.qzMounted = '1';
       window.mountQuiz(quizPanel, course, { generate: generateStudyTool });
+    } else if (quizPanel && typeof window.resetQuizToGrid === 'function') {
+      window.resetQuizToGrid(quizPanel);
     }
     return;
   }
