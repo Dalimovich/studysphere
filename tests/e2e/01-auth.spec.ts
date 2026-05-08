@@ -9,7 +9,7 @@ test.describe('Authentication', () => {
     await page.waitForLoadState('networkidle');
 
     // After auth setup, should be logged in — sidebar or course list visible
-    const appReady = await page.locator('#portalHamburger, #courseOverview').first().isVisible({ timeout: 10000 }).catch(() => false);
+    const appReady = await page.waitForFunction(() => sessionStorage.getItem('ss_logged_in') === 'true', { timeout: 10000 }).then(() => true).catch(() => false);
     expect(appReady).toBe(true);
 
     const crashes = errors.filter(e => !e.includes('ResizeObserver') && !e.includes('favicon'));

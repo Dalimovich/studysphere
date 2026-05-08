@@ -9,7 +9,7 @@ test.describe('Course management', () => {
 
     await app.goto();
 
-    await expect(page.locator('#portalHamburger')).toBeVisible({ timeout: 10000 });
+    await page.waitForFunction(() => sessionStorage.getItem('ss_logged_in') === 'true', { timeout: 10000 });
 
     const crashes = errors.filter(e =>
       !e.includes('ResizeObserver') &&

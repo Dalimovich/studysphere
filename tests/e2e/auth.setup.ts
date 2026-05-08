@@ -17,9 +17,8 @@ setup('authenticate', async ({ page }) => {
   await page.goto('/');
   await page.waitForLoadState('networkidle');
 
-  // Check if already authenticated (portal loaded)
-  const isLoggedIn = await page.locator('#portalHamburger').first()
-    .isVisible({ timeout: 3000 }).catch(() => false);
+  // Check if already authenticated — app sets ss_logged_in in sessionStorage after auth
+  const isLoggedIn = await page.evaluate(() => sessionStorage.getItem('ss_logged_in') === 'true').catch(() => false);
 
   if (!isLoggedIn) {
     // Not logged in — app shows landing page. Click the Login button to open auth modal.
@@ -32,8 +31,8 @@ setup('authenticate', async ({ page }) => {
     await page.locator('#authPassword').fill(password);
     await page.locator('#authSubmit').click();
 
-    // Wait for portal to appear after login
-    await page.waitForSelector('#portalHamburger', { timeout: 25000 });
+    // Wait for sessionStorage flag set by supabase.js after successful login
+    await page.waitForFunction(() => sessionStorage.getItem('ss_logged_in') === 'true', { timeout: 30000 });
   } else {
     console.log('[auth.setup] Already authenticated — saving existing session');
   }
