@@ -5,6 +5,7 @@
 [functions]
   node_bundler = "esbuild"
   included_files = ["backend/node_modules/pdf-parse/**"]
+  timeout = 26
 
 [[redirects]]
   from = "/api/ai"

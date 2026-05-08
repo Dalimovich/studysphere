@@ -121,7 +121,7 @@ function callOpenAI(systemPrompt, userMessage, maxTokens, model) {
         } catch (e) { reject(e); }
       });
     });
-    req.setTimeout(45000, function () { req.destroy(new Error('OpenAI timed out')); });
+    req.setTimeout(23000, function () { req.destroy(new Error('OpenAI timed out')); });
     req.on('error', reject);
     req.write(body);
     req.end();
