@@ -20,32 +20,31 @@ exports.handler = async function (event) {
   if (!user) return fail(401, 'Invalid or expired token');
 
   const serviceKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
-  const supaUrl = requireEnv('SUPABASE_URL').replace(/\/$/, '');
   const params = event.queryStringParameters || {};
 
   // ── GET — list notes ──────────────────────────────────────────────────────
   if (event.httpMethod === 'GET') {
-    let url = supaUrl + '/rest/v1/notes' +
-      '?select=id,title,type,course_id,document_id,source_page_start,source_page_end,created_at,updated_at' +
-      '&user_id=eq.' + encodeURIComponent(user.id) +
-      '&order=created_at.desc&limit=100';
-    if (params.courseId)    url += '&course_id=eq.'    + encodeURIComponent(params.courseId);
-    if (params.documentId)  url += '&document_id=eq.'  + encodeURIComponent(params.documentId);
-    if (params.id)          url += '&id=eq.'           + encodeURIComponent(params.id);
-
-    const rows = await supaRequest(serviceKey, 'GET', url, null).catch(function () { return []; });
-
-    // If fetching a single note by id, also return content_markdown
+    // Single note by id — return full content
     if (params.id) {
-      const full = await supaRequest(serviceKey, 'GET',
-        supaUrl + '/rest/v1/notes?select=*&id=eq.' + encodeURIComponent(params.id) +
+      const full = await supaRequest(
+        'GET',
+        'notes?select=*&id=eq.' + encodeURIComponent(params.id) +
         '&user_id=eq.' + encodeURIComponent(user.id),
-        null
-      ).catch(function () { return []; });
-      return jsonResponse(200, { note: full && full[0] || null });
+        null, serviceKey
+      ).catch(function () { return { body: [] }; });
+      const rows = Array.isArray(full.body) ? full.body : [];
+      return jsonResponse(200, { note: rows[0] || null });
     }
 
-    return jsonResponse(200, { notes: Array.isArray(rows) ? rows : [] });
+    let path = 'notes?select=id,title,type,course_id,document_id,source_page_start,source_page_end,created_at,updated_at' +
+      '&user_id=eq.' + encodeURIComponent(user.id) +
+      '&order=created_at.desc&limit=100';
+    if (params.courseId)   path += '&course_id=eq.'   + encodeURIComponent(params.courseId);
+    if (params.documentId) path += '&document_id=eq.' + encodeURIComponent(params.documentId);
+
+    const result = await supaRequest('GET', path, null, serviceKey).catch(function () { return { body: [] }; });
+    const rows = Array.isArray(result.body) ? result.body : [];
+    return jsonResponse(200, { notes: rows });
   }
 
   // ── PATCH — update note ───────────────────────────────────────────────────
@@ -63,10 +62,10 @@ exports.handler = async function (event) {
     if (!Object.keys(patch).length) return fail(400, 'Nothing to update');
     patch.updated_at = new Date().toISOString();
 
-    await supaRequest(serviceKey, 'PATCH',
-      supaUrl + '/rest/v1/notes?id=eq.' + encodeURIComponent(id) +
-      '&user_id=eq.' + encodeURIComponent(user.id),
-      patch,
+    await supaRequest(
+      'PATCH',
+      'notes?id=eq.' + encodeURIComponent(id) + '&user_id=eq.' + encodeURIComponent(user.id),
+      patch, serviceKey,
       { 'Prefer': 'return=minimal' }
     );
     return jsonResponse(200, { ok: true });
@@ -77,10 +76,10 @@ exports.handler = async function (event) {
     const id = params.id;
     if (!id) return fail(400, 'id is required');
 
-    await supaRequest(serviceKey, 'DELETE',
-      supaUrl + '/rest/v1/notes?id=eq.' + encodeURIComponent(id) +
-      '&user_id=eq.' + encodeURIComponent(user.id),
-      null,
+    await supaRequest(
+      'DELETE',
+      'notes?id=eq.' + encodeURIComponent(id) + '&user_id=eq.' + encodeURIComponent(user.id),
+      null, serviceKey,
       { 'Prefer': 'return=minimal' }
     );
     return jsonResponse(200, { ok: true });
