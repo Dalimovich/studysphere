@@ -187,6 +187,8 @@
       if (subEl) subEl.textContent = _glSkillSubs[skill] || '';
       _glLoadSampleTools(skill);
       _glRenderStudyTools();
+      var _glCourseForSkill = _glCourse();
+      _glLoadDbTools(_glCourseForSkill.id);
 
       // Swap AI chips
       var aiChipsEl = document.querySelector('.ai-chips');
@@ -277,11 +279,70 @@
       return d;
     }
 
+    // ── DB helpers ────────────────────────────────────────────────────────────
+    function _supaHeaders() {
+      var token = window._sbToken || '';
+      var key = window._SAKEY || '';
+      return { 'Content-Type': 'application/json', 'apikey': key, 'Authorization': 'Bearer ' + token };
+    }
+    function _supaUrl() { return (window._SUPA || '').replace(/\/$/, ''); }
+    function _userId() {
+      try {
+        var p = (window._sbToken || '').split('.')[1];
+        return JSON.parse(atob(p.replace(/-/g, '+').replace(/_/g, '/'))).sub || null;
+      } catch (e) { return null; }
+    }
+
+    function _dbSaveQuiz(courseId, items) {
+      var uid = _userId();
+      if (!uid) return Promise.resolve(null);
+      var sk = _glActiveSkill || 'general';
+      var name = (_glSkillNames[sk] || sk) + ' Quiz';
+      return fetch(_supaUrl() + '/rest/v1/quiz_runs', {
+        method: 'POST',
+        headers: Object.assign({}, _supaHeaders(), { 'Prefer': 'return=representation' }),
+        body: JSON.stringify({ user_id: uid, course_id: courseId, name: name, items: items })
+      }).then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (rows) { return rows && rows[0] ? rows[0].id : null; })
+        .catch(function () { return null; });
+    }
+
+    function _dbLoadQuiz(courseId) {
+      var url = _supaUrl() + '/rest/v1/quiz_runs?course_id=eq.' + encodeURIComponent(courseId) + '&order=created_at.desc&limit=1';
+      return fetch(url, { headers: _supaHeaders() })
+        .then(function (r) { return r.ok ? r.json() : []; })
+        .catch(function () { return []; });
+    }
+
+    function _dbSaveCards(courseId, items) {
+      var uid = _userId();
+      if (!uid) return Promise.resolve(null);
+      var sk = _glActiveSkill || 'general';
+      var name = (_glSkillNames[sk] || sk) + ' Flashcards';
+      return fetch(_supaUrl() + '/rest/v1/flashcard_decks', {
+        method: 'POST',
+        headers: Object.assign({}, _supaHeaders(), { 'Prefer': 'return=representation' }),
+        body: JSON.stringify({ user_id: uid, course_id: courseId, name: name, cards: items })
+      }).then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (rows) { return rows && rows[0] ? rows[0].id : null; })
+        .catch(function () { return null; });
+    }
+
+    function _dbLoadCards(courseId) {
+      var url = _supaUrl() + '/rest/v1/flashcard_decks?course_id=eq.' + encodeURIComponent(courseId) + '&order=created_at.desc&limit=1';
+      return fetch(url, { headers: _supaHeaders() })
+        .then(function (r) { return r.ok ? r.json() : []; })
+        .catch(function () { return []; });
+    }
+
     function _glCourse() {
       var sk = _glActiveSkill || 'general';
+      var realId = (window.activeCourseId) ||
+        (window.activeCourseRef && window.activeCourseRef.id) ||
+        ('german-' + sk);
       return {
-        id: 'german-' + sk,
-        short: 'german-' + sk,
+        id: realId,
+        short: realId,
         name: 'German ' + (_glSkillNames[sk] || sk)
       };
     }
@@ -372,6 +433,28 @@
       _glSelectedOption = null;
       _glCardIndex = 0;
       _glCardFlipped = false;
+    }
+
+    async function _glLoadDbTools(courseId) {
+      try {
+        var quizRows = await _dbLoadQuiz(courseId);
+        if (quizRows && quizRows[0] && Array.isArray(quizRows[0].items) && quizRows[0].items.length) {
+          _glQuizItems = quizRows[0].items;
+          _glQuizIndex = 0;
+          _glSelectedOption = null;
+        }
+        var cardRows = await _dbLoadCards(courseId);
+        if (cardRows && cardRows[0] && Array.isArray(cardRows[0].cards) && cardRows[0].cards.length) {
+          _glCards = cardRows[0].cards.map(function (card) {
+            return Object.assign({ bookmarked: false, confidence: null }, card);
+          });
+          _glCardIndex = 0;
+          _glCardFlipped = false;
+        }
+      } catch (e) {
+        // keep sample tools on error
+      }
+      _glRenderStudyTools();
     }
 
     function _glSetToolMode(mode) {
@@ -583,26 +666,94 @@
       _glRenderStudyTools();
     }
 
-    async function _glGenerateStudyTool(tool) {
+    function _glSeenItems() {
+      return _glQuizItems.map(function (q) { return q.question || ''; })
+        .concat(_glCards.map(function (c) { return c.front || ''; }))
+        .filter(Boolean).slice(0, 60);
+    }
+
+    function _glShowSourcePicker(docs, onConfirm) {
+      var existing = document.getElementById('glSourcePickerOverlay');
+      if (existing) existing.remove();
+      var listHtml = docs.map(function (d) {
+        return '<label class="qzsp-item">' +
+          '<input type="checkbox" class="qzsp-cb" value="' + _glEscape(d.id) + '" checked>' +
+          '<span class="qzsp-name">' + _glEscape(d.file_name || d.fileName || 'Untitled') + '</span>' +
+          '</label>';
+      }).join('');
+      var overlay = document.createElement('div');
+      overlay.id = 'glSourcePickerOverlay';
+      overlay.className = 'qzsp-overlay';
+      overlay.innerHTML =
+        '<div class="qzsp-modal">' +
+          '<div class="qzsp-head"><span class="qzsp-title">&#x1F4C2; Choose source files</span>' +
+            '<button class="qzsp-close" type="button">&#x2715;</button></div>' +
+          '<p class="qzsp-sub">Select which indexed files to use for generation.</p>' +
+          '<div class="qzsp-list">' + listHtml + '</div>' +
+          '<div class="qzsp-actions">' +
+            '<button class="qzsp-btn-ghost" id="glspSelectAll" type="button">Select all</button>' +
+            '<button class="qzsp-btn-ghost" id="glspClearAll" type="button">Clear</button>' +
+            '<button class="qzsp-btn-primary" id="glspConfirm" type="button">&#x2728; Generate</button>' +
+          '</div>' +
+        '</div>';
+      document.body.appendChild(overlay);
+      overlay.querySelector('.qzsp-close').onclick = function () { overlay.remove(); };
+      overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.remove(); });
+      overlay.querySelector('#glspSelectAll').onclick = function () {
+        overlay.querySelectorAll('.qzsp-cb').forEach(function (cb) { cb.checked = true; });
+      };
+      overlay.querySelector('#glspClearAll').onclick = function () {
+        overlay.querySelectorAll('.qzsp-cb').forEach(function (cb) { cb.checked = false; });
+      };
+      overlay.querySelector('#glspConfirm').onclick = function () {
+        var ids = [];
+        overlay.querySelectorAll('.qzsp-cb:checked').forEach(function (cb) { ids.push(cb.value); });
+        overlay.remove();
+        if (!ids.length) { if (typeof showToast === 'function') showToast('No files selected', 'Select at least one file.'); return; }
+        onConfirm(ids);
+      };
+    }
+
+    async function _glPickSourcesThenGenerate(tool) {
+      var course = _glCourse();
+      var token = window._sbToken || '';
+      try {
+        var r = await fetch(BACKEND_URL + '/api/documents/list?courseId=' + encodeURIComponent(course.id), {
+          headers: { Authorization: 'Bearer ' + token }
+        });
+        var data = r.ok ? await r.json() : {};
+        var docs = (data.documents || []).filter(function (d) { return d.processing_status === 'ready'; });
+        if (!docs.length) {
+          _glRunGenerate(tool, null);
+          return;
+        }
+        _glShowSourcePicker(docs, function (selectedIds) { _glRunGenerate(tool, selectedIds); });
+      } catch (e) {
+        _glRunGenerate(tool, null);
+      }
+    }
+
+    async function _glRunGenerate(tool, docIds) {
       var targetMode = tool === 'flashcards' ? 'cards' : 'quiz';
       _glSetToolMode(targetMode);
       var body = document.getElementById('glStudyToolBody');
       if (body)
         body.innerHTML = '<div class="gl-study-empty">Generating from your material...</div>';
+      var course = _glCourse();
       try {
+        var payload = {
+          courseId: course.id,
+          tool: tool,
+          count: tool === 'quiz' ? 5 : 8,
+          difficulty: 'medium',
+          topic: _glSkillNames[_glActiveSkill] || _glActiveSkill || null,
+          seenItems: _glSeenItems()
+        };
+        if (docIds && docIds.length) payload.docIds = docIds;
         var resp = await fetch(BACKEND_URL + '/api/ai/generate', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: 'Bearer ' + (window._sbToken || '')
-          },
-          body: JSON.stringify({
-            courseId: _glCourse().id,
-            tool: tool,
-            count: tool === 'quiz' ? 5 : 8,
-            difficulty: 'medium',
-            topic: _glSkillNames[_glActiveSkill] || _glActiveSkill || null
-          })
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (window._sbToken || '') },
+          body: JSON.stringify(payload)
         });
         var data = await resp.json();
         if (data && data.items && data.items.length) {
@@ -610,31 +761,27 @@
             _glQuizItems = data.items;
             _glQuizIndex = 0;
             _glSelectedOption = null;
+            _dbSaveQuiz(course.id, data.items);
           } else {
             _glCards = data.items.map(function (card) {
-              return {
-                front: card.front,
-                back: card.back,
-                source: card.source || '',
-                bookmarked: false,
-                confidence: null
-              };
+              return { front: card.front, back: card.back, source: card.source || '', bookmarked: false, confidence: null };
             });
             _glCardIndex = 0;
             _glCardFlipped = false;
+            _dbSaveCards(course.id, data.items);
           }
         } else {
-          if (typeof showToast === 'function')
-            showToast(
-              'Using sample tools',
-              data.error || 'Upload indexed course files to generate more.'
-            );
+          var errMsg = (data && data.error) ? data.error : 'No indexed documents found for this course.';
+          if (typeof showToast === 'function') showToast('Generation failed', errMsg);
         }
       } catch (e) {
-        if (typeof showToast === 'function')
-          showToast('Generation failed', 'Showing sample tools for now.');
+        if (typeof showToast === 'function') showToast('Generation failed', e.message || 'Could not reach server.');
       }
       _glRenderStudyTools();
+    }
+
+    async function _glGenerateStudyTool(tool) {
+      _glPickSourcesThenGenerate(tool);
     }
 
     function _glFileIcon(name) {

@@ -333,7 +333,7 @@ RULES:
 3. Ignore: table-of-contents lines, headers/footers, administrative text, filler sentences.
 4. Back must be substantial — not a one-word answer. Explain the idea clearly.
 5. Use the professor's own notation and terminology from the context.
-6. Write all math as plain ASCII: x^2, x_0, sum_i, integral, etc. (no Unicode math).
+6. Write all math using KaTeX notation: inline math as $...$, display math as $$...$$. For example: $x^2$, $x_0$, $\sum_i$, $\int_a^b f(x)\,dx$.
 7. Include difficulty: "easy" | "medium" | "hard".
 8. Include why_important: one sentence on why this is exam-relevant.
 9. Include source: file name and page (copy from the [Source N] header).
@@ -376,7 +376,7 @@ RULES:
 6. Include question_type from the list above.
 7. Include why_important: one sentence.
 8. Include source: file name and page.
-9. Write math as plain ASCII.
+9. Write math using KaTeX notation: inline as $...$, display as $$...$$.
 10. answer must be the letter "A", "B", "C", or "D".
 
 Respond ONLY with valid JSON:
@@ -579,7 +579,7 @@ Write a structured, exam-focused summary of the provided COURSE CONTEXT.
 Rules:
 1. Use ## headings for main topics found in the context.
 2. Use bullet points for key facts, definitions, formulas, and methods.
-3. Write math as plain ASCII.
+3. Write math using KaTeX notation: inline as $...$, display as $$...$$.
 4. End with a "Key Takeaways" section (3-5 bullets).
 5. Only include content from the context — no invented facts.
 6. Cite (filename, p.X) inline for important claims.
