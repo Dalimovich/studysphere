@@ -1,7 +1,27 @@
 import { fetchPdfBytes } from '../../services/pdf-service.js';
 import { panelShow, panelHide } from '../../core/panels.js';
 
+function _bookmarkKey(fileName) { return 'ss_page_' + (fileName || ''); }
+
+function _savePageBookmark() {
+  var name = window.activeFileName;
+  var page = window.pdfPage;
+  if (name && page && page > 1) {
+    try { sessionStorage.setItem(_bookmarkKey(name), String(page)); } catch (e) {}
+  }
+}
+
+function _restorePageBookmark(fileName) {
+  try {
+    var saved = sessionStorage.getItem(_bookmarkKey(fileName));
+    return saved ? parseInt(saved, 10) : null;
+  } catch (e) { return null; }
+}
+
 export function openFile(f, course) {
+  // Save page position for the file being left before switching
+  _savePageBookmark();
+
   var _mySeq = ++window._pdfOpenSeq;
   window.activeFileName = f.name;
   window.currentCourseShort = course.short;
@@ -91,6 +111,18 @@ export function openFile(f, course) {
               document.getElementById('pdfAll').textContent = 'Single page';
               if (typeof window._annotLoad === 'function') window._annotLoad(f.name);
               if (typeof window.renderPages === 'function') window.renderPages();
+              // Restore bookmarked page position after render settles
+              var _savedPage = _restorePageBookmark(f.name);
+              if (_savedPage && _savedPage > 1 && _savedPage <= pdf.numPages) {
+                setTimeout(function () {
+                  if (window._pdfOpenSeq !== _mySeq) return;
+                  var inp = document.getElementById('pdfPageInput');
+                  if (inp) {
+                    inp.value = _savedPage;
+                    inp.dispatchEvent(new Event('blur'));
+                  }
+                }, 700);
+              }
               setTimeout(function () {
                 var tp = [];
                 for (var pi = 1; pi <= pdf.numPages; pi++) {

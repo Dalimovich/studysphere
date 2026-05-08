@@ -121,7 +121,20 @@ export function showCourseSection(course, section) {
   section = ['files', 'quiz', 'flashcards'].includes(section) ? section : 'files';
   window.activeCourseRef = course;
   window.activeCourseSection = section;
+
+  // Save page bookmark before clearing activeFileName
+  var leavingFile = window.activeFileName;
+  var leavingPage = window.pdfPage;
+  if (leavingFile && leavingPage && leavingPage > 1) {
+    try { sessionStorage.setItem('ss_page_' + leavingFile, String(leavingPage)); } catch (e) {}
+  }
+
   window.activeFileName = null;
+
+  // Close notes panel when leaving PDF view
+  if (window._notesPanel && typeof window._notesPanel.close === 'function') {
+    window._notesPanel.close();
+  }
 
   document.getElementById('pdfView').style.display = 'none';
   document.getElementById('welcomeState').style.display = 'none';

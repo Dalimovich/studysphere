@@ -3,6 +3,10 @@ function updatePageInfo() {
   var tot = document.getElementById('pdfPageTotal');
   if (inp && document.activeElement !== inp) inp.value = pdfShowAll ? _pdfVisiblePage() : pdfPage;
   if (tot) tot.textContent = pdfTotal;
+  // Persist page position in sessionStorage so it survives refresh
+  if (activeFileName && pdfPage && pdfPage > 1) {
+    try { sessionStorage.setItem('ss_page_' + activeFileName, String(pdfPage)); } catch (e) {}
+  }
 }
 function _pdfVisiblePage() {
   var body = document.getElementById('pdfBody');
