@@ -27,13 +27,15 @@ exports.handler = async function (event) {
   try { body = JSON.parse(event.body || '{}'); }
   catch (e) { return fail(400, 'Invalid JSON'); }
 
-  const { courseId, tool, topic, count, difficulty, documentIds, seenItems } = body;
+  const { courseId, tool, topic, count, difficulty, seenItems } = body;
+  // Accept both documentIds (preferred) and docIds (legacy) for backward compat
+  const rawDocumentIds = body.documentIds || body.docIds;
   if (!courseId || typeof courseId !== 'string') return fail(400, 'courseId is required');
   if (!['flashcards', 'quiz', 'summary'].includes(tool))
     return fail(400, 'tool must be flashcards, quiz, or summary');
 
   const serviceKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
-  const docIds     = Array.isArray(documentIds) && documentIds.length ? documentIds : null;
+  const docIds     = Array.isArray(rawDocumentIds) && rawDocumentIds.length ? rawDocumentIds : null;
   const seen       = Array.isArray(seenItems) ? seenItems : [];
 
   let result;

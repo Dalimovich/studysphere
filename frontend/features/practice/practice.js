@@ -347,18 +347,54 @@
         .catch(function () { return []; });
     }
 
-    function _glCourse() {
+    // Used for FILE OPERATIONS (upload/download/delete) — always returns a valid object.
+    // Falls back to german-<skill> which is the learner's personal practice storage bucket.
+    function _glStorageCourse() {
       var sk = _glActiveSkill || 'general';
+      var id = window.activeCourseId ||
+        (window.activeCourseRef && window.activeCourseRef.id) ||
+        ('german-' + sk);
+      return {
+        id: id,
+        short: id,
+        name: (window.activeCourseRef && window.activeCourseRef.name) ||
+          'German ' + (_glSkillNames[sk] || sk)
+      };
+    }
+
+    // Used for RAG GENERATION — returns null when no real course is loaded.
+    // Prevents sending fake german-* IDs to the AI pipeline.
+    function _glCourse() {
       var realId = window.activeCourseId ||
         (window.activeCourseRef && window.activeCourseRef.id) ||
         null;
       if (!realId) return null;
+      var sk = _glActiveSkill || 'general';
       return {
         id: realId,
         short: realId,
         name: (window.activeCourseRef && window.activeCourseRef.name) ||
           'German ' + (_glSkillNames[sk] || sk)
       };
+    }
+
+    // Render inline KaTeX ($...$) and display KaTeX ($$...$$) if window.katex is available.
+    // Falls back to escaped plain text if katex hasn't loaded yet.
+    function _glRenderMath(text) {
+      if (!text) return '';
+      var s = _glEscape(text);
+      if (!window.katex) return s;
+      try {
+        s = s.replace(/\$\$([^$]+?)\$\$/g, function (_, m) {
+          try { return window.katex.renderToString(m, { displayMode: true, throwOnError: false }); }
+          catch (e) { return _glEscape(m); }
+        });
+        s = s.replace(/\$([^$\n]+?)\$/g, function (_, m) {
+          try { return window.katex.renderToString(m, { displayMode: false, throwOnError: false }); }
+          catch (e) { return _glEscape(m); }
+        });
+      } catch (e) { /* keep escaped fallback */ }
+      return s;
     }
 
     function _glFmtSize(bytes) {
@@ -439,9 +475,9 @@
 
     function _glLoadSampleTools(skill) {
       var sample = _glSampleTools(skill);
-      _glQuizItems = sample.quiz;
+      _glQuizItems = sample.quiz.map(function (q) { return Object.assign({ _sample: true }, q); });
       _glCards = sample.cards.map(function (card) {
-        return Object.assign({ bookmarked: false, confidence: null }, card);
+        return Object.assign({ bookmarked: false, confidence: null, _sample: true }, card);
       });
       _glQuizIndex = 0;
       _glSelectedOption = null;
@@ -525,6 +561,7 @@
           '<div class="gl-study-empty">No quiz generated yet. Click <strong>Generate Quiz</strong> to create one from your uploaded files.</div>';
         return;
       }
+      var isSample = _glQuizItems[0] && _glQuizItems[0]._sample;
       var item = _glNormalizeQuizItem(_glQuizItems[_glQuizIndex], _glQuizIndex);
       var answered = !!_glSelectedOption;
       var optionHtml = ['A', 'B', 'C', 'D']
@@ -555,7 +592,7 @@
             letter +
             '</span>' +
             '<span>' +
-            _glEscape(item.options[letter]) +
+            _glRenderMath(item.options[letter]) +
             '</span>' +
             status +
             '</button>'
@@ -563,8 +600,9 @@
         })
         .join('');
       body.innerHTML =
+        (isSample ? '<div class="gl-sample-banner">Sample practice — generate from your files to replace this.</div>' : '') +
         '<section class="gl-quiz-shell" aria-live="polite">' +
-        '<div class="gl-quiz-badge">Big Match ' +
+        '<div class="gl-quiz-badge">Question ' +
         (_glQuizIndex + 1) +
         ' / ' +
         _glQuizItems.length +
@@ -573,14 +611,14 @@
         _glEscape(item.category) +
         '</div>' +
         '<div class="gl-quiz-question">' +
-        _glEscape(item.question) +
+        _glRenderMath(item.question) +
         '</div>' +
         '<div class="gl-quiz-options">' +
         optionHtml +
         '</div>' +
         (answered
           ? '<div class="gl-explanation"><strong>Explanation:</strong> ' +
-            _glEscape(item.explanation) +
+            _glRenderMath(item.explanation) +
             '</div><button class="gl-continue-btn" id="glContinueQuiz" type="button">Got it, keep going</button>'
           : '') +
         '</section>';
@@ -608,8 +646,10 @@
           '<div class="gl-study-empty">No flashcards generated yet. Click <strong>Generate Cards</strong> to create some from your uploaded files.</div>';
         return;
       }
+      var isSample = _glCards[0] && _glCards[0]._sample;
       var card = _glCards[_glCardIndex];
       body.innerHTML =
+        (isSample ? '<div class="gl-sample-banner">Sample practice — generate from your files to replace this.</div>' : '') +
         '<section class="gl-flash-shell" aria-live="polite">' +
         '<div class="gl-flash-top">' +
         '<div><div class="gl-flash-label">' +
@@ -637,10 +677,10 @@
         (_glCardFlipped ? 'back side visible' : 'front side visible') +
         '">' +
         '<span class="gl-flash-side front"><span class="gl-flash-text">' +
-        _glEscape(card.front || card.term || 'Card front') +
+        _glRenderMath(card.front || card.term || 'Card front') +
         '</span></span>' +
         '<span class="gl-flash-side back"><span class="gl-flash-text">' +
-        _glEscape(card.back || card.definition || 'Card back') +
+        _glRenderMath(card.back || card.definition || 'Card back') +
         '</span></span>' +
         '</button></div>' +
         '<div class="gl-flash-controls">' +
@@ -839,7 +879,7 @@
     async function _glLoadFiles() {
       var uid = _currentUser && (_currentUser.id || _currentUser.sub);
       if (!uid) return;
-      var course = _glCourse();
+      var course = _glStorageCourse();
       if (!course.files) course.files = [];
       try {
         await _ufMerge(course);
@@ -857,13 +897,13 @@
     function _glOpenFile(uid, fname) {
       var ext = (fname.split('.').pop() || '').toLowerCase();
       if (ext === 'pdf') {
-        var course = _glCourse();
+        var course = _glStorageCourse();
         activeCourseId = course.id;
         var fakeFile = { name: fname, _uploaded: true, _course: course };
         _showFilesView();
         openFile(fakeFile, course);
       } else {
-        _ufFetchBytes(uid, _glCourse(), fname)
+        _ufFetchBytes(uid, _glStorageCourse(), fname)
           .then(function (bytes) {
             var blob = new Blob([bytes], { type: 'application/octet-stream' });
             window.open(URL.createObjectURL(blob), '_blank');
@@ -878,7 +918,7 @@
     async function _glDeleteFile(uid, fname, rowEl) {
       if (!confirm('Delete "' + fname + '"?')) return;
       try {
-        await _ufDeleteRemote(uid, _glCourse(), fname);
+        await _ufDeleteRemote(uid, _glStorageCourse(), fname);
         rowEl.remove();
         var list = document.getElementById('glFileList');
         if (list && !list.querySelector('.gl-file-row')) {
@@ -905,7 +945,7 @@
       var loadMsg = _glAppendMsg('Loading file…', 'bot');
       var bytes;
       try {
-        bytes = await _ufFetchBytes(uid, _glCourse(), fname);
+        bytes = await _ufFetchBytes(uid, _glStorageCourse(), fname);
       } catch (e) {
         loadMsg.textContent = '⚠️ Could not load file: ' + (e.message || String(e));
         return;
@@ -1009,7 +1049,7 @@
         try {
           await _ufUpload(
             uid,
-            _glCourse(),
+            _glStorageCourse(),
             f,
             function (pct) {
               if (bar) bar.style.width = pct + '%';
@@ -1033,7 +1073,7 @@
     window._glUploadClick = function () {
       var inp = document.getElementById('glFileInput');
       if (!inp) return;
-      var course = _glCourse();
+      var course = _glStorageCourse();
       var ref = activeCourseRef && activeCourseRef.id === course.id ? activeCourseRef : course;
       var folders = (ref.userFolders || []).map(function (fd) {
         return fd.name;
