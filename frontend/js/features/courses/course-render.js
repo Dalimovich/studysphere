@@ -77,10 +77,11 @@ export function buildFilesContent(course) {
     })
     .join('');
 
+  var hasFolders = course.userFolders && course.userFolders.length > 0;
   var filesHtml = course.files.length
     ? course.files.slice().sort(function (a, b) { return a.name.localeCompare(b.name); })
         .map(function (f) { return fileRowHtml(f, null); }).join('')
-    : course._filesLoading
+    : course._filesLoading || hasFolders
       ? ''
       : '<div class="co-files-loading" style="opacity:.5">No files yet &mdash; click Upload files to add some</div>';
 
