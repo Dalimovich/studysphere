@@ -55,51 +55,52 @@
     }).catch(function() {});
   }
 
-  function _fetchTemplate(attemptsLeft) {
-    return fetch(TEMPLATE_URL + '?v=' + Date.now())
-      .then(function (r) {
-        if (!r.ok) throw new Error('Template fetch failed: ' + r.status);
-        return r.text();
-      })
-      .then(function (html) {
-        var tmp = document.createElement('div');
-        tmp.innerHTML = html;
-        var root = tmp.querySelector('[data-flashcards-root]');
-        if (!root) throw new Error('No flashcards root in template');
-        return root.outerHTML;
-      })
-      .catch(function (err) {
-        if (attemptsLeft > 0) {
-          return new Promise(function (res) { setTimeout(res, 1500); })
-            .then(function () { return _fetchTemplate(attemptsLeft - 1); });
-        }
-        throw err;
-      });
-  }
-
-  function _loadTemplate() {
-    if (_templatePromise) return _templatePromise;
-    _templatePromise = _fetchTemplate(3)
-      .catch(function (err) {
-        console.error('flashcards template load error:', err);
-        _templatePromise = null;
-        return '<div class="fc-empty">Failed to load flashcards UI — click the Flashcards tab to retry.</div>';
-      });
-    return _templatePromise;
-  }
+  var _TEMPLATE_HTML = '<div class="fc-root" data-flashcards-root>' +
+    '<div class="fc-toolbar">' +
+      '<button class="fc-btn fc-btn-primary" id="fcGenerateBtn" type="button"><span class="fc-btn-icon">&#x2728;</span> Generate cards</button>' +
+      '<div class="fc-search"><span class="fc-search-icon">&#x1F50D;</span><input type="text" id="fcSearchInput" placeholder="Search flashcards…" /></div>' +
+      '<select class="fc-sort" id="fcSortSelect" aria-label="Sort decks">' +
+        '<option value="recent">Recently studied</option>' +
+        '<option value="name">By name</option>' +
+        '<option value="size">By card count</option>' +
+        '<option value="created">Recently created</option>' +
+      '</select>' +
+      '<div class="fc-view-toggle" role="tablist" aria-label="View mode">' +
+        '<button class="fc-view-btn active" data-view="grid" type="button" aria-label="Grid view">&#x25A6;</button>' +
+        '<button class="fc-view-btn" data-view="list" type="button" aria-label="List view">&#x2630;</button>' +
+      '</div>' +
+    '</div>' +
+    '<div class="fc-layout">' +
+      '<div class="fc-deck-pane" id="fcDeckPane">' +
+        '<div class="fc-deck-grid" id="fcDeckGrid"><div class="fc-empty">Loading decks…</div></div>' +
+        '<div class="fc-view-all" id="fcViewAllRow"><span class="fc-view-all-icon">&#x1F4C1;</span> View all decks<span class="fc-view-all-chev">&#x203A;</span></div>' +
+      '</div>' +
+      '<div class="fc-study-pane" id="fcStudyPane">' +
+        '<div class="fc-study-header">' +
+          '<span class="fc-study-icon">&#x1F4DA;</span>' +
+          '<div class="fc-study-meta"><div class="fc-study-deck-name" id="fcStudyName">Select a deck</div><div class="fc-study-deck-count" id="fcStudyCount">0 cards</div></div>' +
+          '<button class="fc-btn fc-btn-secondary fc-study-settings" id="fcStudySettingsBtn" type="button"><span class="fc-btn-icon">&#x2699;</span> Study settings</button>' +
+        '</div>' +
+        '<div class="fc-card-stage" id="fcCardStage"><div class="fc-card-empty">Pick a deck to start studying.</div></div>' +
+        '<div class="fc-study-progress">' +
+          '<div class="fc-study-progress-track"><div class="fc-study-progress-bar" id="fcStudyProgressBar"></div></div>' +
+          '<div class="fc-study-progress-label" id="fcStudyProgressLabel">0 / 0</div>' +
+        '</div>' +
+        '<div class="fc-study-controls">' +
+          '<button class="fc-btn fc-btn-ghost" id="fcPrevBtn" type="button" disabled><span>&#x25C0;</span> Previous</button>' +
+          '<button class="fc-btn fc-btn-flip" id="fcFlipBtn" type="button" disabled><span class="fc-btn-icon">&#x21BB;</span> Flip card</button>' +
+          '<button class="fc-btn fc-btn-ghost" id="fcNextBtn" type="button" disabled>Next <span>&#x25B6;</span></button>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
 
   window.mountFlashcards = function (target, course, options) {
-    if (!target) return Promise.resolve();
+    if (!target) return;
     options = options || {};
-    return _loadTemplate().then(function (html) {
-      target.innerHTML = html;
-      var root = target.querySelector('[data-flashcards-root]');
-      if (!root) {
-        delete target.dataset.fcMounted;
-        return;
-      }
-      _initShell(root, course, options);
-    });
+    target.innerHTML = _TEMPLATE_HTML;
+    var root = target.querySelector('[data-flashcards-root]');
+    if (root) _initShell(root, course, options);
   };
 
   window.resetFlashcardsToGrid = function (target) {
