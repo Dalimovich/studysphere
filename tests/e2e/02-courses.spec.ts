@@ -8,8 +8,7 @@ test.describe('Course management', () => {
     app.collectErrors(errors);
 
     await app.goto();
-
-    await page.waitForFunction(() => sessionStorage.getItem('ss_logged_in') === 'true', { timeout: 10000 });
+    await app.loginIfNeeded();
 
     const crashes = errors.filter(e =>
       !e.includes('ResizeObserver') &&

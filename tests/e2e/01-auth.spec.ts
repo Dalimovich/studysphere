@@ -9,7 +9,7 @@ test.describe('Authentication', () => {
     page.on('pageerror', e => errors.push(e.message));
 
     await app.goto();
-    await app.waitForAuthenticated(30000);
+    await app.loginIfNeeded();
 
     const crashes = errors.filter(
       e =>

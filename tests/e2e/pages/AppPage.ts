@@ -98,6 +98,51 @@ export class AppPage {
     );
   }
 
+  /**
+   * Ensures the test is running in an authenticated session.
+   * If the stored session has expired or failed, re-authenticates using
+   * E2E_EMAIL / E2E_PASSWORD env vars so tests are resilient to token expiry.
+   * Returns true if authenticated, false if credentials are missing.
+   */
+  async loginIfNeeded(): Promise<boolean> {
+    const email = process.env.E2E_EMAIL;
+    const password = process.env.E2E_PASSWORD;
+
+    // Check if already authenticated (fast path)
+    const alreadyAuth = await this.page.evaluate(() => {
+      if (sessionStorage.getItem('ss_logged_in') === 'true') return true;
+      return !!(
+        document.querySelector('#courseAddBtn') ||
+        document.querySelector('#sdCourseList') ||
+        document.querySelector('#welcomeState') ||
+        document.querySelector('#courseOverview')
+      );
+    }).catch(() => false);
+
+    if (alreadyAuth) return true;
+    if (!email || !password) return false;
+
+    // Session expired or invalid — find and click the login button
+    const loginBtn = this.page.locator(
+      '[data-i18n="landing_nav_login"], #landingLoginBtn, button:has-text("Login"), button:has-text("Sign in")'
+    ).first();
+
+    if (await loginBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await loginBtn.click();
+    }
+
+    try {
+      await this.page.waitForSelector('#authEmail', { timeout: 10000 });
+      await this.emailInput.fill(email);
+      await this.passwordInput.fill(password);
+      await this.loginBtn.click();
+      await this.waitForAuthenticated(30000);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   // ── Auth ──────────────────────────────────────────────────────────────────
   get emailInput() {
     return this.page.locator('#authEmail');
