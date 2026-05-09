@@ -58,12 +58,16 @@
   function _loadTemplate() {
     if (_templatePromise) return _templatePromise;
     _templatePromise = fetch(TEMPLATE_URL)
-      .then(function (r) { return r.text(); })
+      .then(function (r) {
+        if (!r.ok) throw new Error('Template fetch failed: ' + r.status);
+        return r.text();
+      })
       .then(function (html) {
         var tmp = document.createElement('div');
         tmp.innerHTML = html;
         var root = tmp.querySelector('[data-flashcards-root]');
-        return root ? root.outerHTML : html;
+        if (!root) throw new Error('No flashcards root in template');
+        return root.outerHTML;
       })
       .catch(function (err) {
         console.error('flashcards template load error:', err);

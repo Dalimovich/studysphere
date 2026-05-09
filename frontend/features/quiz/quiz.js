@@ -53,12 +53,16 @@
   function _loadTemplate() {
     if (_templatePromise) return _templatePromise;
     _templatePromise = fetch(TEMPLATE_URL)
-      .then(function (r) { return r.text(); })
+      .then(function (r) {
+        if (!r.ok) throw new Error('Template fetch failed: ' + r.status);
+        return r.text();
+      })
       .then(function (html) {
         var tmp = document.createElement('div');
         tmp.innerHTML = html;
         var root = tmp.querySelector('[data-quiz-root]');
-        return root ? root.outerHTML : html;
+        if (!root) throw new Error('No quiz root in template');
+        return root.outerHTML;
       })
       .catch(function () { _templatePromise = null; return '<div class="qz-empty">Failed to load quiz UI.</div>'; });
     return _templatePromise;
