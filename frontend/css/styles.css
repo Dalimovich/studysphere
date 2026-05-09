@@ -2766,7 +2766,7 @@ body.night .sb-acc-chev-btn {
 }
 .qzsp-folder-selall:hover { background: rgba(192,132,252,.22); }
 .qzsp-folder-files { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px 8px; }
-.qzsp-folder-list { display: flex; flex-direction: column; gap: 6px; }
+.qzsp-folder-list { gap: 6px; }
 
 /* Fallback for browsers without :has() — JS adds .co-inner-wide */
 .co-inner.co-inner-wide {
