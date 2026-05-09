@@ -529,7 +529,7 @@ async function runPipeline({ serviceKey, userId, courseId, tool, topic, count, d
     if (!rawChunks.length) continue;
 
     const ranked    = filterAndRank(rawChunks, docNamesMap);
-    const maxChunks = Math.min(thisCount * 2, 14);
+    const maxChunks = Math.min(thisCount * 2, 24);
     const topChunks = deduplicateChunks(ranked, maxChunks);
     if (!topChunks.length) continue;
 
@@ -594,7 +594,7 @@ async function runPipeline({ serviceKey, userId, courseId, tool, topic, count, d
     let repairChunks = [];
     try {
       const raw = await retrieveWithEmbeddings(serviceKey, userId, courseId, queries, embeddings, [repairDocId]);
-      repairChunks = deduplicateChunks(filterAndRank(raw, docNamesMap), Math.min(shortage * 2, 10));
+      repairChunks = deduplicateChunks(filterAndRank(raw, docNamesMap), Math.min(shortage * 3, 20));
     } catch (e) {}
 
     if (repairChunks.length) {
