@@ -50,9 +50,8 @@
     }).catch(function() {});
   }
 
-  function _loadTemplate() {
-    if (_templatePromise) return _templatePromise;
-    _templatePromise = fetch(TEMPLATE_URL)
+  function _fetchTemplate(attemptsLeft) {
+    return fetch(TEMPLATE_URL + '?v=' + Date.now())
       .then(function (r) {
         if (!r.ok) throw new Error('Template fetch failed: ' + r.status);
         return r.text();
@@ -64,7 +63,19 @@
         if (!root) throw new Error('No quiz root in template');
         return root.outerHTML;
       })
-      .catch(function () { _templatePromise = null; return '<div class="qz-empty">Failed to load quiz UI.</div>'; });
+      .catch(function (err) {
+        if (attemptsLeft > 0) {
+          return new Promise(function (res) { setTimeout(res, 1500); })
+            .then(function () { return _fetchTemplate(attemptsLeft - 1); });
+        }
+        throw err;
+      });
+  }
+
+  function _loadTemplate() {
+    if (_templatePromise) return _templatePromise;
+    _templatePromise = _fetchTemplate(3)
+      .catch(function () { _templatePromise = null; return '<div class="qz-empty">Failed to load quiz UI — click the Quiz tab to retry.</div>'; });
     return _templatePromise;
   }
 
