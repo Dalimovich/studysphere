@@ -520,7 +520,7 @@ async function runPipeline({ serviceKey, userId, courseId, tool, topic, count, d
     const thisCount   = Math.max(2, remaining);
     // Ask the model for a small buffer so 1-2 deduped items don't leave us short.
     // The final .slice(0, itemCount) trims back to the requested count.
-    const promptCount = fi === 0 ? Math.min(thisCount + 2, 15) : thisCount;
+    const promptCount = fi === 0 ? thisCount + 2 : thisCount;
 
     // Retrieve chunks for this file using pre-computed embeddings
     let rawChunks;
