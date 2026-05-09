@@ -518,6 +518,9 @@ async function runPipeline({ serviceKey, userId, courseId, tool, topic, count, d
 
     const docId       = fileIds[fi];
     const thisCount   = Math.max(2, remaining);
+    // Ask the model for a small buffer so 1-2 deduped items don't leave us short.
+    // The final .slice(0, itemCount) trims back to the requested count.
+    const promptCount = fi === 0 ? Math.min(thisCount + 2, 15) : thisCount;
 
     // Retrieve chunks for this file using pre-computed embeddings
     let rawChunks;
@@ -539,8 +542,8 @@ async function runPipeline({ serviceKey, userId, courseId, tool, topic, count, d
     const context = buildContext(topChunks, docNamesMap);
 
     let systemPrompt;
-    if (tool === 'flashcards') systemPrompt = flashcardsSystemPrompt(thisCount);
-    else                       systemPrompt = quizSystemPrompt(thisCount, diff);
+    if (tool === 'flashcards') systemPrompt = flashcardsSystemPrompt(promptCount);
+    else                       systemPrompt = quizSystemPrompt(promptCount, diff);
 
     // Tell the model to avoid items already generated
     const alreadySeen = seen.concat(allItems.map(function (it) { return it.question || it.front || ''; })).filter(Boolean).slice(0, 50);
@@ -552,8 +555,8 @@ async function runPipeline({ serviceKey, userId, courseId, tool, topic, count, d
     const focusPart   = topic ? '\n\n---\nFocus topic: ' + topic : '';
     const userMessage = 'COURSE CONTEXT:\n\n' + context + focusPart;
     const maxTokens   = tool === 'flashcards'
-      ? Math.min(8000, 900 + thisCount * 400)
-      : Math.min(6000, 1000 + thisCount * 320);
+      ? Math.min(8000, 900 + promptCount * 400)
+      : Math.min(6000, 1000 + promptCount * 320);
 
     let result;
     try {
