@@ -2,11 +2,11 @@
 // Multi-step pipeline for generating exam-quality flashcards and quizzes.
 //
 // Pipeline:
-//   1. Retrieve a large candidate pool (multi-query, formula-sheet boosting)
-//   2. Score each chunk for study value (formulas, exercises, definitions …)
-//   3. Keep only high-value chunks; deduplicate across documents
-//   4. Build structured context with section labels
-//   5. Call OpenAI with rich, role-specific prompts
+//   1. Embed retrieval queries once (shared across all files)
+//   2. Fetch all indexed document IDs for the course
+//   3. Process one file at a time — retrieve chunks, generate items
+//   4. Track a wall-clock deadline; return partial results if time runs low
+//   5. Deduplicate generated items across files
 //
 // Exported: runPipeline(opts) → { items, sources, error? }
 
@@ -23,7 +23,10 @@ const EMBED_DIMENSIONS   = 1536;
 const OPENAI_MODEL_DEFAULT = optionalEnv('OPENAI_GENERATE_MODEL', 'gpt-4o-mini');
 const OPENAI_MODEL_STRONG  = optionalEnv('OPENAI_GENERATE_MODEL_STRONG', 'gpt-4o');
 const MIN_SIMILARITY     = 0.10;
-const CANDIDATE_LIMIT    = 60;  // larger pool so scoring has more to work with
+const CANDIDATE_LIMIT    = 60;
+
+// Wall-clock budget: leave ~4 s buffer before Netlify's 26 s hard kill.
+const PIPELINE_DEADLINE_MS = 22000;
 
 // German/English section keywords that indicate high-value study material
 const HIGH_VALUE_SECTIONS = [
@@ -35,14 +38,12 @@ const HIGH_VALUE_SECTIONS = [
   'merkblatt','tabelle','tabellenbuch','keypoint','key point','leitsatz'
 ];
 
-// File-name fragments that indicate formula sheets / summaries (big boost)
 const FORMULA_SHEET_NAMES = [
   'formel','formelzettel','formelsammlung','zusammenfassung','tabelle',
   'tabellenbuch','cheatsheet','formula','summary','merkblatt','übersicht',
   'cheat','sheet'
 ];
 
-// Source-type base scores
 const SOURCE_BASE = {
   solution: 0.20,
   exercise: 0.18,
@@ -80,7 +81,7 @@ function embedText(text) {
         } catch (e) { reject(e); }
       });
     });
-    req.setTimeout(15000, function () { req.destroy(new Error('Embed timed out')); });
+    req.setTimeout(12000, function () { req.destroy(new Error('Embed timed out')); });
     req.on('error', reject);
     req.write(body);
     req.end();
@@ -121,7 +122,7 @@ function callOpenAI(systemPrompt, userMessage, maxTokens, model) {
         } catch (e) { reject(e); }
       });
     });
-    req.setTimeout(23000, function () { req.destroy(new Error('OpenAI timed out')); });
+    req.setTimeout(18000, function () { req.destroy(new Error('OpenAI timed out')); });
     req.on('error', reject);
     req.write(body);
     req.end();
@@ -167,19 +168,11 @@ function rpcChunks(serviceKey, supaUrl, payload) {
   });
 }
 
-async function retrieveMultiQuery(serviceKey, userId, courseId, queries, docIds) {
+// Retrieve chunks using pre-computed embeddings (avoids re-embedding per file).
+async function retrieveWithEmbeddings(serviceKey, userId, courseId, queries, embeddings, docIds) {
   const supaUrl = requireEnv('SUPABASE_URL');
 
-  // Embed all queries in parallel
-  const embeddings = await Promise.all(queries.map(function (q) {
-    return embedText(q).catch(function () { return null; });
-  }));
-
-  const validEmbeddings = embeddings.filter(Boolean);
-  if (!validEmbeddings.length) throw new Error('All embeddings failed');
-
-  // Fetch chunks for each query in parallel
-  const allResults = await Promise.all(validEmbeddings.map(function (emb, qi) {
+  const allResults = await Promise.all(embeddings.map(function (emb, qi) {
     const basePayload = {
       p_user_id:    userId,
       p_course_id:  courseId,
@@ -201,7 +194,6 @@ async function retrieveMultiQuery(serviceKey, userId, courseId, queries, docIds)
     return rpcChunks(serviceKey, supaUrl, basePayload);
   }));
 
-  // Merge: deduplicate by chunk id, keep highest similarity per chunk
   const byId = new Map();
   allResults.forEach(function (chunks) {
     chunks.forEach(function (c) {
@@ -232,19 +224,14 @@ function textStudyScore(text) {
   let score = 0;
   const lower = text.toLowerCase();
 
-  // Formula indicators
   if (/[=≈∑∫∂√π]/.test(text) || /\b[a-z]_?\{?[a-z0-9]\}?\s*=/.test(text)) score += 0.15;
-  // Numbered list / steps
   if (/^\s*\d+[\.\)]/m.test(text)) score += 0.08;
-  // German section keywords in body
   HIGH_VALUE_SECTIONS.forEach(function (kw) {
     if (lower.includes(kw)) score += 0.06;
   });
-  // Common mistake signals
   if (/fehler|mistake|achtung|attention|nicht verwechseln|do not|never|always/i.test(text)) score += 0.08;
-  // Table-of-contents / header noise (penalise)
-  if (/^\s*\d+\s*\.{3,}/m.test(text)) score -= 0.20;  // dotted TOC line
-  if (text.trim().split('\n').length < 3 && text.length < 80) score -= 0.15; // very short fragment
+  if (/^\s*\d+\s*\.{3,}/m.test(text)) score -= 0.20;
+  if (text.trim().split('\n').length < 3 && text.length < 80) score -= 0.15;
 
   return score;
 }
@@ -296,6 +283,23 @@ function fetchDocNames(serviceKey, docIds) {
     .catch(function () { return {}; });
 }
 
+// Fetch all indexed document IDs for a course (used when no docIds filter provided).
+function fetchCourseDocIds(serviceKey, userId, courseId) {
+  return supaRequest(
+    'GET',
+    'documents?course_id=eq.' + encodeURIComponent(courseId) +
+      '&user_id=eq.' + encodeURIComponent(userId) +
+      '&status=eq.indexed&select=id',
+    null,
+    serviceKey
+  )
+    .then(function (r) {
+      if (Array.isArray(r.body)) return r.body.map(function (d) { return d.id; });
+      return [];
+    })
+    .catch(function () { return []; });
+}
+
 // ─── Context builder ──────────────────────────────────────────────────────────
 
 function buildContext(chunks, docNamesMap) {
@@ -333,7 +337,7 @@ RULES:
 3. Ignore: table-of-contents lines, headers/footers, administrative text, filler sentences.
 4. Back must be substantial — not a one-word answer. Explain the idea clearly.
 5. Use the professor's own notation and terminology from the context.
-6. Write all math using KaTeX notation: inline math as $...$, display math as $$...$$. For example: $x^2$, $x_0$, $\sum_i$, $\int_a^b f(x)\,dx$.
+6. Write all math using KaTeX notation: inline math as $...$, display math as $$...$$. For example: $x^2$, $x_0$, $\\sum_i$, $\\int_a^b f(x)\\,dx$.
 7. Include difficulty: "easy" | "medium" | "hard".
 8. Include why_important: one sentence on why this is exam-relevant.
 9. Include source: file name and page (copy from the [Source N] header).
@@ -383,9 +387,21 @@ Respond ONLY with valid JSON:
 {"items":[{"question":"...","options":{"A":"...","B":"...","C":"...","D":"..."},"answer":"A","explanation":"...","difficulty":"medium","question_type":"calculation","why_important":"...","source":"filename, p.X"}]}`;
 }
 
+function summarySystemPrompt() {
+  return `You are an expert tutor summarising course materials for exam preparation.
+Write a structured, exam-focused summary of the provided COURSE CONTEXT.
+Rules:
+1. Use ## headings for main topics found in the context.
+2. Use bullet points for key facts, definitions, formulas, and methods.
+3. Write math using KaTeX notation: inline as $...$, display as $$...$$.
+4. End with a "Key Takeaways" section (3-5 bullets).
+5. Only include content from the context — no invented facts.
+6. Cite (filename, p.X) inline for important claims.
+Respond ONLY with valid JSON: {"text":"## Topic\\n- point\\n..."}`;
+}
+
 // ─── Output deduplication ─────────────────────────────────────────────────────
 
-// Jaccard similarity on word sets — catches rephrased duplicates.
 function wordJaccard(a, b) {
   const wordsOf = function (s) {
     return new Set(String(s || '').toLowerCase().replace(/[^a-z0-9äöüß\s]/g, ' ').split(/\s+/).filter(Boolean));
@@ -398,7 +414,6 @@ function wordJaccard(a, b) {
   return intersection / (sa.size + sb.size - intersection);
 }
 
-// Remove generated items whose question/front text is too similar to an earlier item.
 function deduplicateItems(items) {
   const THRESHOLD = 0.55;
   const kept = [];
@@ -410,44 +425,6 @@ function deduplicateItems(items) {
     if (!isDup) kept.push(item);
   });
   return kept;
-}
-
-// ─── Topic discovery ──────────────────────────────────────────────────────────
-
-// When no topic is specified, retrieve a broad sample and ask the model to list
-// the main topics — then use those as targeted retrieval queries. This ensures
-// the generated items cover the full course rather than whichever generic queries
-// happen to score highest.
-async function discoverTopics(serviceKey, userId, courseId, tool, docIds) {
-  const broadQueries = [
-    'main topics key concepts overview',
-    'Themen Kapitel Übersicht Inhaltsverzeichnis'
-  ];
-  let chunks;
-  try {
-    chunks = await retrieveMultiQuery(serviceKey, userId, courseId, broadQueries, docIds);
-  } catch (e) {
-    return null;
-  }
-  if (!chunks.length) return null;
-
-  // Take top 10 chunks by similarity for the topic-discovery call
-  const sample = chunks
-    .sort(function (a, b) { return b.similarity - a.similarity; })
-    .slice(0, 10)
-    .map(function (c) { return c.chunk_text; })
-    .join('\n\n---\n\n');
-
-  const systemPrompt =
-    'You are a course analyst. Given excerpts from course materials, list the 4-6 distinct ' +
-    'main topics covered. Return ONLY valid JSON: {"topics":["topic 1","topic 2",...]}. ' +
-    'Each topic should be a short phrase (3-8 words) that would make a good search query.';
-
-  try {
-    const result = await callOpenAI(systemPrompt, sample, 300, OPENAI_MODEL_DEFAULT);
-    if (Array.isArray(result.topics) && result.topics.length) return result.topics;
-  } catch (e) { /* fall through to generic queries */ }
-  return null;
 }
 
 // ─── Retrieval queries by tool ────────────────────────────────────────────────
@@ -476,86 +453,177 @@ function buildQueries(tool, topic) {
 // ─── Main pipeline ────────────────────────────────────────────────────────────
 
 async function runPipeline({ serviceKey, userId, courseId, tool, topic, count, difficulty, docIds, seenItems }) {
-  const itemCount  = Math.min(Math.max(parseInt(count) || 8, 3), 15);
-  const diff       = ['easy', 'medium', 'hard'].includes(difficulty) ? difficulty : 'medium';
+  const startTime   = Date.now();
+  const timeLeft    = function () { return PIPELINE_DEADLINE_MS - (Date.now() - startTime); };
 
-  // Use the stronger model for hard quizzes — gpt-4o-mini can't reliably produce
-  // multi-step calculation and trap questions at hard difficulty.
+  const itemCount   = Math.min(Math.max(parseInt(count) || 8, 3), 15);
+  const diff        = ['easy', 'medium', 'hard'].includes(difficulty) ? difficulty : 'medium';
   const useStrongModel = tool === 'quiz' && diff === 'hard';
-  const model = useStrongModel ? OPENAI_MODEL_STRONG : OPENAI_MODEL_DEFAULT;
+  const model       = useStrongModel ? OPENAI_MODEL_STRONG : OPENAI_MODEL_DEFAULT;
 
-  // Scale context to item count: more items need more source material to avoid repetition.
-  const maxContextChunks = Math.min(itemCount * 2, 18);
-
-  // Step 1: build retrieval queries.
-  // Skip topic discovery when scoped to specific documents — the chunks are already
-  // filtered so broad discovery adds latency without improving coverage.
-  let queries;
-  if (!topic && !(docIds && docIds.length)) {
-    const discovered = await discoverTopics(serviceKey, userId, courseId, tool, docIds);
-    queries = discovered || buildQueries(tool, topic);
-  } else {
-    queries = buildQueries(tool, topic);
+  // Summary tool: single-pass (no per-file loop needed)
+  if (tool === 'summary') {
+    return runSummaryPipeline({ serviceKey, userId, courseId, tool, topic, docIds, model, timeLeft });
   }
 
-  // Step 2: retrieve large candidate pool across multiple queries
-  let rawChunks;
+  // ── Step 1: embed queries once ──────────────────────────────────────────────
+  const queries = buildQueries(tool, topic);
+  let embeddings;
   try {
-    rawChunks = await retrieveMultiQuery(serviceKey, userId, courseId, queries, docIds);
+    embeddings = await Promise.all(queries.map(function (q) {
+      return embedText(q).catch(function () { return null; });
+    }));
+    embeddings = embeddings.filter(Boolean);
+    if (!embeddings.length) throw new Error('All embeddings failed');
   } catch (e) {
     throw new Error('Retrieval failed: ' + (e.message || e));
   }
 
-  if (!rawChunks.length) {
+  // ── Step 2: determine which files to process ────────────────────────────────
+  let fileIds;
+  if (docIds && docIds.length) {
+    fileIds = docIds;
+  } else {
+    fileIds = await fetchCourseDocIds(serviceKey, userId, courseId);
+    // Fall back: do a broad retrieval to discover which docs have chunks indexed
+    if (!fileIds.length) {
+      const broad = await retrieveWithEmbeddings(serviceKey, userId, courseId, queries, embeddings, null);
+      fileIds = [...new Set(broad.map(function (c) { return c.document_id; }))];
+    }
+  }
+
+  if (!fileIds.length) {
     return { items: [], sources: [], error: 'No indexed course documents found. Upload and index your course files first.' };
   }
 
-  // Step 3: fetch doc names so we can score formula-sheet files
+  // ── Step 3: fetch doc names (needed for formula-sheet scoring) ──────────────
+  const docNamesMap = await fetchDocNames(serviceKey, fileIds);
+
+  // ── Step 4: per-file generation loop ───────────────────────────────────────
+  const allItems   = [];
+  const allSources = [];
+  const seenSourceFiles = new Set();
+  const seen       = Array.isArray(seenItems) ? seenItems.filter(Boolean).slice(0, 50) : [];
+
+  // How many items to request from each file; recalculate as we go
+  for (var fi = 0; fi < fileIds.length; fi++) {
+    const remaining = itemCount - allItems.length;
+    if (remaining <= 0) break;
+    // Need at least 5 s: ~2 s for vector search + ~3 s minimum for generation
+    if (timeLeft() < 5000) break;
+
+    const docId       = fileIds[fi];
+    const filesLeft   = fileIds.length - fi;
+    const thisCount   = Math.max(2, Math.ceil(remaining / filesLeft));
+
+    // Retrieve chunks for this file using pre-computed embeddings
+    let rawChunks;
+    try {
+      rawChunks = await retrieveWithEmbeddings(serviceKey, userId, courseId, queries, embeddings, [docId]);
+    } catch (e) {
+      continue;
+    }
+    if (!rawChunks.length) continue;
+
+    const ranked    = filterAndRank(rawChunks, docNamesMap);
+    const maxChunks = Math.min(thisCount * 2, 14);
+    const topChunks = deduplicateChunks(ranked, maxChunks);
+    if (!topChunks.length) continue;
+
+    // Re-check time after retrieval
+    if (timeLeft() < 4000) break;
+
+    const context = buildContext(topChunks, docNamesMap);
+
+    let systemPrompt;
+    if (tool === 'flashcards') systemPrompt = flashcardsSystemPrompt(thisCount);
+    else                       systemPrompt = quizSystemPrompt(thisCount, diff);
+
+    // Tell the model to avoid items already generated
+    const alreadySeen = seen.concat(allItems.map(function (it) { return it.question || it.front || ''; })).filter(Boolean).slice(0, 50);
+    if (alreadySeen.length) {
+      systemPrompt += '\n\nPREVIOUSLY SHOWN — do NOT generate questions/cards covering the same topic or phrasing as any of these:\n' +
+        alreadySeen.map(function (s) { return '- ' + String(s).slice(0, 120); }).join('\n');
+    }
+
+    const focusPart   = topic ? '\n\n---\nFocus topic: ' + topic : '';
+    const userMessage = 'COURSE CONTEXT:\n\n' + context + focusPart;
+    const maxTokens   = tool === 'flashcards' ? 1400 : (useStrongModel ? 1800 : 1400);
+
+    let result;
+    try {
+      result = await callOpenAI(systemPrompt, userMessage, maxTokens, model);
+    } catch (e) {
+      // Timeout or API error — return whatever we have so far
+      break;
+    }
+
+    const fileItems = deduplicateItems(result.items || []);
+    allItems.push.apply(allItems, fileItems);
+
+    // Accumulate unique sources
+    topChunks.forEach(function (c) {
+      const fn = docNamesMap[c.document_id] || 'Unknown';
+      if (!seenSourceFiles.has(fn)) {
+        seenSourceFiles.add(fn);
+        allSources.push({
+          file_name: fn,
+          pages: c.page_start === c.page_end ? String(c.page_start) : c.page_start + '-' + c.page_end,
+          section: c.section_title || null
+        });
+      }
+    });
+  }
+
+  if (!allItems.length) {
+    return { items: [], sources: [], error: 'No indexed course documents found. Upload and index your course files first.' };
+  }
+
+  const finalItems = deduplicateItems(allItems).slice(0, itemCount);
+  return { items: finalItems, text: '', sources: allSources };
+}
+
+// ─── Summary pipeline (single-pass, unchanged behaviour) ─────────────────────
+
+async function runSummaryPipeline({ serviceKey, userId, courseId, tool, topic, docIds, model, timeLeft }) {
+  const queries = buildQueries(tool, topic);
+  let embeddings;
+  try {
+    embeddings = await Promise.all(queries.map(function (q) {
+      return embedText(q).catch(function () { return null; });
+    }));
+    embeddings = embeddings.filter(Boolean);
+    if (!embeddings.length) throw new Error('All embeddings failed');
+  } catch (e) {
+    throw new Error('Retrieval failed: ' + (e.message || e));
+  }
+
+  let rawChunks;
+  try {
+    rawChunks = await retrieveWithEmbeddings(serviceKey, userId, courseId, queries, embeddings, docIds || null);
+  } catch (e) {
+    throw new Error('Retrieval failed: ' + (e.message || e));
+  }
+  if (!rawChunks.length) {
+    return { items: [], sources: [], error: 'No indexed course documents found.' };
+  }
+
   const uniqueDocIds = [...new Set(rawChunks.map(function (c) { return c.document_id; }))];
   const docNamesMap  = await fetchDocNames(serviceKey, uniqueDocIds);
+  const ranked       = filterAndRank(rawChunks, docNamesMap);
+  const topChunks    = deduplicateChunks(ranked, 18);
+  const context      = buildContext(topChunks, docNamesMap);
+  const focusPart    = topic ? '\n\n---\nFocus topic: ' + topic : '';
 
-  // Step 4: score for study value, rank, deduplicate chunks
-  const ranked    = filterAndRank(rawChunks, docNamesMap);
-  const topChunks = deduplicateChunks(ranked, maxContextChunks);
-
-  if (!topChunks.length) {
-    return { items: [], sources: [], error: 'Could not find enough high-value study material. Try indexing more files.' };
-  }
-
-  // Step 5: build context string
-  const context = buildContext(topChunks, docNamesMap);
-
-  // Step 6: choose prompt and call OpenAI
-  let systemPrompt;
-  if (tool === 'flashcards')  systemPrompt = flashcardsSystemPrompt(itemCount);
-  else if (tool === 'quiz')   systemPrompt = quizSystemPrompt(itemCount, diff);
-  else systemPrompt = summarySystemPrompt();
-
-  // Append seen-items block so the model avoids repeating them
-  const seen = Array.isArray(seenItems) ? seenItems.filter(Boolean).slice(0, 50) : [];
-  if (seen.length) {
-    systemPrompt += '\n\nPREVIOUSLY SHOWN — do NOT generate questions/cards covering the same topic or phrasing as any of these:\n' +
-      seen.map(function (s) { return '- ' + String(s).slice(0, 120); }).join('\n');
-  }
-
-  const focusPart  = topic ? '\n\n---\nFocus topic: ' + topic : '';
-  const userMessage = 'COURSE CONTEXT:\n\n' + context + focusPart;
-
-  const maxTokens = tool === 'flashcards' ? 2000 : tool === 'quiz' ? (useStrongModel ? 2800 : 2000) : 1600;
+  if (timeLeft() < 4000) return { items: [], sources: [], error: 'Not enough time remaining.' };
 
   let result;
   try {
-    result = await callOpenAI(systemPrompt, userMessage, maxTokens, model);
+    result = await callOpenAI(summarySystemPrompt(), 'COURSE CONTEXT:\n\n' + context + focusPart, 1600, model);
   } catch (e) {
     throw new Error('Generation failed: ' + (e.message || e));
   }
 
-  // Step 7: deduplicate generated items — the model sometimes produces near-identical
-  // questions/cards when context chunks overlap, especially at lower item counts.
-  const rawItems = result.items || [];
-  const items = deduplicateItems(rawItems);
-
-  // Build sources list
   const seenFiles = new Set();
   const sources = topChunks
     .map(function (c) {
@@ -571,20 +639,7 @@ async function runPipeline({ serviceKey, userId, courseId, tool, topic, count, d
       return true;
     });
 
-  return { items, text: result.text || '', sources };
-}
-
-function summarySystemPrompt() {
-  return `You are an expert tutor summarising course materials for exam preparation.
-Write a structured, exam-focused summary of the provided COURSE CONTEXT.
-Rules:
-1. Use ## headings for main topics found in the context.
-2. Use bullet points for key facts, definitions, formulas, and methods.
-3. Write math using KaTeX notation: inline as $...$, display as $$...$$.
-4. End with a "Key Takeaways" section (3-5 bullets).
-5. Only include content from the context — no invented facts.
-6. Cite (filename, p.X) inline for important claims.
-Respond ONLY with valid JSON: {"text":"## Topic\\n- point\\n..."}`;
+  return { items: [], text: result.text || '', sources };
 }
 
 module.exports = { runPipeline };
