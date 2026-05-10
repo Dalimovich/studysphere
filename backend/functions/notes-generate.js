@@ -3,7 +3,7 @@
 //         scope: 'page'|'section'|'range'|'document',
 //         currentPage?, pageRange?: {start,end},
 //         language: 'same_as_source'|'en'|'de'|'bilingual',
-//         detailLevel: 'detailed'|'summary' }
+//         detailLevel: 'brief'|'balanced'|'detailed'|'exam' }
 // Response: { note: { id, title, type, content_markdown, sources } }
 
 'use strict';
@@ -13,21 +13,22 @@ const { requireEnv, optionalEnv } = require('../lib/env');
 const { jsonResponse, fail, handleOptions } = require('../lib/responses');
 const { verifySupabaseToken, extractBearerToken } = require('../lib/supabase-auth');
 const { supaRequest } = require('../lib/supabase-admin');
+const {
+  langInstr,
+  getMaxTokens,
+  summaryPrompt,
+  sectionSummaryPrompt,
+  mergeSummaryPrompt,
+  strictSummaryPrompt,
+  validateSummary,
+  FILLER_PHRASES,
+  TEMPLATE_NOISE_TERMS
+} = require('../lib/summary-prompts');
 
-const OPENAI_MODEL = optionalEnv('OPENAI_GENERATE_MODEL_STRONG', 'gpt-4o');
+const OPENAI_MODEL    = optionalEnv('OPENAI_GENERATE_MODEL_STRONG', 'gpt-4o');
 const MAX_CONTEXT_CHARS = 28000;
 
-// ── Language instruction ──────────────────────────────────────────────────────
-
-function langInstr(lang) {
-  if (lang === 'en')        return 'Write the notes in English regardless of the source language.';
-  if (lang === 'de')        return 'Schreibe die Notizen auf Deutsch, unabhängig von der Quellsprache.';
-  if (lang === 'bilingual') return 'Write bilingually: use the source language for content, add English translations in parentheses for key technical terms.';
-  // same_as_source (default)
-  return 'Write the notes in exactly the same language as the source text. If the source is German, write in German. If English, write in English. Do NOT translate.';
-}
-
-// ── Prompts ───────────────────────────────────────────────────────────────────
+// ── Notes prompts (notes-only logic stays here) ───────────────────────────────
 
 function notesPrompt(lang) {
   return `You are generating detailed, exam-ready study notes from university lecture PDF slides.
@@ -82,164 +83,6 @@ Rules:
 - Every sentence must add information — no filler, no repetition`;
 }
 
-// ── Summary detail level instruction ─────────────────────────────────────────
-
-function summaryDetailInstr(detailLevel) {
-  switch (detailLevel) {
-    case 'brief':
-      return `DETAIL LEVEL: Brief
-Write a SHORT but information-dense summary.
-- Target length: ~250–400 words for 1–3 pages; scale proportionally for more.
-- Cover: main idea, 3–5 key concepts, critical formulas, 2–3 exam takeaways.
-- No lengthy explanations — just essential facts a student needs to recognize the topic.
-- Skip sections that have no content (e.g. omit Formulas section if there are none).`;
-    case 'detailed':
-      return `DETAIL LEVEL: Detailed
-Write a COMPREHENSIVE summary — thorough enough to study from without reopening the PDF.
-- Target length: ~900–1500 words for 3–6 pages; scale up significantly for more pages.
-- Cover EVERY important concept, definition, process step, formula, comparison, list, and example found in the source.
-- Do NOT shorten lists, skip processes, or omit definitions.
-- Reproduce important lists completely with all items.
-- Include all advantages and disadvantages when listed in the source.`;
-    case 'exam':
-      return `DETAIL LEVEL: Exam-focused
-Structure output around what a student needs to pass an exam on this material.
-- Cover: key terms with exact definitions, must-know processes step by step, all formulas with variable explanations, comparison tables, typical exam question types.
-- Add a dedicated "Prüfungsfragen / Exam Q&A" section with 4–8 likely exam questions and precise model answers drawn from the source.
-- Be selective but complete — every included item must be exam-relevant, and every exam-relevant item must be included.`;
-    default: // 'balanced'
-      return `DETAIL LEVEL: Balanced
-Write a STRUCTURED summary that covers all important material without excessive detail.
-- Target length: ~500–900 words for 3–6 pages; scale proportionally for more pages.
-- Cover: main idea, all important definitions, key processes (summarized but complete), formulas, important lists, comparisons, and exam relevance.
-- Prefer completeness over brevity when content is dense. Do not produce the same short output for 2 pages and 20 pages.`;
-  }
-}
-
-function summaryPrompt(lang, detailLevel) {
-  return `You are a study assistant generating a student-focused summary of a university lecture PDF.
-
-${langInstr(lang)}
-
-${summaryDetailInstr(detailLevel || 'balanced')}
-
-STRICT RULES:
-- Use ONLY the provided PDF text. Do NOT invent, hallucinate, or add external knowledge.
-- IGNORE: author names, university/institute names, logos, copyright lines, semester labels, slide numbers.
-- Stay faithful to the source — preserve definitions verbatim or near-verbatim.
-- Include page references *(S. X)* or *(S. X–Y)* whenever citing a specific fact or concept.
-- Use Markdown. Use KaTeX for formulas: inline $...$, display $$...$$
-- Do NOT write generic filler like "this section provides an overview" or "various methods are discussed".
-- The summary length MUST scale with content. More pages = longer summary. Do not cap at a fixed short length.
-- Include a section only if the source contains relevant content for it.
-
-OUTPUT STRUCTURE — use all sections that apply:
-
-# Zusammenfassung: [Main topic — use the actual lecture title or first major heading]
-
-## 1. Überblick / Big Picture
-2–4 sentences: what this section covers, why it matters, how it fits into the lecture.
-
-## 2. Hauptkonzepte / Main Concepts
-For each major concept found in the source:
-- **[Concept name]** *(S. X)*: precise explanation — not just the term, but what it means and why it matters.
-
-## 3. Wichtige Definitionen / Important Definitions
-- **[Term]** *(S. X)*: [exact or near-verbatim definition from the source]
-Omit this section ONLY if there are truly no definitions in the source.
-
-## 4. Technische Begriffe / Technical Terms
-- **[Term]**: short explanation of what it means in this context
-Include terms that are specific to the field and appear in the source.
-
-## 5. Methoden und Prozesse / Methods and Processes
-For each method, process, or procedure named in the source:
-- **[Method name]** *(S. X)*: what it is, how it works, when it is used, key characteristics.
-Include step-by-step descriptions if the source provides them.
-Omit this section if the source contains no methods or processes.
-
-## 6. Formeln / Formulas
-$$[formula]$$
-Where: [variable] = [meaning], unit: [unit]
-*(S. X)*
-If no formulas appear in the selected content, write: "Keine Formeln in den ausgewählten Seiten gefunden."
-
-## 7. Wichtige Listen und Klassifikationen / Important Lists and Classifications
-Reproduce important lists from the source COMPLETELY — all items, not just a selection.
-Examples: classifications, component lists, advantages/disadvantages, material groups, process categories.
-Omit this section if there are no important lists.
-
-## 8. Vergleiche / Comparisons
-Comparison tables or side-by-side lists when the source compares methods, materials, or approaches.
-Use Markdown table format when comparing 2+ items across multiple properties.
-Omit this section if the source contains no comparisons.
-
-## 9. Prüfungsrelevanz / What to Remember for the Exam
-The most important things a student must know. Be specific — name actual concepts, not vague categories.
-For exam-focused detail level: also include 4–8 likely exam questions with model answers.
-
-## 10. Quellen / Source Pages
-List the page ranges used: *(S. X–Y)*`;
-}
-
-function sectionSummaryPrompt(lang, detailLevel, pageStart, pageEnd) {
-  var pageRef = pageStart != null
-    ? (pageStart === pageEnd ? 'Seite ' + pageStart : 'Seiten ' + pageStart + '–' + pageEnd)
-    : 'diesem Abschnitt';
-  return `You are summarizing ONE specific page group (${pageRef}) from a university lecture PDF for a student.
-
-${langInstr(lang)}
-
-${summaryDetailInstr(detailLevel || 'balanced')}
-
-STRICT RULES:
-- Use ONLY the provided PDF text for ${pageRef}. Do NOT invent information.
-- IGNORE: author names, university logos, copyright notices, semester labels, slide numbers.
-- Include page references *(S. X)* for important facts.
-- Use Markdown. Use KaTeX for formulas ($...$ inline, $$...$$ display).
-- This is ONE SECTION of a larger summary — do not introduce the whole lecture context.
-- Only cover what is actually on these pages.
-
-OUTPUT FORMAT:
-## [Heading — use the actual slide/section title if visible, else describe the topic]
-
-Cover whatever is present on these pages: main concepts, definitions, technical terms, processes/methods, formulas, lists, comparisons. Include page references. Scale length to content density.`;
-}
-
-function mergeSummaryPrompt(lang, detailLevel) {
-  return `You are merging multiple section summaries from a university lecture PDF into one final structured study summary.
-
-${langInstr(lang)}
-
-${summaryDetailInstr(detailLevel || 'balanced')}
-
-MERGE RULES:
-- Preserve ALL important content from ALL sections. Do NOT aggressively shorten.
-- Remove exact duplicates (identical facts stated twice), but keep content that appears in different contexts.
-- Keep ALL page references *(S. X)*.
-- Organize under the full 10-section structure below, matching the lecture's topic flow.
-- Do NOT invent new content. Use only what is in the provided section summaries.
-- The merged summary must be longer than any individual section summary.
-- Add a final Prüfungsrelevanz section covering the most important exam points across all content.
-
-OUTPUT: Complete Markdown document using this structure:
-
-# Zusammenfassung: [Chapter/Topic Title]
-
-## 1. Überblick / Big Picture
-## 2. Hauptkonzepte / Main Concepts
-## 3. Wichtige Definitionen / Important Definitions
-## 4. Technische Begriffe / Technical Terms
-## 5. Methoden und Prozesse / Methods and Processes
-## 6. Formeln / Formulas
-## 7. Wichtige Listen und Klassifikationen / Important Lists and Classifications
-## 8. Vergleiche / Comparisons
-## 9. Prüfungsrelevanz / What to Remember for the Exam
-## 10. Quellen / Source Pages
-
-Fill each section from the provided section summaries. Skip a section only if no content exists for it across all sections.`;
-}
-
 function strictNotesPrompt(lang, missingTerms) {
   return notesPrompt(lang) + `
 
@@ -267,7 +110,7 @@ Rules:
 - For each definition: quote it near-verbatim with page ref *(S. X)*.
 - For each list: reproduce it COMPLETELY with all items.
 - For each formula: use KaTeX $...$ or $$...$$, explain every variable.
-- If a piece of information is not clearly in the source, do NOT include it. Do not write "(Nicht klar aus dem PDF.)" — simply omit unclear content.
+- If a piece of information is not clearly in the source, do NOT include it. Simply omit unclear content.
 - Every claim needs a page reference *(S. X)*.
 - No filler sentences. Every bullet adds information.
 - No formulas section if there are no formulas on these pages — write "Keine Formeln auf diesen Seiten."
@@ -303,18 +146,6 @@ Output a complete, well-structured Markdown document starting with:
 # [Chapter/Topic Title]
 
 The merged note should be significantly longer than any individual section note.`;
-}
-
-// ── Token budget by tool + detail level ───────────────────────────────────────
-
-function getMaxTokens(tool, detailLevel) {
-  if (tool === 'notes') return 4000;
-  switch (detailLevel) {
-    case 'brief':    return 1500;
-    case 'detailed': return 5000;
-    case 'exam':     return 3500;
-    default:         return 3000; // balanced
-  }
 }
 
 // ── OpenAI call ───────────────────────────────────────────────────────────────
@@ -359,7 +190,7 @@ function callOpenAI(systemPrompt, userMessage, maxTokens) {
   });
 }
 
-// ── Quality validation ────────────────────────────────────────────────────────
+// ── Notes quality validation ──────────────────────────────────────────────────
 
 function extractKeyTerms(contextText) {
   var words = contextText.match(/[A-Za-zÄÖÜäöüß]{5,}/g) || [];
@@ -374,52 +205,15 @@ function extractKeyTerms(contextText) {
     .slice(0, 30);
 }
 
-var FILLER_PHRASES = [
-  'overview of', 'general introduction', 'this section covers', 'various methods',
-  'überblick über', 'einführung in', 'verschiedene methoden', 'allgemeine einführung'
-];
-
-// Template noise that must not appear in a valid summary output
-var TEMPLATE_NOISE_TERMS = [
-  'platzhalter', 'titelfolie', 'bild einsetzen', 'hinter das logo',
-  'masterfolie', 'vorlage für', 'textfeld', 'klicken sie', 'layout'
-];
-
 function validateNotes(markdown, contextText) {
   var issues = [];
 
   if (markdown.length < 700) issues.push('too_short');
 
   var keyTerms = extractKeyTerms(contextText);
-  var mdLower = markdown.toLowerCase();
+  var mdLower  = markdown.toLowerCase();
   var missingTerms = keyTerms.filter(function (t) { return !mdLower.includes(t); });
   if (keyTerms.length > 0 && missingTerms.length / keyTerms.length > 0.45) {
-    issues.push('missing_terms');
-  }
-
-  for (var i = 0; i < FILLER_PHRASES.length; i++) {
-    if (mdLower.includes(FILLER_PHRASES[i])) { issues.push('generic_filler'); break; }
-  }
-
-  // Reject if template noise leaked into the output
-  for (var j = 0; j < TEMPLATE_NOISE_TERMS.length; j++) {
-    if (mdLower.includes(TEMPLATE_NOISE_TERMS[j])) { issues.push('template_noise'); break; }
-  }
-
-  return { valid: issues.length === 0, issues: issues, missingTerms: missingTerms.slice(0, 15) };
-}
-
-function validateSummary(markdown, contextText, detailLevel) {
-  var issues = [];
-  var minLen = detailLevel === 'brief' ? 250 : detailLevel === 'detailed' ? 700 : 400;
-
-  if (markdown.length < minLen) issues.push('too_short');
-
-  var keyTerms = extractKeyTerms(contextText);
-  var mdLower = markdown.toLowerCase();
-  var missingTerms = keyTerms.filter(function (t) { return !mdLower.includes(t); });
-  // Summary can miss more terms than notes — threshold 0.6 (vs 0.45 for notes)
-  if (keyTerms.length > 0 && missingTerms.length / keyTerms.length > 0.60) {
     issues.push('missing_terms');
   }
 
@@ -458,13 +252,11 @@ async function fetchChunks(serviceKey, userId, courseId, documentId, pageStart, 
     '&document_id=eq.' + encodeURIComponent(documentId) +
     '&order=page_start.asc,id.asc' +
     '&limit=' + limit;
-  // Overlap filter: include chunks that overlap with [pageStart, pageEnd]
   if (pageEnd   != null) path += '&page_start=lte.' + pageEnd;
   if (pageStart != null) path += '&page_end=gte.'   + pageStart;
 
   var result = await supaRequest('GET', path, null, serviceKey);
   var chunks = Array.isArray(result.body) ? result.body : [];
-  // Remove short metadata-only chunks (title slides, author info)
   return chunks.filter(function (c) { return !isMetadataChunk(c.chunk_text); });
 }
 
@@ -495,12 +287,12 @@ function buildContext(chunks, fileName) {
 async function saveNote(serviceKey, opts) {
   var result = await supaRequest('POST', 'notes?select=id',
     {
-      user_id: opts.userId,
-      course_id: opts.courseId,
-      document_id: opts.documentId || null,
-      title: opts.title,
-      type: opts.type,
-      content_markdown: opts.markdown,
+      user_id:           opts.userId,
+      course_id:         opts.courseId,
+      document_id:       opts.documentId || null,
+      title:             opts.title,
+      type:              opts.type,
+      content_markdown:  opts.markdown,
       source_page_start: opts.filterStart != null ? opts.filterStart : null,
       source_page_end:   opts.filterEnd   != null ? opts.filterEnd   : null
     },
@@ -555,7 +347,7 @@ exports.handler = async function (event) {
   var detailLevel = body.detailLevel || 'balanced';  // brief | balanced | detailed | exam
   var scope       = body.scope       || 'section';   // page | section | range | document
   var currentPage = body.currentPage != null ? Number(body.currentPage) : null;
-  var pageRange   = body.pageRange   || null;         // { start, end }
+  var pageRange   = body.pageRange   || null;
 
   var mode = body.mode || 'generate'; // 'generate' | 'section' | 'merge'
 
@@ -564,7 +356,7 @@ exports.handler = async function (event) {
 
   var serviceKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
 
-  // ── MERGE MODE: combine pre-generated section markdowns into final note ───
+  // ── MERGE MODE ────────────────────────────────────────────────────────────
   if (mode === 'merge') {
     var sections = body.sections || [];
     if (!sections.length) return fail(400, 'sections required for merge mode');
@@ -576,25 +368,29 @@ exports.handler = async function (event) {
       return hdr + '\n\n' + s.markdown;
     }).join('\n\n');
 
-    var mergePromptFn = tool === 'summary' ? mergeSummaryPrompt(language, detailLevel) : mergeNotesPrompt(language);
+    var mergePromptFn   = tool === 'summary' ? mergeSummaryPrompt(language, detailLevel) : mergeNotesPrompt(language);
     var mergeInstruction = tool === 'summary'
       ? 'Merge these section summaries into one final structured study summary:\n\n'
       : 'Merge these section notes into one final study note:\n\n';
-    var mergeMaxTokens = tool === 'summary' ? getMaxTokens('summary', detailLevel) + 1000 : 5000;
+    var mergeMaxTokens  = tool === 'summary' ? getMaxTokens('summary', detailLevel) + 1000 : 5000;
 
     var mergedMarkdown;
     try {
-      mergedMarkdown = await callOpenAI(mergePromptFn,
-        mergeInstruction + combinedInput.slice(0, MAX_CONTEXT_CHARS), mergeMaxTokens);
+      mergedMarkdown = await callOpenAI(
+        mergePromptFn,
+        mergeInstruction + combinedInput.slice(0, MAX_CONTEXT_CHARS),
+        mergeMaxTokens
+      );
     } catch (e) {
       return jsonResponse(200, { error: 'Merge failed: ' + e.message });
     }
 
     var mergeTitle = extractTitle(mergedMarkdown,
-      (documentId ? (body.fileName || 'Notizen') : 'Notizen') + ' — ' + (tool === 'summary' ? 'Zusammenfassung' : 'Notizen'));
+      (fileName || 'Notizen') + ' — ' + (tool === 'summary' ? 'Zusammenfassung' : 'Notizen'));
 
     var mergeFilterStart = sections[0] && sections[0].pageStart != null ? sections[0].pageStart : null;
-    var mergeFilterEnd   = sections[sections.length - 1] && sections[sections.length - 1].pageEnd != null ? sections[sections.length - 1].pageEnd : null;
+    var mergeFilterEnd   = sections[sections.length - 1] && sections[sections.length - 1].pageEnd != null
+      ? sections[sections.length - 1].pageEnd : null;
 
     var mergeSources = [];
     sections.forEach(function (s) {
@@ -615,7 +411,7 @@ exports.handler = async function (event) {
     });
   }
 
-  // ── SECTION MODE: generate notes for a page range, return markdown only ──
+  // ── SECTION MODE ──────────────────────────────────────────────────────────
   if (mode === 'section') {
     var secStart = body.pageRange && body.pageRange.start != null ? Number(body.pageRange.start) : null;
     var secEnd   = body.pageRange && body.pageRange.end   != null ? Number(body.pageRange.end)   : null;
@@ -658,9 +454,9 @@ exports.handler = async function (event) {
     return jsonResponse(200, { markdown: secMarkdown, pageStart: secStart, pageEnd: secEnd });
   }
 
-  console.log('[notes-generate]', { mode, scope, currentPage, pageRange, tool });
+  // ── GENERATE MODE ─────────────────────────────────────────────────────────
+  console.log('[notes-generate]', { mode, scope, currentPage, pageRange, tool, detailLevel });
 
-  // ── Resolve page filter from scope ────────────────────────────────────────
   var filterStart = null;
   var filterEnd   = null;
 
@@ -675,16 +471,14 @@ exports.handler = async function (event) {
       filterStart = pageRange.start != null ? Number(pageRange.start) : null;
       filterEnd   = pageRange.end   != null ? Number(pageRange.end)   : null;
     }
-    // Also apply pageRange if sent alongside scope
     if (filterStart == null && pageRange) {
       filterStart = pageRange.start != null ? Number(pageRange.start) : null;
       filterEnd   = pageRange.end   != null ? Number(pageRange.end)   : null;
     }
   }
 
-  console.log('[notes-generate page filter]', { filterStart: filterStart, filterEnd: filterEnd, scope: scope, currentPage: currentPage });
+  console.log('[notes-generate page filter]', { filterStart, filterEnd, scope, currentPage });
 
-  // ── Retrieve indexed chunks ───────────────────────────────────────────────
   var context        = null;
   var sources        = [];
   var rawContextText = '';
@@ -699,7 +493,6 @@ exports.handler = async function (event) {
       })
     });
 
-    // Guard: reject chunks that are entirely outside the requested range
     if (filterStart != null && filterEnd != null && chunks.length) {
       var badChunks = chunks.filter(function (c) {
         return c.page_end < filterStart || c.page_start > filterEnd;
@@ -722,17 +515,15 @@ exports.handler = async function (event) {
     }
   }
 
-  // ── Fallback to pdfText ───────────────────────────────────────────────────
   if (!context) {
     if (pdfText && pdfText.trim().length > 100) {
-      // Noise filter: reject template/title-slide content when a specific page is requested
-      var TEMPLATE_NOISE = ['platzhalter', 'titelfolie', 'bild einsetzen', 'hinter das logo', 'masterfolie', 'vorlage für'];
+      var TEMPLATE_NOISE_INLINE = ['platzhalter', 'titelfolie', 'bild einsetzen', 'hinter das logo', 'masterfolie', 'vorlage für'];
       var pdfLower = pdfText.toLowerCase();
-      var isNoise = filterStart != null && filterStart > 3 &&
-        TEMPLATE_NOISE.some(function (t) { return pdfLower.includes(t); });
+      var isNoise  = filterStart != null && filterStart > 3 &&
+        TEMPLATE_NOISE_INLINE.some(function (t) { return pdfLower.includes(t); });
 
       if (isNoise) {
-        console.warn('[notes-generate] pdfText looks like title-slide/template noise for page', filterStart, '— rejecting fallback');
+        console.warn('[notes-generate] pdfText looks like title-slide/template noise for page', filterStart);
         return jsonResponse(200, {
           error: 'Die Seiten ' + filterStart + '–' + filterEnd + ' wurden noch nicht indiziert. Bitte warte auf die Indizierung oder wähle "Ganzes PDF".'
         });
@@ -750,9 +541,8 @@ exports.handler = async function (event) {
     }
   }
 
-  // ── Build prompt + user message ───────────────────────────────────────────
   var systemPrompt = tool === 'summary' ? summaryPrompt(language, detailLevel) : notesPrompt(language);
-  var maxTokens = getMaxTokens(tool, detailLevel);
+  var maxTokens    = getMaxTokens(tool, detailLevel);
 
   var pageHint = '';
   if (filterStart != null) {
@@ -766,7 +556,6 @@ exports.handler = async function (event) {
       ? 'Erstelle eine studentengerechte Zusammenfassung aus dem obigen Text. Halte dich strikt an den angegebenen Seitenbereich. Erfasse alle wichtigen Definitionen, Formeln, Listen, Prozesse und Vergleiche.'
       : 'Erstelle detaillierte Lernnotizen aus dem obigen Text. Erfasse ALLE Definitionen, Listen, Formeln und Prozessschritte.');
 
-  // ── Generate ──────────────────────────────────────────────────────────────
   var markdown;
   try {
     markdown = await callOpenAI(systemPrompt, userMessage, maxTokens);
@@ -781,10 +570,10 @@ exports.handler = async function (event) {
     if (!validation.valid) {
       console.log('[notes-generate] notes validation failed:', validation.issues, '— regenerating');
       try {
-        var strictPrompt   = strictNotesPrompt(language, validation.missingTerms);
-        var strictMessage  = userMessage + '\n\nFEHLENDE BEGRIFFE — müssen in den Notizen vorkommen: ' +
+        var sPrompt  = strictNotesPrompt(language, validation.missingTerms);
+        var sMessage = userMessage + '\n\nFEHLENDE BEGRIFFE — müssen in den Notizen vorkommen: ' +
           validation.missingTerms.join(', ');
-        markdown = await callOpenAI(strictPrompt, strictMessage, maxTokens);
+        markdown = await callOpenAI(sPrompt, sMessage, maxTokens);
       } catch (e) {
         console.error('notes-generate strict regen error:', e.message);
       }
@@ -794,14 +583,11 @@ exports.handler = async function (event) {
     if (!sumValidation.valid) {
       console.log('[notes-generate] summary validation failed:', sumValidation.issues, '— regenerating');
       try {
-        var strictSummaryPrompt = summaryPrompt(language, detailLevel) + `
-
-ADDITIONAL REQUIREMENT — FINAL CHECK:
-The following key terms from the source text are missing from your summary. You MUST include all of them that are genuinely important:
-${sumValidation.missingTerms.map(function (t) { return '- ' + t; }).join('\n')}
-
-ALSO: Do not include any slide-template noise (Platzhalter, Titelfolie, Bild einsetzen, etc.) in the output.`;
-        markdown = await callOpenAI(strictSummaryPrompt, userMessage, maxTokens);
+        markdown = await callOpenAI(
+          strictSummaryPrompt(language, detailLevel, sumValidation.missingTerms),
+          userMessage,
+          maxTokens
+        );
       } catch (e) {
         console.error('notes-generate summary strict regen error:', e.message);
       }
@@ -821,7 +607,7 @@ ALSO: Do not include any slide-template noise (Platzhalter, Titelfolie, Bild ein
   try {
     noteId = await saveNote(serviceKey, {
       userId: user.id, courseId, documentId, title, type: tool, markdown, sources,
-      filterStart: filterStart, filterEnd: filterEnd
+      filterStart, filterEnd
     });
   } catch (e) {
     console.error('notes-generate save error:', e.message);
