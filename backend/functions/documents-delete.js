@@ -3,7 +3,7 @@
 //
 // Request body: { documentId }
 
-const { requireEnv } = require('../lib/env');
+const { requireEnv, optionalEnv } = require('../lib/env');
 const { jsonResponse, fail, handleOptions } = require('../lib/responses');
 const { verifySupabaseToken, extractBearerToken } = require('../lib/supabase-auth');
 const { supaRequest } = require('../lib/supabase-admin');
@@ -108,8 +108,14 @@ exports.handler = async function (event) {
 
   // Delete from storage
   if (doc.storage_path) {
-    const bucket = requireEnv('RAG_STORAGE_BUCKET') || 'course-documents';
-    await storageDelete(serviceKey, bucket, doc.storage_path);
+    let bucket = optionalEnv('RAG_STORAGE_BUCKET', 'course-documents');
+    let storagePath = doc.storage_path;
+    const colon = storagePath.indexOf(':');
+    if (colon > 0 && storagePath.indexOf('/') > colon) {
+      bucket = storagePath.substring(0, colon);
+      storagePath = storagePath.substring(colon + 1);
+    }
+    await storageDelete(serviceKey, bucket, storagePath);
   }
 
   // Delete document row

@@ -29,7 +29,6 @@ const {
 const {
   classifyChunk,
   cleanChunkText,
-  chooseSummaryStrategy,
   buildSummaryPipeline,
   computeEffectivePages,
   LOW_VALUE_CATEGORIES

@@ -11,6 +11,11 @@ Run these migrations in order:
 3. `20260504_000003_chat_room_rls_patch.sql`
 4. `20260504_000004_storage_security.sql`
 5. `20260504_000005_security_indexes.sql`
+6. `20260505_000001_rag_foundation.sql`
+7. `20260505_000002_rag_caching.sql`
+8. `20260505_000003_evaluations.sql`
+9. `20260506_000001_processing_error.sql`
+10. `20260511_000001_ai_cache_schema_alignment.sql`
 
 ## How to run
 

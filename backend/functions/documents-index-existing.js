@@ -63,8 +63,8 @@ exports.handler = async function (event) {
   const serviceKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
   const courseKey = _ufKey(courseId);
 
-  // Check if already indexed for this course to avoid duplicate work
-  // Compute the canonical storage path for this file
+  // Check if this exact storage object is already indexed for this course.
+  // File names are not unique across folders, so storage_path is the canonical key.
   const folderSegment = folder ? _sanitizeFolder(folder) + '/' : '';
   const sourcePath = user.id + '/' + courseKey + '/' + folderSegment + storageName;
   const docStoragePath = SOURCE_BUCKET + ':' + sourcePath;
@@ -75,8 +75,8 @@ exports.handler = async function (event) {
       user.id +
       '&course_id=eq.' +
       encodeURIComponent(courseId) +
-      '&file_name=eq.' +
-      encodeURIComponent(fileName) +
+      '&storage_path=eq.' +
+      encodeURIComponent(docStoragePath) +
       '&select=id,processing_status,storage_path&limit=1',
     null,
     serviceKey

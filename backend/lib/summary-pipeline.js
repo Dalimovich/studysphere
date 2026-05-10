@@ -111,13 +111,6 @@ function cleanChunkText(text) {
  * Picks a generation strategy based on content page count and detail level.
  * @returns {'single'|'sectioned'|'multi_section'|'map_reduce'}
  */
-function chooseSummaryStrategy(pageCount, detailLevel) {
-  if (pageCount <= 2)  return 'single';
-  if (pageCount <= 6)  return 'sectioned';
-  if (pageCount <= 15) return 'multi_section';
-  return 'map_reduce';
-}
-
 // ── Topic group builder ───────────────────────────────────────────────────────
 
 /**
@@ -266,7 +259,6 @@ function computeEffectivePages(keptChunks) {
 module.exports = {
   classifyChunk,
   cleanChunkText,
-  chooseSummaryStrategy,
   buildTopicGroups,
   buildSummaryPipeline,
   estimateChunkWeight,

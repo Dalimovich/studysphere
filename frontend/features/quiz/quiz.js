@@ -1,9 +1,6 @@
 // Quiz feature — mirrors flashcards UI with AI generation.
 
 (function () {
-  var TEMPLATE_URL = 'features/quiz/quiz.html';
-  var _templatePromise = null;
-
   // courseId -> { quizzes: [{id,name,items,answers,submitted,createdAt,lastTaken,progress,bestScore,_dbId}], activeId, _loaded }
   var _state = {};
 

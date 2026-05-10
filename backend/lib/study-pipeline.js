@@ -431,6 +431,59 @@ function deduplicateItems(items, threshold) {
   return kept;
 }
 
+function normalizeGeneratedItems(tool, items) {
+  if (!Array.isArray(items)) return [];
+  const letters = ['A', 'B', 'C', 'D'];
+  return items.map(function (item) {
+    if (!item || typeof item !== 'object') return null;
+    if (tool === 'flashcards') {
+      const front = String(item.front || '').trim();
+      const back = String(item.back || '').trim();
+      if (front.length < 3 || back.length < 3) return null;
+      return {
+        front,
+        back,
+        card_type: item.card_type || '',
+        difficulty: ['easy', 'medium', 'hard'].includes(item.difficulty) ? item.difficulty : 'medium',
+        why_important: item.why_important || '',
+        source: item.source || ''
+      };
+    }
+
+    if (tool === 'quiz') {
+      const question = String(item.question || '').trim();
+      if (question.length < 5) return null;
+      let options;
+      if (Array.isArray(item.options)) {
+        options = {};
+        letters.forEach(function (l, i) { options[l] = String(item.options[i] || '').trim(); });
+      } else if (item.options && typeof item.options === 'object') {
+        options = {};
+        letters.forEach(function (l) { options[l] = String(item.options[l] || '').trim(); });
+      } else {
+        return null;
+      }
+      if (letters.some(function (l) { return !options[l]; })) return null;
+      const answer = typeof item.answer === 'string'
+        ? item.answer.trim().toUpperCase()
+        : letters[item.answer] || '';
+      if (!letters.includes(answer)) return null;
+      return {
+        question,
+        options,
+        answer,
+        explanation: item.explanation || '',
+        difficulty: ['easy', 'medium', 'hard'].includes(item.difficulty) ? item.difficulty : 'medium',
+        question_type: item.question_type || '',
+        why_important: item.why_important || '',
+        source: item.source || ''
+      };
+    }
+
+    return item;
+  }).filter(Boolean);
+}
+
 // ─── Retrieval queries by tool ────────────────────────────────────────────────
 
 function buildQueries(tool, topic) {
@@ -566,7 +619,7 @@ async function runPipeline({ serviceKey, userId, courseId, tool, topic, count, d
       break;
     }
 
-    const fileItems = deduplicateItems(result.items || []);
+    const fileItems = deduplicateItems(normalizeGeneratedItems(tool, result.items || []));
     allItems.push.apply(allItems, fileItems);
 
     // Accumulate unique sources
@@ -598,7 +651,9 @@ async function runPipeline({ serviceKey, userId, courseId, tool, topic, count, d
     try {
       const raw = await retrieveWithEmbeddings(serviceKey, userId, courseId, queries, embeddings, [repairDocId]);
       repairChunks = deduplicateChunks(filterAndRank(raw, docNamesMap), Math.min(shortage * 3, 20));
-    } catch (e) {}
+    } catch (e) {
+      // Keep partial grounded items when the repair retrieval fails.
+    }
 
     if (repairChunks.length) {
       const repairContext = buildContext(repairChunks, docNamesMap);
@@ -615,9 +670,44 @@ async function runPipeline({ serviceKey, userId, courseId, tool, topic, count, d
 
       try {
         const repairResult = await callOpenAI(repairPrompt, 'COURSE CONTEXT:\n\n' + repairContext, repairTokens, model);
-        const repairItems = deduplicateItems((repairResult.items || []).concat(finalItems)).slice(0, itemCount);
+        const repairItems = deduplicateItems(finalItems.concat(normalizeGeneratedItems(tool, repairResult.items || []))).slice(0, itemCount);
         if (repairItems.length > finalItems.length) finalItems = repairItems;
-      } catch (e) {}
+      } catch (e) {
+        // Keep the validated items we already have if repair generation fails.
+      }
+    }
+  }
+
+  // If the first repair still leaves us short, try other files with the same
+  // strict validation. We prefer returning fewer grounded items over padding
+  // with invented content, but this gives the model a fair chance to backfill.
+  for (let ri = 1; finalItems.length < itemCount && ri < fileIds.length && timeLeft() > 5000; ri++) {
+    let extraChunks = [];
+    try {
+      const raw = await retrieveWithEmbeddings(serviceKey, userId, courseId, queries, embeddings, [fileIds[ri]]);
+      extraChunks = deduplicateChunks(filterAndRank(raw, docNamesMap), Math.min((itemCount - finalItems.length) * 3, 20));
+    } catch (e) {
+      // Skip this file and try the next candidate while time remains.
+    }
+    if (!extraChunks.length) continue;
+
+    const shortageNow = itemCount - finalItems.length;
+    let extraPrompt = tool === 'flashcards'
+      ? flashcardsSystemPrompt(shortageNow)
+      : quizSystemPrompt(shortageNow, diff);
+    extraPrompt += '\n\nDO NOT repeat any of these already-generated items:\n' +
+      finalItems.map(function (it) { return '- ' + (it.question || it.front || '').slice(0, 120); }).join('\n');
+
+    try {
+      const extraResult = await callOpenAI(
+        extraPrompt,
+        'COURSE CONTEXT:\n\n' + buildContext(extraChunks, docNamesMap),
+        tool === 'flashcards' ? Math.min(8000, 900 + shortageNow * 400) : Math.min(6000, 1000 + shortageNow * 320),
+        model
+      );
+      finalItems = deduplicateItems(finalItems.concat(normalizeGeneratedItems(tool, extraResult.items || []))).slice(0, itemCount);
+    } catch (e) {
+      // Returning fewer grounded items is better than padding with invalid output.
     }
   }
 
@@ -685,5 +775,5 @@ async function runSummaryPipeline({ serviceKey, userId, courseId, tool, topic, d
 
 module.exports = {
   runPipeline,
-  _testing: { parseJsonSafe, wordJaccard, deduplicateItems, textStudyScore, flashcardsSystemPrompt, quizSystemPrompt }
+  _testing: { parseJsonSafe, wordJaccard, deduplicateItems, normalizeGeneratedItems, textStudyScore, flashcardsSystemPrompt, quizSystemPrompt }
 };

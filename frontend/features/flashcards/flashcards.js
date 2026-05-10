@@ -1,14 +1,8 @@
 // Flashcards feature module.
 //
-// Phase 2: Generate now actually calls /api/ai/generate (via the injected
-// `generate` function from course-files.js) and turns the response into a
-// real, browsable deck. Multiple decks per course are kept in-memory for now
-// (full DB persistence in Phase 3).
+// Generates decks from /api/ai/generate and persists them in Supabase.
 
 (function () {
-  var TEMPLATE_URL = 'features/flashcards/flashcards.html';
-  var _templatePromise = null;
-
   // courseId -> { decks: [{id, name, cards, createdAt, lastStudied, progress, flipped, _dbId}], activeId, _loaded }
   var _state = {};
 

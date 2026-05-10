@@ -10,7 +10,15 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = 'fake-service-key';
 process.env.OPENAI_API_KEY = 'sk-fake';
 
 const { _testing } = require('../../backend/lib/study-pipeline.js');
-const { parseJsonSafe, wordJaccard, deduplicateItems, textStudyScore, flashcardsSystemPrompt, quizSystemPrompt } = _testing;
+const {
+  parseJsonSafe,
+  wordJaccard,
+  deduplicateItems,
+  normalizeGeneratedItems,
+  textStudyScore,
+  flashcardsSystemPrompt,
+  quizSystemPrompt
+} = _testing;
 
 // ── parseJsonSafe ─────────────────────────────────────────────────────────────
 
@@ -85,6 +93,28 @@ test('deduplicateItems: keeps first of duplicates', () => {
   ];
   const result = deduplicateItems(items);
   assert.equal(result[0].question, items[0].question);
+});
+
+test('normalizeGeneratedItems: drops malformed quiz items', () => {
+  const result = normalizeGeneratedItems('quiz', [
+    {
+      question: 'What is force?',
+      options: { A: 'Mass times acceleration', B: 'Energy', C: 'Power', D: 'Velocity' },
+      answer: 'A'
+    },
+    { question: 'Broken', options: { A: 'Only one option' }, answer: 'A' }
+  ]);
+  assert.equal(result.length, 1);
+  assert.equal(result[0].answer, 'A');
+});
+
+test('normalizeGeneratedItems: drops empty flashcards', () => {
+  const result = normalizeGeneratedItems('flashcards', [
+    { front: 'Define velocity', back: 'Rate of change of displacement.' },
+    { front: '', back: 'Missing front' }
+  ]);
+  assert.equal(result.length, 1);
+  assert.equal(result[0].front, 'Define velocity');
 });
 
 // ── textStudyScore ────────────────────────────────────────────────────────────

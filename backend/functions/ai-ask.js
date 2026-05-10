@@ -1,6 +1,6 @@
 // POST /api/ai/ask
 // RAG endpoint: embeds the question, retrieves relevant chunks from the student's
-// course documents, then calls Claude with only those chunks as context.
+// course documents, then calls OpenAI with only those chunks as context.
 //
 // Request body:
 //   { courseId, question, mode? }
@@ -540,7 +540,7 @@ function fetchDocumentNames(serviceKey, documentIds) {
   });
 }
 
-// ─── Claude call ──────────────────────────────────────────────────────────────
+// ─── OpenAI call ──────────────────────────────────────────────────────────────
 
 // Detect language of retrieved chunks using stop-word frequency across major languages.
 // Returns a language code; falls back to 'en' if no signal is strong enough.
@@ -583,19 +583,12 @@ function detectLanguage(question, chunks) {
   return cBestRatio > 0.03 ? cBestLang : 'de';
 }
 
-async function fetchSummaryChunks(serviceKey, userId, courseId) {
+async function fetchSummaryChunks(serviceKey, userId, courseId, embedding, question) {
   try {
-    const result = await supaRequest(
-      'GET',
-      'document_chunks?user_id=eq.' + userId +
-      '&course_id=eq.' + encodeURIComponent(courseId) +
-      '&source_type=in.(summary,notes)' +
-      '&select=id,document_id,chunk_text,page_start,page_end,source_type,section_title,is_official' +
-      '&limit=30',
-      null, serviceKey
-    );
-    if (!Array.isArray(result.body)) return [];
-    return result.body.map(function (c) { return Object.assign({}, c, { similarity: 0.18 }); });
+    const chunks = await retrieveChunks(serviceKey, userId, courseId, embedding, question, null);
+    return chunks
+      .filter(function (c) { return c.source_type === 'summary' || c.source_type === 'notes'; })
+      .slice(0, 8);
   } catch (e) { return []; }
 }
 
@@ -858,7 +851,7 @@ function normalizeQuestion(q) {
   return q.toLowerCase().replace(/\s+/g, ' ').trim();
 }
 
-function hashQuestion(userId, courseId, normalizedQ, docVersionHash, mode, openFileName, activeDocId) {
+function hashQuestion(userId, courseId, normalizedQ, docVersionHash, mode, openFileName, activeDocId, openContextHash) {
   return crypto
     .createHash('sha256')
     .update(
@@ -875,9 +868,29 @@ function hashQuestion(userId, courseId, normalizedQ, docVersionHash, mode, openF
         '|' +
         (openFileName || '') +
         '|' +
-        (activeDocId || '')
+        (activeDocId || '') +
+        '|' +
+        (openContextHash || '')
     )
     .digest('hex');
+}
+
+async function findDocumentIdByName(serviceKey, userId, courseId, fileName) {
+  if (!fileName) return null;
+  const result = await supaRequest(
+    'GET',
+    'documents?user_id=eq.' +
+      userId +
+      '&course_id=eq.' +
+      encodeURIComponent(courseId) +
+      '&file_name=eq.' +
+      encodeURIComponent(fileName) +
+      '&processing_status=eq.ready&select=id&limit=1',
+    null,
+    serviceKey
+  );
+  if (Array.isArray(result.body) && result.body[0]) return result.body[0].id;
+  return null;
 }
 
 // Compute a hash over all document IDs + updated_at for the user's course
@@ -1187,7 +1200,19 @@ exports.handler = async function (event) {
 
   // 2. Get document version hash (used for cache invalidation)
   const docVersionHash = await getDocumentVersionHash(serviceKey, user.id, courseId);
-  const questionHash = hashQuestion(user.id, courseId, normalizedQ, docVersionHash, ragMode, openFileName, activeDocId);
+  const openContextHash = openCtx
+    ? crypto.createHash('sha1').update(openCtx.slice(0, 12000)).digest('hex')
+    : '';
+  const questionHash = hashQuestion(
+    user.id,
+    courseId,
+    normalizedQ,
+    docVersionHash,
+    ragMode,
+    openFileName,
+    activeDocId,
+    openContextHash
+  );
 
   // 3. Check exact answer cache
   const exactHit = await getExactCache(
@@ -1240,7 +1265,7 @@ exports.handler = async function (event) {
     const ids = entries.map(function (e) { return e.id; });
     const [fetchedChunks, summaryInjectCache] = await Promise.all([
       fetchChunksByIds(serviceKey, user.id, courseId, ids),
-      fetchSummaryChunks(serviceKey, user.id, courseId)
+      fetchSummaryChunks(serviceKey, user.id, courseId, embedding, question)
     ]);
     const simMap = {};
     entries.forEach(function (e) { simMap[e.id] = e.similarity; });
@@ -1275,7 +1300,7 @@ exports.handler = async function (event) {
     });
     const [allResults, summaryInject] = await Promise.all([
       Promise.all(retrievalPromises),
-      fetchSummaryChunks(serviceKey, user.id, courseId)
+      fetchSummaryChunks(serviceKey, user.id, courseId, embedding, question)
     ]);
     rawChunks = mergeChunkResults([...allResults, summaryInject]);
   }
@@ -1313,13 +1338,16 @@ exports.handler = async function (event) {
 
   // 7b. Fetch doc names early so we can resolve the open file's document ID for ranking.
   // We fetch for ALL chunks in rawChunks, not just the final ranked set.
-  const allRawDocIds = [...new Set(rawChunks.map(function (c) { return c.document_id; }))];
+  const namedOpenDocId = activeDocId || (openFileName
+    ? await findDocumentIdByName(serviceKey, user.id, courseId, openFileName).catch(function () { return null; })
+    : null);
+  const allRawDocIds = [...new Set(rawChunks.map(function (c) { return c.document_id; }).concat(namedOpenDocId ? [namedOpenDocId] : []))];
   const allDocNames = await fetchDocumentNames(serviceKey, allRawDocIds);
-  const earlyOpenDocId = openFileName
+  const earlyOpenDocId = namedOpenDocId || (openFileName
     ? (Object.keys(allDocNames).find(function (id) {
         return allDocNames[id] === openFileName || allDocNames[id].toLowerCase() === openFileName.toLowerCase();
       }) || null)
-    : null;
+    : null);
 
   // 7c. If the open file is indexed, retrieve focused chunks from it — works for scanned PDFs
   let effectiveOpenCtx = openCtx;
