@@ -1,171 +1,3 @@
-/* ── RAG UPLOAD PANEL ── */
-#ragUploadPanel {
-  margin: 16px 0;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  overflow: hidden;
-}
-.rag-panel-inner {
-  padding: 16px;
-}
-.rag-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-  flex-wrap: wrap;
-}
-.rag-icon {
-  font-size: 18px;
-}
-.rag-title {
-  font-weight: 600;
-  font-size: 14px;
-  color: var(--text, #fff);
-}
-.rag-subtitle {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.5);
-  flex: 1 1 100%;
-}
-.rag-upload-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  margin-bottom: 12px;
-}
-.rag-source-select {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  color: inherit;
-  border-radius: 8px;
-  padding: 6px 10px;
-  font-size: 12px;
-  cursor: pointer;
-}
-.rag-upload-btn {
-  background: linear-gradient(135deg, #7c3aed, #4f46e5);
-  color: #fff;
-  border-radius: 8px;
-  padding: 6px 14px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-  user-select: none;
-}
-.rag-upload-btn:hover {
-  opacity: 0.9;
-}
-.rag-progress {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.6);
-  margin-bottom: 8px;
-  padding: 6px 0;
-}
-.rag-doc-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.rag-doc-row {
-  display: grid;
-  grid-template-columns: 12px 1fr auto auto;
-  gap: 8px;
-  align-items: center;
-  padding: 6px 8px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.04);
-  font-size: 12px;
-}
-.rag-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.rag-dot-ready {
-  background: #22c55e;
-}
-.rag-dot-pending {
-  background: #f59e0b;
-  animation: rag-pulse 1.2s infinite;
-}
-.rag-dot-failed {
-  background: #ef4444;
-}
-@keyframes rag-pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.4;
-  }
-}
-.rag-doc-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--text, #fff);
-}
-.rag-doc-type {
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.4);
-  text-transform: capitalize;
-}
-.rag-doc-status {
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.5);
-}
-.rag-empty {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.4);
-  padding: 8px 0;
-}
-.rag-doc-delete {
-  margin-left: auto;
-  background: none;
-  border: none;
-  color: rgba(255, 255, 255, 0.3);
-  cursor: pointer;
-  font-size: 11px;
-  padding: 2px 5px;
-  border-radius: 4px;
-  transition:
-    color 0.15s,
-    background 0.15s;
-}
-.rag-doc-delete:hover:not(:disabled) {
-  color: #ef4444;
-  background: rgba(239, 68, 68, 0.1);
-}
-.rag-doc-delete:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-body:not(.night) .rag-doc-delete {
-  color: rgba(0, 0, 0, 0.25);
-}
-body:not(.night) #ragUploadPanel {
-  background: rgba(0, 0, 0, 0.04);
-  border-color: rgba(0, 0, 0, 0.08);
-}
-body:not(.night) .rag-subtitle {
-  color: rgba(0, 0, 0, 0.4);
-}
-body:not(.night) .rag-doc-row {
-  background: rgba(0, 0, 0, 0.03);
-}
-body:not(.night) .rag-doc-name {
-  color: #1e293b;
-}
-body:not(.night) .rag-source-select {
-  background: #fff;
-  border-color: rgba(0, 0, 0, 0.15);
-  color: #1e293b;
-}
 /* ── FILES LOADING STATE ── */
 .co-files-loading {
   display: flex;
@@ -2674,18 +2506,18 @@ body.night .sb-acc-chev-btn {
 .qzsp-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding-right: 4px;
+  padding-right: 6px;
   margin-bottom: 14px;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(155,93,229,0.35) transparent;
+  scrollbar-width: auto;
+  scrollbar-color: rgba(155,93,229,0.55) rgba(255,255,255,0.06);
 }
-.qzsp-list::-webkit-scrollbar { width: 5px; }
-.qzsp-list::-webkit-scrollbar-thumb { background: rgba(155,93,229,0.35); border-radius: 4px; }
-.qzsp-list::-webkit-scrollbar-track { background: transparent; }
+.qzsp-list::-webkit-scrollbar { width: 8px; }
+.qzsp-list::-webkit-scrollbar-thumb { background: rgba(155,93,229,0.55); border-radius: 6px; }
+.qzsp-list::-webkit-scrollbar-track { background: rgba(255,255,255,0.04); border-radius: 6px; }
 .qzsp-item {
   display: flex;
   align-items: center;
@@ -2767,7 +2599,7 @@ body.night .sb-acc-chev-btn {
   transition: background .15s;
 }
 .qzsp-folder-selall:hover { background: rgba(192,132,252,.22); }
-.qzsp-folder-files { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px 8px; }
+.qzsp-folder-files { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px 10px; }
 .qzsp-folder-list { gap: 6px; }
 
 /* Fallback for browsers without :has() — JS adds .co-inner-wide */

@@ -48,6 +48,35 @@
     }).catch(function() {});
   }
 
+  function _docStatusSummary(docs) {
+    var summary = { ready: [], pending: 0, failed: 0, total: docs.length };
+    docs.forEach(function (d) {
+      if (d.processing_status === 'ready') summary.ready.push(d);
+      else if (d.processing_status === 'failed') summary.failed++;
+      else summary.pending++;
+    });
+    return summary;
+  }
+
+  function _showNoReadyDocs(summary) {
+    if (!summary.total) {
+      _toast('No files found', 'Upload PDFs to this course, then wait for indexing to finish.');
+      return;
+    }
+    if (summary.pending) {
+      _toast(
+        'Indexing still running',
+        summary.pending + ' file' + (summary.pending === 1 ? ' is' : 's are') + ' still preparing for AI.'
+      );
+      return;
+    }
+    if (summary.failed) {
+      _toast('Indexing failed', 'Re-index the failed file' + (summary.failed === 1 ? '' : 's') + ' and try again.');
+      return;
+    }
+    _toast('No ready files', 'Re-index your PDFs, then try again.');
+  }
+
   var _TEMPLATE_HTML = '<div class="fc-root" data-flashcards-root>' +
     '<div class="fc-toolbar">' +
       '<button class="fc-btn fc-btn-primary" id="fcGenerateBtn" type="button"><span class="fc-btn-icon">&#x2728;</span> Generate cards</button>' +
@@ -411,11 +440,13 @@
       })
         .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
         .then(function (data) {
-          var docs = (data.documents || []).filter(function (d) { return d.processing_status === 'ready'; });
-          if (!docs.length) { _toast('No indexed files', 'Upload and index PDFs first.'); return; }
-          _showSourcePicker(docs, function (selectedIds) { doGenerate(selectedIds, settings); });
+          var summary = _docStatusSummary(data.documents || []);
+          if (!summary.ready.length) { _showNoReadyDocs(summary); return; }
+          _showSourcePicker(summary.ready, function (selectedIds) { doGenerate(selectedIds, settings); });
         })
-        .catch(function () { doGenerate(null, settings); });
+        .catch(function () {
+          _toast('Could not check indexed files', 'Refresh the page, then try again.');
+        });
     }
 
     function _showSourcePicker(docs, onConfirm) {
@@ -488,6 +519,12 @@
         '</div>';
 
       document.body.appendChild(overlay);
+
+      // Auto-expand all folders on open
+      overlay.querySelectorAll('.qzsp-folder-header').forEach(function (header) {
+        var files = header.nextElementSibling;
+        if (files) { files.style.display = 'block'; header.classList.add('open'); header.querySelector('.qzsp-folder-toggle').innerHTML = '&#x25BE;'; }
+      });
 
       overlay.querySelectorAll('.qzsp-folder-header').forEach(function (header) {
         header.addEventListener('click', function (e) {
