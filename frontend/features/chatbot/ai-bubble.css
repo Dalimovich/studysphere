@@ -65,7 +65,7 @@
   pointer-events: none;
 }
 
-/* Snap transition helper (added/removed by JS) */
+/* Snap transition helper */
 #aiBubble.snapping {
   transition: left 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
               top 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -74,28 +74,31 @@
 /* ── Float panel (expanded) ─────────────────────────────────────────────── */
 #aiFloatPanel {
   position: fixed;
-  width: 380px;
-  max-height: 70vh;
-  background: rgba(15, 23, 42, 0.92);
+  width: 400px;
+  height: 600px;
+  min-width: 300px;
+  min-height: 360px;
+  background: rgba(15, 23, 42, 0.95);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(99, 102, 241, 0.35);
-  border-radius: 24px;
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(99, 102, 241, 0.15);
+  border-radius: 20px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(99, 102, 241, 0.15);
   z-index: 9999;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  user-select: none;
 }
 
 @keyframes panelOpen {
-  from { opacity: 0; transform: scale(0.85); }
+  from { opacity: 0; transform: scale(0.88); }
   to   { opacity: 1; transform: scale(1); }
 }
 
 @keyframes panelClose {
   from { opacity: 1; transform: scale(1); }
-  to   { opacity: 0; transform: scale(0.85); }
+  to   { opacity: 0; transform: scale(0.88); }
 }
 
 #aiFloatPanel.panel-opening {
@@ -106,6 +109,24 @@
   animation: panelClose 0.18s ease-in forwards;
 }
 
+/* ── Resize handles ─────────────────────────────────────────────────────── */
+.ai-resize-handle {
+  position: absolute;
+  z-index: 10000;
+}
+
+/* Edges */
+.ai-resize-n  { top: -4px;   left: 12px;  right: 12px; height: 8px;  cursor: n-resize; }
+.ai-resize-s  { bottom: -4px; left: 12px; right: 12px;  height: 8px; cursor: s-resize; }
+.ai-resize-w  { left: -4px;  top: 12px;   bottom: 12px; width: 8px;  cursor: w-resize; }
+.ai-resize-e  { right: -4px; top: 12px;   bottom: 12px; width: 8px;  cursor: e-resize; }
+
+/* Corners */
+.ai-resize-nw { top: -4px;    left: -4px;   width: 16px; height: 16px; cursor: nw-resize; border-radius: 20px 0 0 0; }
+.ai-resize-ne { top: -4px;    right: -4px;  width: 16px; height: 16px; cursor: ne-resize; border-radius: 0 20px 0 0; }
+.ai-resize-sw { bottom: -4px; left: -4px;   width: 16px; height: 16px; cursor: sw-resize; border-radius: 0 0 0 20px; }
+.ai-resize-se { bottom: -4px; right: -4px;  width: 16px; height: 16px; cursor: se-resize; border-radius: 0 0 20px 0; }
+
 /* Header */
 #aiFpHeader {
   display: flex;
@@ -115,6 +136,7 @@
   background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%);
   border-bottom: 1px solid rgba(99, 102, 241, 0.2);
   flex-shrink: 0;
+  cursor: move;
 }
 
 #aiFpTitle {
@@ -196,18 +218,9 @@
   scrollbar-color: rgba(99, 102, 241, 0.4) transparent;
 }
 
-#aiFpMessages::-webkit-scrollbar {
-  width: 4px;
-}
-
-#aiFpMessages::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-#aiFpMessages::-webkit-scrollbar-thumb {
-  background: rgba(99, 102, 241, 0.4);
-  border-radius: 2px;
-}
+#aiFpMessages::-webkit-scrollbar { width: 4px; }
+#aiFpMessages::-webkit-scrollbar-track { background: transparent; }
+#aiFpMessages::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.4); border-radius: 2px; }
 
 /* Message bubbles */
 .ai-fp-msg {
@@ -217,15 +230,8 @@
   max-width: 88%;
 }
 
-.ai-fp-msg.user {
-  align-self: flex-end;
-  align-items: flex-end;
-}
-
-.ai-fp-msg.bot {
-  align-self: flex-start;
-  align-items: flex-start;
-}
+.ai-fp-msg.user { align-self: flex-end; align-items: flex-end; }
+.ai-fp-msg.bot  { align-self: flex-start; align-items: flex-start; }
 
 .ai-fp-msg-sender {
   font-size: 0.68rem;
@@ -368,14 +374,8 @@
   transition: opacity 0.15s, transform 0.1s;
 }
 
-#aiFpSend:hover {
-  opacity: 0.88;
-  transform: scale(1.05);
-}
-
-#aiFpSend:active {
-  transform: scale(0.95);
-}
+#aiFpSend:hover  { opacity: 0.88; transform: scale(1.05); }
+#aiFpSend:active { transform: scale(0.95); }
 
 /* Empty state */
 .ai-fp-empty {
@@ -408,8 +408,11 @@
   }
 
   #aiFloatPanel {
-    width: calc(100vw - 24px);
-    max-height: 65vh;
+    width: calc(100vw - 24px) !important;
+    height: 70vh !important;
     border-radius: 20px;
+    left: 12px !important;
+    bottom: 84px !important;
+    top: auto !important;
   }
 }

@@ -1,22 +1,26 @@
 /* ── AI FLOATING BUBBLE ─────────────────────────────────────────────────────
    Self-contained IIFE. No ES modules, no import/export.
-   Injects the draggable bubble + expandable panel into document.body.
+   Injects the draggable bubble + resizable/draggable panel into document.body.
    ──────────────────────────────────────────────────────────────────────── */
 (function () {
   'use strict';
 
   // ── Constants ─────────────────────────────────────────────────────────────
-  var DRAG_THRESHOLD = 6;
-  var SNAP_MARGIN    = 16;
-  var PANEL_W        = 380;
-  var STORAGE_KEY    = 'ss_ai_bubble_pos';
+  var DRAG_THRESHOLD  = 6;
+  var SNAP_MARGIN     = 16;
+  var PANEL_DEFAULT_W = 400;
+  var PANEL_DEFAULT_H = 600;
+  var PANEL_MIN_W     = 300;
+  var PANEL_MIN_H     = 360;
+  var STORAGE_KEY     = 'ss_ai_bubble_pos';
+  var PANEL_SIZE_KEY  = 'ss_ai_panel_size';
 
   // ── State ──────────────────────────────────────────────────────────────────
-  var isDragging  = false;
-  var isPanelOpen = false;
-  var isPinned    = false;
-  var startX      = 0;
-  var startY      = 0;
+  var isDragging      = false;
+  var isPanelOpen     = false;
+  var isPinned        = false;
+  var startX          = 0;
+  var startY          = 0;
   var bubbleStartLeft = 0;
   var bubbleStartTop  = 0;
   var totalMovement   = 0;
@@ -41,10 +45,17 @@
       '<span id="aiBubbleStatus"></span>';
     document.body.appendChild(bubbleEl);
 
+    // Resize handles markup
+    var handles = ['n','s','e','w','nw','ne','sw','se'];
+    var handlesHtml = handles.map(function(d) {
+      return '<div class="ai-resize-handle ai-resize-' + d + '" data-dir="' + d + '"></div>';
+    }).join('');
+
     var panelEl = document.createElement('div');
     panelEl.id = 'aiFloatPanel';
     panelEl.style.display = 'none';
     panelEl.innerHTML =
+      handlesHtml +
       '<div id="aiFpHeader">' +
         '<div id="aiFpTitle">' +
           '<span class="ai-fp-icon">🤖</span>' +
@@ -77,7 +88,7 @@
     document.body.appendChild(panelEl);
   }
 
-  // ── Snap logic ─────────────────────────────────────────────────────────────
+  // ── Snap logic (bubble) ────────────────────────────────────────────────────
   function snapBubble(x, y, bW, bH, vW, vH) {
     var distL = x;
     var distR = vW - x - bW;
@@ -85,54 +96,63 @@
     var distB = vH - y - bH;
     var min = Math.min(distL, distR, distT, distB);
 
-    if (min === distL) {
-      return { left: SNAP_MARGIN, top: Math.max(SNAP_MARGIN, Math.min(y, vH - bH - SNAP_MARGIN)) };
-    }
-    if (min === distR) {
-      return { left: vW - bW - SNAP_MARGIN, top: Math.max(SNAP_MARGIN, Math.min(y, vH - bH - SNAP_MARGIN)) };
-    }
-    if (min === distT) {
-      return { left: Math.max(SNAP_MARGIN, Math.min(x, vW - bW - SNAP_MARGIN)), top: SNAP_MARGIN + 56 };
-    }
-    // bottom
+    if (min === distL) return { left: SNAP_MARGIN, top: Math.max(SNAP_MARGIN, Math.min(y, vH - bH - SNAP_MARGIN)) };
+    if (min === distR) return { left: vW - bW - SNAP_MARGIN, top: Math.max(SNAP_MARGIN, Math.min(y, vH - bH - SNAP_MARGIN)) };
+    if (min === distT) return { left: Math.max(SNAP_MARGIN, Math.min(x, vW - bW - SNAP_MARGIN)), top: SNAP_MARGIN + 56 };
     return { left: Math.max(SNAP_MARGIN, Math.min(x, vW - bW - SNAP_MARGIN)), top: vH - bH - SNAP_MARGIN };
   }
 
-  // ── Panel positioning ──────────────────────────────────────────────────────
+  // ── Panel positioning (initial open) ──────────────────────────────────────
   function positionPanel(bubble, panel) {
     var bRect = bubble.getBoundingClientRect();
-    var vW = window.innerWidth;
-    var vH = window.innerHeight;
-    var pW = Math.min(PANEL_W, vW - 24);
-    var pH = Math.min(panel.scrollHeight || 500, vH * 0.7);
+    var vW    = window.innerWidth;
+    var vH    = window.innerHeight;
 
-    var spaceBelow = vH - bRect.bottom;
-    var spaceAbove = bRect.top;
-    var spaceRight = vW - bRect.right;
+    // Use saved size if available, else defaults
+    var saved = getSavedPanelSize();
+    var pW = Math.max(PANEL_MIN_W, Math.min(saved.w, vW - 24));
+    var pH = Math.max(PANEL_MIN_H, Math.min(saved.h, vH - 16));
 
+    // Place panel above the bubble if there's room, else below, else best fit
     var top, left;
+    var spaceAbove = bRect.top - 12;
+    var spaceBelow = vH - bRect.bottom - 12;
 
-    if (spaceBelow >= pH + 12) {
-      top  = bRect.bottom + 12;
-      left = Math.min(bRect.left, vW - pW - 8);
-    } else if (spaceAbove >= pH + 12) {
-      top  = bRect.top - pH - 12;
-      left = Math.min(bRect.left, vW - pW - 8);
-    } else if (spaceRight >= pW + 12) {
-      top  = Math.min(bRect.top, vH - pH - 8);
-      left = bRect.right + 12;
+    if (spaceAbove >= PANEL_MIN_H) {
+      // Anchor bottom of panel to just above bubble
+      top = Math.max(8, bRect.top - pH - 12);
+    } else if (spaceBelow >= PANEL_MIN_H) {
+      top = bRect.bottom + 12;
     } else {
-      top  = Math.min(bRect.top, vH - pH - 8);
-      left = bRect.left - pW - 12;
+      // Not enough space either way — open tall from top
+      top = 8;
+      pH  = vH - 16;
     }
+
+    // Horizontally: prefer right-aligned with bubble, clamped to viewport
+    left = Math.max(8, Math.min(bRect.right - pW, vW - pW - 8));
+    if (left < 8) left = Math.min(8, vW - pW - 8);
 
     top  = Math.max(8, Math.min(top,  vH - pH - 8));
     left = Math.max(8, Math.min(left, vW - pW - 8));
 
-    panel.style.top       = top + 'px';
-    panel.style.left      = left + 'px';
-    panel.style.width     = pW + 'px';
-    panel.style.maxHeight = Math.min(pH, vH * 0.7) + 'px';
+    panel.style.top    = top  + 'px';
+    panel.style.left   = left + 'px';
+    panel.style.width  = pW   + 'px';
+    panel.style.height = pH   + 'px';
+  }
+
+  // ── Save / restore panel size ──────────────────────────────────────────────
+  function getSavedPanelSize() {
+    try {
+      var s = JSON.parse(localStorage.getItem(PANEL_SIZE_KEY) || 'null');
+      if (s && s.w && s.h) return s;
+    } catch (e) {}
+    return { w: PANEL_DEFAULT_W, h: PANEL_DEFAULT_H };
+  }
+
+  function savePanelSize(w, h) {
+    try { localStorage.setItem(PANEL_SIZE_KEY, JSON.stringify({ w: w, h: h })); } catch (e) {}
   }
 
   // ── Open / close panel ─────────────────────────────────────────────────────
@@ -150,7 +170,6 @@
       panel.classList.remove('panel-opening');
       panel.removeEventListener('animationend', onOpen);
     });
-    // Focus input
     var input = document.getElementById('aiFpInput');
     if (input) setTimeout(function () { input.focus(); }, 50);
   }
@@ -170,7 +189,105 @@
     });
   }
 
-  // ── Drag (pointer events) ──────────────────────────────────────────────────
+  // ── Panel drag (header) ────────────────────────────────────────────────────
+  function attachPanelDrag(panel) {
+    var header = document.getElementById('aiFpHeader');
+    if (!header) return;
+
+    var pdStartX, pdStartY, pdPanelLeft, pdPanelTop, pdDragging = false;
+
+    header.addEventListener('pointerdown', function (e) {
+      if (e.target.closest('button')) return; // don't drag on control buttons
+      pdDragging   = true;
+      pdStartX     = e.clientX;
+      pdStartY     = e.clientY;
+      var rect     = panel.getBoundingClientRect();
+      pdPanelLeft  = rect.left;
+      pdPanelTop   = rect.top;
+      header.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+
+    header.addEventListener('pointermove', function (e) {
+      if (!pdDragging) return;
+      var dx   = e.clientX - pdStartX;
+      var dy   = e.clientY - pdStartY;
+      var vW   = window.innerWidth;
+      var vH   = window.innerHeight;
+      var pW   = panel.offsetWidth;
+      var pH   = panel.offsetHeight;
+      var newL = Math.max(0, Math.min(pdPanelLeft + dx, vW - pW));
+      var newT = Math.max(0, Math.min(pdPanelTop  + dy, vH - pH));
+      panel.style.left = newL + 'px';
+      panel.style.top  = newT + 'px';
+    });
+
+    header.addEventListener('pointerup', function () {
+      pdDragging = false;
+    });
+  }
+
+  // ── Panel resize (all edges + corners) ────────────────────────────────────
+  function attachPanelResize(panel) {
+    var handles = panel.querySelectorAll('.ai-resize-handle');
+    handles.forEach(function (handle) {
+      handle.addEventListener('pointerdown', function (e) {
+        e.stopPropagation();
+        e.preventDefault();
+        var dir     = handle.getAttribute('data-dir');
+        var startX  = e.clientX;
+        var startY  = e.clientY;
+        var rect    = panel.getBoundingClientRect();
+        var origL   = rect.left;
+        var origT   = rect.top;
+        var origW   = rect.width;
+        var origH   = rect.height;
+        var vW      = window.innerWidth;
+        var vH      = window.innerHeight;
+
+        handle.setPointerCapture(e.pointerId);
+
+        function onMove(ev) {
+          var dx = ev.clientX - startX;
+          var dy = ev.clientY - startY;
+          var newL = origL, newT = origT, newW = origW, newH = origH;
+
+          if (dir.indexOf('e') !== -1)  newW = Math.max(PANEL_MIN_W, origW + dx);
+          if (dir.indexOf('s') !== -1)  newH = Math.max(PANEL_MIN_H, origH + dy);
+          if (dir.indexOf('w') !== -1) {
+            newW = Math.max(PANEL_MIN_W, origW - dx);
+            newL = origL + origW - newW;
+          }
+          if (dir.indexOf('n') !== -1) {
+            newH = Math.max(PANEL_MIN_H, origH - dy);
+            newT = origT + origH - newH;
+          }
+
+          // Clamp to viewport
+          newL = Math.max(0, Math.min(newL, vW - PANEL_MIN_W));
+          newT = Math.max(0, Math.min(newT, vH - PANEL_MIN_H));
+          newW = Math.min(newW, vW - newL);
+          newH = Math.min(newH, vH - newT);
+
+          panel.style.left   = newL + 'px';
+          panel.style.top    = newT + 'px';
+          panel.style.width  = newW + 'px';
+          panel.style.height = newH + 'px';
+        }
+
+        function onUp() {
+          savePanelSize(panel.offsetWidth, panel.offsetHeight);
+          handle.removeEventListener('pointermove', onMove);
+          handle.removeEventListener('pointerup',   onUp);
+        }
+
+        handle.addEventListener('pointermove', onMove);
+        handle.addEventListener('pointerup',   onUp);
+      });
+    });
+  }
+
+  // ── Bubble drag ────────────────────────────────────────────────────────────
   function attachDrag(bubble) {
     bubble.addEventListener('pointerdown', function (e) {
       if (e.button !== 0 && e.pointerType === 'mouse') return;
@@ -195,18 +312,12 @@
         e.preventDefault();
         var newLeft = bubbleStartLeft + dx;
         var newTop  = bubbleStartTop  + dy;
-        // clamp within viewport
         var vW = window.innerWidth;
         var vH = window.innerHeight;
         newLeft = Math.max(0, Math.min(newLeft, vW - bubble.offsetWidth));
         newTop  = Math.max(0, Math.min(newTop,  vH - bubble.offsetHeight));
         bubble.style.left = newLeft + 'px';
         bubble.style.top  = newTop  + 'px';
-        // Reposition panel if open
-        if (isPanelOpen && !isPinned) {
-          var panel = document.getElementById('aiFloatPanel');
-          if (panel) positionPanel(bubble, panel);
-        }
       }
     });
 
@@ -216,17 +327,11 @@
       bubble.classList.remove('dragging');
 
       if (!isDragging) {
-        // It's a click — toggle panel
-        if (isPanelOpen) {
-          closePanel();
-        } else {
-          openPanel();
-        }
+        if (isPanelOpen) closePanel(); else openPanel();
       } else {
-        // Snap to nearest edge
-        var rect = bubble.getBoundingClientRect();
-        var vW   = window.innerWidth;
-        var vH   = window.innerHeight;
+        var rect    = bubble.getBoundingClientRect();
+        var vW      = window.innerWidth;
+        var vH      = window.innerHeight;
         var snapped = snapBubble(rect.left, rect.top, bubble.offsetWidth, bubble.offsetHeight, vW, vH);
         bubble.classList.add('snapping');
         bubble.style.left = snapped.left + 'px';
@@ -234,11 +339,6 @@
         bubble.addEventListener('transitionend', function onSnap() {
           bubble.classList.remove('snapping');
           bubble.removeEventListener('transitionend', onSnap);
-          // Reposition panel after snap settles
-          if (isPanelOpen) {
-            var panel = document.getElementById('aiFloatPanel');
-            if (panel) positionPanel(bubble, panel);
-          }
         });
         savePosition(snapped.left, snapped.top);
       }
@@ -246,11 +346,9 @@
     });
   }
 
-  // ── Save / restore position ────────────────────────────────────────────────
+  // ── Save / restore bubble position ────────────────────────────────────────
   function savePosition(left, top) {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ left: left, top: top }));
-    } catch (e) {}
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ left: left, top: top })); } catch (e) {}
   }
 
   function restorePosition(bubble) {
@@ -264,11 +362,7 @@
     try {
       var saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
       if (saved && typeof saved.left === 'number' && typeof saved.top === 'number') {
-        // Validate still in viewport
-        if (
-          saved.left >= 0 && saved.left <= vW - bW &&
-          saved.top  >= 0 && saved.top  <= vH - bH
-        ) {
+        if (saved.left >= 0 && saved.left <= vW - bW && saved.top >= 0 && saved.top <= vH - bH) {
           bubble.style.left = saved.left + 'px';
           bubble.style.top  = saved.top  + 'px';
           return;
@@ -284,11 +378,10 @@
   function appendMessage(role, html) {
     var msgs = document.getElementById('aiFpMessages');
     if (!msgs) return null;
-    // Remove empty state if present
     var empty = msgs.querySelector('.ai-fp-empty');
     if (empty) empty.remove();
 
-    var wrap = document.createElement('div');
+    var wrap   = document.createElement('div');
     wrap.className = 'ai-fp-msg ' + role;
 
     var sender = document.createElement('div');
@@ -309,7 +402,7 @@
   function appendThinking() {
     var msgs = document.getElementById('aiFpMessages');
     if (!msgs) return null;
-    var wrap = document.createElement('div');
+    var wrap   = document.createElement('div');
     wrap.className = 'ai-fp-msg bot';
 
     var sender = document.createElement('div');
@@ -329,10 +422,7 @@
 
   function escapeHtml(t) {
     return String(t)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/\n/g, '<br>');
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
   }
 
   // ── Input / send ───────────────────────────────────────────────────────────
@@ -344,16 +434,11 @@
     input.value = '';
     input.style.height = 'auto';
 
-    // Append user message
     appendMessage('user', escapeHtml(text));
-
-    // Show thinking
     var thinkRow = appendThinking();
 
-    // Dispatch to existing handler or event
     if (typeof window._aiBubbleSendMessage === 'function') {
       var result = window._aiBubbleSendMessage(text);
-      // Expect a promise or nothing
       if (result && typeof result.then === 'function') {
         result.then(function (response) {
           if (thinkRow) thinkRow.remove();
@@ -363,19 +448,11 @@
           appendMessage('bot', '❌ Something went wrong. Please try again.');
         });
       } else {
-        // Handler is synchronous — let it call back via window._aiFpBotReply
-        if (thinkRow) {
-          setTimeout(function () {
-            if (thinkRow.parentNode) thinkRow.remove();
-          }, 8000);
-        }
+        if (thinkRow) setTimeout(function () { if (thinkRow.parentNode) thinkRow.remove(); }, 8000);
       }
     } else {
       document.dispatchEvent(new CustomEvent('ai:message', { detail: { text: text } }));
-      // Auto-dismiss thinking after 8s if nobody picks it up
-      setTimeout(function () {
-        if (thinkRow && thinkRow.parentNode) thinkRow.remove();
-      }, 8000);
+      setTimeout(function () { if (thinkRow && thinkRow.parentNode) thinkRow.remove(); }, 8000);
     }
   }
 
@@ -415,18 +492,17 @@
     var qa = document.getElementById('aiFpQuickActions');
     if (!qa) return;
     qa.addEventListener('click', function (e) {
-      var chip = e.target.closest('.ai-chip');
+      var chip   = e.target.closest('.ai-chip');
       if (!chip) return;
       var action = chip.getAttribute('data-action');
-      var cfg = CHIP_CONFIG[action];
+      var cfg    = CHIP_CONFIG[action];
       if (!cfg) return;
       appendMessage('user', escapeHtml(chip.textContent.trim()));
-      appendMessage('bot', escapeHtml(cfg.label));
+      appendMessage('bot',  escapeHtml(cfg.label));
       cfg.trigger();
     });
   }
 
-  // ── Wire input row ─────────────────────────────────────────────────────────
   function wireInput() {
     var input = document.getElementById('aiFpInput');
     var send  = document.getElementById('aiFpSend');
@@ -436,18 +512,12 @@
         this.style.height = Math.min(this.scrollHeight, 120) + 'px';
       });
       input.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter' && !e.shiftKey) {
-          e.preventDefault();
-          handleSend();
-        }
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
       });
     }
-    if (send) {
-      send.addEventListener('click', handleSend);
-    }
+    if (send) send.addEventListener('click', handleSend);
   }
 
-  // ── Wire header buttons ────────────────────────────────────────────────────
   function wireHeader() {
     var closeBtn = document.getElementById('aiFpClose');
     if (closeBtn) closeBtn.addEventListener('click', closePanel);
@@ -462,57 +532,52 @@
     }
   }
 
-  // ── Close on outside click (when not pinned) ───────────────────────────────
   function wireOutsideClick() {
     document.addEventListener('pointerdown', function (e) {
       if (isPinned || !isPanelOpen) return;
       var bubble = document.getElementById('aiBubble');
       var panel  = document.getElementById('aiFloatPanel');
       if (!bubble || !panel) return;
-      if (!bubble.contains(e.target) && !panel.contains(e.target)) {
-        closePanel();
-      }
+      if (!bubble.contains(e.target) && !panel.contains(e.target)) closePanel();
     });
   }
 
-  // ── Viewport resize: re-clamp bubble ──────────────────────────────────────
-  function wireResize() {
+  function wireViewportResize() {
     window.addEventListener('resize', function () {
       var bubble = document.getElementById('aiBubble');
       if (!bubble) return;
-      var vW = window.innerWidth;
-      var vH = window.innerHeight;
+      var vW   = window.innerWidth;
+      var vH   = window.innerHeight;
       var left = parseFloat(bubble.style.left) || 0;
       var top  = parseFloat(bubble.style.top)  || 0;
       var bW   = bubble.offsetWidth;
       var bH   = bubble.offsetHeight;
-      var cLeft = Math.max(0, Math.min(left, vW - bW));
-      var cTop  = Math.max(0, Math.min(top,  vH - bH));
-      if (cLeft !== left || cTop !== top) {
-        bubble.style.left = cLeft + 'px';
-        bubble.style.top  = cTop  + 'px';
-      }
+      var cL   = Math.max(0, Math.min(left, vW - bW));
+      var cT   = Math.max(0, Math.min(top,  vH - bH));
+      if (cL !== left || cT !== top) { bubble.style.left = cL + 'px'; bubble.style.top = cT + 'px'; }
+
       if (isPanelOpen) {
         var panel = document.getElementById('aiFloatPanel');
-        if (panel) positionPanel(bubble, panel);
+        if (panel) {
+          var pW = Math.min(panel.offsetWidth,  vW - 16);
+          var pH = Math.min(panel.offsetHeight, vH - 16);
+          var pL = Math.max(0, Math.min(parseFloat(panel.style.left) || 0, vW - pW));
+          var pT = Math.max(0, Math.min(parseFloat(panel.style.top)  || 0, vH - pH));
+          panel.style.width  = pW + 'px';
+          panel.style.height = pH + 'px';
+          panel.style.left   = pL + 'px';
+          panel.style.top    = pT + 'px';
+        }
       }
     });
   }
 
-  // ── Public API exposed on window ───────────────────────────────────────────
+  // ── Public API ─────────────────────────────────────────────────────────────
   function exposeAPI() {
-    window._aiBubbleOpen = function () {
-      if (!isPanelOpen) openPanel();
-    };
-    window._aiBubbleClose = function () {
-      if (isPanelOpen) closePanel();
-    };
-    window._aiBubbleToggle = function () {
-      if (isPanelOpen) closePanel(); else openPanel();
-    };
-    // Allows external code to push a bot reply into the panel
-    window._aiFpBotReply = function (html) {
-      // Remove any pending thinking row
+    window._aiBubbleOpen   = function () { if (!isPanelOpen) openPanel(); };
+    window._aiBubbleClose  = function () { if (isPanelOpen) closePanel(); };
+    window._aiBubbleToggle = function () { if (isPanelOpen) closePanel(); else openPanel(); };
+    window._aiFpBotReply   = function (html) {
       var msgs = document.getElementById('aiFpMessages');
       if (msgs) {
         var thinking = msgs.querySelector('.ai-fp-thinking');
@@ -530,27 +595,26 @@
     injectHTML();
 
     var bubble = document.getElementById('aiBubble');
-    if (!bubble) return;
+    var panel  = document.getElementById('aiFloatPanel');
+    if (!bubble || !panel) return;
 
     restorePosition(bubble);
     attachDrag(bubble);
+    attachPanelDrag(panel);
+    attachPanelResize(panel);
     wireHeader();
     wireChips();
     wireInput();
     wireOutsideClick();
-    wireResize();
+    wireViewportResize();
     exposeAPI();
   }
 
   // ── Boot ───────────────────────────────────────────────────────────────────
-  // ss-ready fires from loader.js before this script loads, so we can't rely on
-  // catching that event. Instead: if DOM is ready, init immediately; otherwise
-  // wait for DOMContentLoaded. The _initialized guard prevents double-init.
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
     init();
   }
-  // Also listen for ss-ready in case this script somehow loads before it fires.
   window.addEventListener('ss-ready', init);
 })();
