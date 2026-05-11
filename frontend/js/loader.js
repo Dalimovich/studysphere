@@ -289,6 +289,7 @@
     [
       'features/toast/toast.css',
       'features/chatbot/chatbot.css',
+      'features/chatbot/ai-bubble.css',
       'features/chat/chat.css',
       'features/dashboard/dashboard.css',
       'features/practice/practice.css',
@@ -369,6 +370,7 @@
         var featureSrcs = [
           'features/toast/toast.js',
           'features/chatbot/chatbot.js',
+          'features/chatbot/ai-bubble.js',
           'features/chat/chat.js',
           'features/dashboard/dashboard.js',
           'features/practice/practice.js',
