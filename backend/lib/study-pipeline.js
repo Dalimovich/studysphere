@@ -184,7 +184,9 @@ function rpcChunks(serviceKey, supaUrl, payload) {
 
 function fetchDirectChunks(serviceKey, userId, courseId, docIds, limit) {
   if (!docIds || !docIds.length) return Promise.resolve([]);
-  const ids = docIds.map(function (id) { return String(id).replace(/"/g, ''); }).join(',');
+  // Quote each id to match fetchDocNames and tolerate any id that might
+  // contain reserved PostgREST characters in the future.
+  const ids = docIds.map(function (id) { return '"' + String(id).replace(/"/g, '') + '"'; }).join(',');
   const basePath = 'document_chunks?user_id=eq.' + encodeURIComponent(userId) +
     '&course_id=eq.' + encodeURIComponent(courseId) +
     '&document_id=in.(' + ids + ')' +
@@ -465,9 +467,28 @@ Respond ONLY with valid JSON: {"text":"## Topic\\n- point\\n..."}`;
 
 // ─── Output deduplication ─────────────────────────────────────────────────────
 
+// Common stop-words in EN + DE that would otherwise inflate Jaccard similarity
+// between distinct quiz questions (e.g. "what is the formula for X" vs
+// "what is the formula for Y" share 5 stop-words).
+const STOPWORDS = new Set([
+  'a','an','the','is','are','was','were','be','been','being','of','in','on',
+  'to','for','with','at','by','from','as','and','or','but','if','then','than',
+  'that','this','these','those','it','its','what','which','who','whom','how',
+  'why','when','where','do','does','did','can','could','should','would','will',
+  'shall','may','might','must','not','no','yes','so','such','one','two',
+  'der','die','das','den','dem','des','ein','eine','einer','einen','eines',
+  'ist','sind','war','waren','sein','seine','seines','seinem','seiner',
+  'und','oder','aber','wenn','dann','als','wie','was','wer','wo','wann',
+  'auf','in','an','zu','bei','von','mit','für','aus','nach','vor','über',
+  'unter','durch','gegen','ohne','um','nicht','kein','keine'
+]);
+
 function wordJaccard(a, b) {
   const wordsOf = function (s) {
-    return new Set(String(s || '').toLowerCase().replace(/[^a-z0-9äöüß\s]/g, ' ').split(/\s+/).filter(Boolean));
+    return new Set(
+      String(s || '').toLowerCase().replace(/[^a-z0-9äöüß\s]/g, ' ').split(/\s+/)
+        .filter(function (w) { return w && w.length > 1 && !STOPWORDS.has(w); })
+    );
   };
   const sa = wordsOf(a);
   const sb = wordsOf(b);
@@ -478,7 +499,10 @@ function wordJaccard(a, b) {
 }
 
 function deduplicateItems(items, threshold) {
-  const THRESHOLD = threshold !== undefined ? threshold : 0.72;
+  // 0.60 after stopword filtering — content words only, so a lower threshold
+  // matches what 0.72 used to catch on raw text without over-deduping
+  // legitimately distinct questions that share filler words.
+  const THRESHOLD = threshold !== undefined ? threshold : 0.60;
   const kept = [];
   items.forEach(function (item) {
     const text = item.question || item.front || '';
@@ -678,8 +702,10 @@ async function runPipeline({ serviceKey, userId, courseId, tool, topic, count, d
     if (tool === 'flashcards') systemPrompt = flashcardsSystemPrompt(promptCount);
     else                       systemPrompt = quizSystemPrompt(promptCount, diff);
 
-    // Tell the model to avoid items already generated
-    const alreadySeen = seen.concat(allItems.map(function (it) { return it.question || it.front || ''; })).filter(Boolean).slice(0, 50);
+    // Tell the model to avoid items already generated. Prioritise items from
+    // the current run so they're never crowded out by a long seenItems list.
+    const fromThisRun = allItems.map(function (it) { return it.question || it.front || ''; }).filter(Boolean);
+    const alreadySeen = fromThisRun.concat(seen).slice(0, 60);
     if (alreadySeen.length) {
       systemPrompt += '\n\nPREVIOUSLY SHOWN — do NOT generate questions/cards covering the same topic or phrasing as any of these:\n' +
         alreadySeen.map(function (s) { return '- ' + String(s).slice(0, 120); }).join('\n');
