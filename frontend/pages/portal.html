@@ -1028,8 +1028,9 @@
               <div id="aiHoverZone"></div>
             </div>
             <!-- /centreContent -->
+            <!-- LEGACY AI PANEL START -->
             <!-- AI PANEL -->
-            <div id="aiPanel">
+            <div id="aiPanel" style="display:none!important">
               <div id="aiResizeHandle" title="Drag to resize"></div>
               <div class="ai-hdr">
                 <div class="ai-av-wrap">
@@ -1238,6 +1239,7 @@
               </div>
             </div>
             <!-- /aiPanel -->
+            <!-- LEGACY AI PANEL END -->
           </div>
           <!-- /pdfViewerWrap -->
         </div>
@@ -1396,3 +1398,6 @@
 </div>
 
 <!-- Widget panel, FAB and drag ghost — injected by features/js/dashboard.js -->
+
+<link rel="stylesheet" href="features/chatbot/ai-bubble.css">
+<script src="features/chatbot/ai-bubble.js"></script>

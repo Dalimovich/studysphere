@@ -3,6 +3,27 @@
   var container = document.getElementById('psec-aipage');
   if (!container) return;
 
+  // ── AI Bubble bridge ────────────────────────────────────────────────────
+  // If the floating bubble system is active, route its messages into this
+  // chatbot's _send() once it is initialised. The assignment is deferred to
+  // after _init() so that _send is in scope.
+  function _registerBubbleBridge() {
+    // Allow the bubble to open the chatbot section and send a message
+    window._aiBubbleSendMessage = function (text) {
+      // Navigate to the chatbot section first if needed
+      var psbAIPage = document.getElementById('psbAIPage');
+      if (psbAIPage && typeof psbAIPage.click === 'function') {
+        var secVisible = container.style.display !== 'none' && container.offsetParent !== null;
+        if (!secVisible) psbAIPage.click();
+      }
+      // Delay slightly so the section is visible before sending
+      setTimeout(function () {
+        _send(text || '');
+      }, 150);
+      // Return undefined — chatbot handles reply display internally
+    };
+  }
+
   fetch('features/chatbot/chatbot.html')
     .then(function (r) {
       return r.text();
@@ -1196,6 +1217,8 @@
       _setGreeting();
       _renderSidebar();
     }, 800);
+
+    _registerBubbleBridge();
   }
 
   window._aipRefreshSidebar = function () {
