@@ -396,12 +396,12 @@ export function bindFileEvents(co, course) {
           var attempts = 0;
           var MAX = 60;
           (function poll() {
-            if (attempts++ >= MAX) return resolve('timeout');
+            if (attempts++ >= MAX) return resolve({ status: 'timeout', error: null });
             listCourseDocuments(course.id).then(function (docs) {
               var d = (docs || []).find(function (x) { return x.id === docId; });
               if (!d) return setTimeout(poll, 3000);
               if (d.processing_status === 'ready' || d.processing_status === 'failed') {
-                return resolve(d.processing_status);
+                return resolve({ status: d.processing_status, error: d.processing_error || null });
               }
               setTimeout(poll, 3000);
             }).catch(function () { setTimeout(poll, 3000); });
@@ -418,37 +418,42 @@ export function bindFileEvents(co, course) {
           t.folder,
           Object.assign({}, _guessDocMeta(t.fname), { forceReindex: true })
         ).then(function (res) {
-          if (!res || !res.documentId) return 'failed';
+          if (!res || !res.documentId) return { status: 'failed', error: null };
           return _waitForDoc(res.documentId);
-        }).then(function (status) {
-          if (status === 'ready') return 'ready';
+        }).then(function (result) {
+          if (result.status === 'ready') return result;
           // Auto-retry once on failure/timeout, with a small pause
           if (!retry) {
             return new Promise(function (r) { setTimeout(r, 1500); })
               .then(function () { return _runOne(t, true); });
           }
-          return status;
-        }).catch(function () { return 'failed'; });
+          return result;
+        }).catch(function () { return { status: 'failed', error: null }; });
       }
 
       var i = 0;
+      var failedErrors = [];
       function next() {
         if (i >= targets.length) {
           reindexAllBtn.disabled = false;
           reindexAllBtn.textContent = origLabel;
           if (typeof window.showToast === 'function') {
-            window.showToast(
-              'Reindex complete',
-              done + ' succeeded' + (failed ? ', ' + failed + ' failed' : '') + '.'
-            );
+            var msg = done + ' succeeded' + (failed ? ', ' + failed + ' failed' : '') + '.';
+            if (failedErrors.length === 1 && failedErrors[0]) {
+              msg += ' Error: ' + failedErrors[0];
+            }
+            window.showToast('Reindex complete', msg);
           }
           try { _bindRagStatus(co, course); } catch (e) {}
           return;
         }
         var t = targets[i++];
-        _runOne(t, false).then(function (status) {
-          if (status === 'ready') done++;
-          else failed++;
+        _runOne(t, false).then(function (result) {
+          if (result.status === 'ready') done++;
+          else {
+            failed++;
+            if (result.error) failedErrors.push(result.error);
+          }
           updateLabel();
           // Re-bind after each so the user sees green dots appear progressively
           try { _bindRagStatus(co, course); } catch (e) {}
