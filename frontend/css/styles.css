@@ -267,6 +267,7 @@ body:not(.night) .rag-fb-btn {
   overflow-x: hidden;
   display: none;
   background: var(--dp-bg);
+  background-attachment: fixed;
 }
 #portal.show {
   display: block;
@@ -2495,6 +2496,7 @@ body.night .sb-acc-chev-btn {
 
 #courseOverview {
   background: var(--dp-bg);
+  background-attachment: fixed;
   position: relative;
   min-height: 100%;
 }
