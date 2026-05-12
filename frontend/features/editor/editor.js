@@ -1193,15 +1193,23 @@
         );
       }
 
+      // Tracks the last fully-rendered page so we can tell a real navigation
+      // (first open, page change) apart from an in-place re-render (undo,
+      // redo, blend mode, annotation tweak). Only the former should flash
+      // the friendly placeholder — otherwise every undo blanks the editor.
+      var _lastRenderedPage = null;
       function renderCurrentPage() {
         if (!_pdf) return;
-        // Show the friendly placeholder while pdf.js does its work, with a
-        // minimum visible time so the polish isn't a 30 ms flash.
-        canvas.innerHTML = _epdfRenderingPlaceholder(_currentPage);
-        var _placeholderShownAt = Date.now();
+        var isNavigation = (_lastRenderedPage !== _currentPage);
+        var _placeholderShownAt = 0;
         var _MIN_PLACEHOLDER_MS = 450;
+        if (isNavigation) {
+          canvas.innerHTML = _epdfRenderingPlaceholder(_currentPage);
+          _placeholderShownAt = Date.now();
+        }
         window._edPdfOverlayCanvas = null;
         _pdf.getPage(_currentPage).then(function (page) {
+          if (!isNavigation) return page;
           var elapsed = Date.now() - _placeholderShownAt;
           var wait = Math.max(0, _MIN_PLACEHOLDER_MS - elapsed);
           if (wait) {
@@ -1209,6 +1217,7 @@
           }
           return page;
         }).then(function (page) {
+          _lastRenderedPage = _currentPage;
           // Clear the placeholder now that we're about to insert the real page
           canvas.innerHTML = '';
           var vp = page.getViewport({ scale: _scale });
