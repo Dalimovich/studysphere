@@ -104,7 +104,7 @@
       sub: '~1200',
       elo: 1200,
       depth: 2,
-      color: '#a78bfa',
+      color: '#60a5fa',
       border: 'rgba(167,139,250,.3)'
     },
     {
@@ -113,8 +113,8 @@
       sub: '~1600',
       elo: 1600,
       depth: 3,
-      color: '#f472b6',
-      border: 'rgba(244,114,182,.3)'
+      color: '#0ea5e9',
+      border: 'rgba(14,165,233,.3)'
     },
     {
       id: 5,
@@ -914,7 +914,7 @@
     }
     if (!checkGameEnd() && gameMode === 'bot' && turn !== playerColor && !gameOver) {
       aiThinking = true;
-      setStatus('AI thinking…', 'rgba(192,132,252,.8)');
+      setStatus('AI thinking…', 'rgba(59,130,246,.8)');
       setTimeout(
         function () {
           var depth = botDepth || 1;

@@ -485,8 +485,8 @@
           f.otherId +
           '" ' +
           (isAdded ? 'checked' : '') +
-          ' style="accent-color:#c084fc"/>' +
-          '<div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#c084fc,#f472b6);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.78rem;color:#fff;flex-shrink:0">' +
+          ' style="accent-color:#3b82f6"/>' +
+          '<div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#0ea5e9);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.78rem;color:#fff;flex-shrink:0">' +
           name.charAt(0).toUpperCase() +
           '</div>' +
           name;
@@ -852,7 +852,7 @@
             _chatEsc(r.name) +
             '</span></span>' +
             (isCreator
-              ? '<button style="background:none;border:none;color:rgba(192,132,252,.5);cursor:pointer;font-size:.8rem;padding:2px 4px;flex-shrink:0" title="Edit">&#x270E;</button>'
+              ? '<button style="background:none;border:none;color:rgba(59,130,246,.5);cursor:pointer;font-size:.8rem;padding:2px 4px;flex-shrink:0" title="Edit">&#x270E;</button>'
               : '');
           row.addEventListener('click', function () {
             _chatOpenRoom(rid, r.name);
@@ -982,7 +982,7 @@
       // code blocks
       s = s.replace(
         /`([^`]+)`/g,
-        '<code style="background:rgba(192,132,252,.15);padding:1px 5px;border-radius:4px;font-family:monospace;font-size:.88em">$1</code>'
+        '<code style="background:rgba(59,130,246,.15);padding:1px 5px;border-radius:4px;font-family:monospace;font-size:.88em">$1</code>'
       );
       // bold
       s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
@@ -993,7 +993,7 @@
       // mentions @name
       s = s.replace(
         /@(\w[\w\s]*\w|\w)/g,
-        '<span style="color:#c084fc;font-weight:800;background:rgba(192,132,252,.12);border-radius:4px;padding:0 3px">@$1</span>'
+        '<span style="color:#3b82f6;font-weight:800;background:rgba(59,130,246,.12);border-radius:4px;padding:0 3px">@$1</span>'
       );
       return s;
     }
@@ -1151,7 +1151,7 @@
           attachHTML =
             '<div style="margin-top:6px"><a href="' +
             _chatEsc(m.attachment_url) +
-            '" target="_blank" style="display:inline-flex;align-items:center;gap:6px;padding:7px 12px;background:rgba(192,132,252,.1);border:1px solid rgba(192,132,252,.2);border-radius:10px;color:#c084fc;font-size:.8rem;font-weight:700;text-decoration:none">📎 ' +
+            '" target="_blank" style="display:inline-flex;align-items:center;gap:6px;padding:7px 12px;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.2);border-radius:10px;color:#3b82f6;font-size:.8rem;font-weight:700;text-decoration:none">📎 ' +
             _chatEsc(m.attachment_name || 'File') +
             '</a></div>';
         }
@@ -1171,7 +1171,7 @@
           attachHTML =
             '<div style="margin-top:6px"><a id="' +
             attachId +
-            '" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;padding:7px 12px;background:rgba(192,132,252,.1);border:1px solid rgba(192,132,252,.2);border-radius:10px;color:#c084fc;font-size:.8rem;font-weight:700;text-decoration:none">Attachment: ' +
+            '" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;padding:7px 12px;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.2);border-radius:10px;color:#3b82f6;font-size:.8rem;font-weight:700;text-decoration:none">Attachment: ' +
             _chatEsc(m.attachment_name || 'File') +
             '</a></div>';
         }
@@ -1181,7 +1181,7 @@
       var contentHTML = m.content
         ? _chatMd(m.content).replace(
             /(https?:\/\/[^\s<]+)/g,
-            '<a href="$1" target="_blank" rel="noopener" style="color:#c084fc;text-decoration:underline;word-break:break-all">$1</a>'
+            '<a href="$1" target="_blank" rel="noopener" style="color:#3b82f6;text-decoration:underline;word-break:break-all">$1</a>'
           )
         : '';
 
@@ -1719,7 +1719,7 @@
                 : '') +
               '</div>' +
               '<button style="flex-shrink:0;padding:5px 14px;background:' +
-              (alreadyIn ? 'rgba(34,197,94,.15)' : 'linear-gradient(135deg,#c084fc,#f472b6)') +
+              (alreadyIn ? 'rgba(34,197,94,.15)' : 'linear-gradient(135deg,#3b82f6,#0ea5e9)') +
               ";border:none;border-radius:20px;font-family:'Nunito',sans-serif;font-weight:800;font-size:.75rem;color:" +
               (alreadyIn ? '#22c55e' : '#fff') +
               ';cursor:pointer">' +
@@ -1988,7 +1988,7 @@
           div.style.cssText =
             'padding:10px;border-radius:10px;background:var(--row-bg);margin-bottom:8px';
           div.innerHTML =
-            '<div style="font-size:.7rem;font-weight:800;color:rgba(192,132,252,.9);margin-bottom:4px">' +
+            '<div style="font-size:.7rem;font-weight:800;color:rgba(59,130,246,.9);margin-bottom:4px">' +
             _chatEsc(m.display_name || 'User') +
             '</div>' +
             '<div style="font-size:.8rem;color:var(--on-glass);line-height:1.4">' +
@@ -2373,7 +2373,7 @@
           d.style.cssText =
             'padding:7px 10px;border-radius:8px;background:var(--row-bg);cursor:pointer';
           d.innerHTML =
-            '<div style="font-size:.68rem;font-weight:800;color:rgba(192,132,252,.8)">' +
+            '<div style="font-size:.68rem;font-weight:800;color:rgba(59,130,246,.8)">' +
             _chatEsc(m.display_name || 'User') +
             ' · ' +
             new Date(m.created_at).toLocaleDateString() +

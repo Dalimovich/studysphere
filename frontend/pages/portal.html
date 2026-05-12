@@ -1,4 +1,4 @@
-﻿<!-- PORTAL -->
+<!-- PORTAL -->
 <div id="portal">
   <div class="blobs">
     <div class="blob blob-1"></div>
@@ -8,7 +8,7 @@
   </div>
 
   <div class="shell">
-    <!-- ════ SIDEBAR ════ -->
+    <!-- ---- SIDEBAR ---- -->
     <nav class="sidebar">
       <div class="sb-user" id="authIndicator">
         <div class="sb-avatar" id="authAvatar">?</div>
@@ -27,7 +27,7 @@
           <div class="sb-item-icon"><span class="sb-sprite" data-sprite="courses"></span></div>
           <span>Courses</span>
         </div>
-        <!-- German learner nav — hidden for enrolled students -->
+        <!-- German learner nav � hidden for enrolled students -->
         <div class="sb-item psb" id="psbGerman" style="display: none">
           <div class="sb-item-icon">&#x1F1E9;&#x1F1EA;</div>
           <span>Practice</span>
@@ -93,7 +93,7 @@
           <span class="sb-night-track" id="nightTrack">
             <span class="sb-night-track-label" id="nightLabel">Night</span>
             <span class="sb-night-thumb" id="nightThumb">
-              <span id="nightIcon">🌙</span>
+              <span id="nightIcon">??</span>
             </span>
           </span>
         </button>
@@ -102,7 +102,7 @@
     <!-- /sidebar -->
     <div class="mob-scrim" id="mobScrim"></div>
 
-    <!-- ════ MAIN ════ -->
+    <!-- ---- MAIN ---- -->
     <div class="main">
       <div class="topbar">
         <button class="ptb-back-btn" id="goPortal" style="display: none">&#x2190; Back</button>
@@ -153,7 +153,7 @@
         </div>
       </div>
 
-      <!-- ══ STUDY TECHNIQUES POPUP ══ -->
+      <!-- -- STUDY TECHNIQUES POPUP -- -->
       <div class="st-overlay" id="stOverlay" style="display: none">
         <div class="st-popup" id="stPopup">
           <div class="st-popup-head">
@@ -166,17 +166,17 @@
             <button class="st-tech-card active" data-tech="pomodoro">
               <span class="st-tech-icon">&#x1F345;</span>
               <span class="st-tech-name">Pomodoro</span>
-              <span class="st-tech-desc">25 min focus · 5 min break</span>
+              <span class="st-tech-desc">25 min focus � 5 min break</span>
             </button>
             <button class="st-tech-card" data-tech="5217">
               <span class="st-tech-icon">&#x26A1;</span>
               <span class="st-tech-name">52 / 17</span>
-              <span class="st-tech-desc">52 min focus · 17 min break</span>
+              <span class="st-tech-desc">52 min focus � 17 min break</span>
             </button>
             <button class="st-tech-card" data-tech="9020">
               <span class="st-tech-icon">&#x1F9E0;</span>
               <span class="st-tech-name">90 / 20</span>
-              <span class="st-tech-desc">90 min focus · 20 min break</span>
+              <span class="st-tech-desc">90 min focus � 20 min break</span>
             </button>
             <button class="st-tech-card" data-tech="custom">
               <span class="st-tech-icon">&#x2699;&#xFE0F;</span>
@@ -224,11 +224,11 @@
           <!-- Music source picker -->
           <div class="st-music-section">
             <div class="st-setting-label" style="padding: 0 16px 8px; display: block">
-              🎵 Music during focus
+              ?? Music during focus
             </div>
             <div class="st-music-sources" id="stMusicSources">
               <button class="st-music-src active" data-src="lofi">
-                <span class="st-music-src-icon">📻</span>
+                <span class="st-music-src-icon">??</span>
                 <span>Lo-fi</span>
               </button>
               <button class="st-music-src" data-src="youtube">
@@ -248,12 +248,12 @@
                 <span>Spotify</span>
               </button>
               <button class="st-music-src" data-src="none">
-                <span class="st-music-src-icon">🔇</span>
+                <span class="st-music-src-icon">??</span>
                 <span>None</span>
               </button>
             </div>
-            <div class="st-music-src-hint" id="stMusicHint">Lofi Girl radio — always available</div>
-            <!-- Playlist selector — shown when YouTube is active -->
+            <div class="st-music-src-hint" id="stMusicHint">Lofi Girl radio � always available</div>
+            <!-- Playlist selector � shown when YouTube is active -->
             <div class="st-playlist-selector" id="stPlaylistSelector" style="display: none">
               <select class="st-playlist-select" id="stPlaylistSelect"></select>
             </div>
@@ -264,7 +264,7 @@
       </div>
 
       <div class="main-scroll">
-        <!-- DASHBOARD — content injected by features/js/dashboard.js -->
+        <!-- DASHBOARD � content injected by features/js/dashboard.js -->
         <div id="psec-dashboard" class="portal-section"></div>
 
         <!-- PROFILE -->
@@ -321,14 +321,14 @@
           <div
             style="
               background: var(--glass-bg);
-              border: 1px solid rgba(192, 132, 252, 0.3);
+              border: 1px solid rgba(59, 130, 246, 0.3);
               border-radius: 24px;
               padding: 36px 30px;
               max-width: 440px;
               width: 100%;
               text-align: center;
               position: relative;
-              box-shadow: 0 0 60px rgba(192, 132, 252, 0.15);
+              box-shadow: 0 0 60px rgba(59, 130, 246, 0.15);
             "
           >
             <div style="font-size: 2.8rem; margin-bottom: 10px">&#x1F393;</div>
@@ -410,7 +410,7 @@
                 opacity: 0.6;
               "
             >
-              Pay with Card · Klarna · PayPal
+              Pay with Card � Klarna � PayPal
             </p>
             <button
               id="paywallLogoutBtn"
@@ -459,7 +459,7 @@
                   <div class="sem-opt sel" data-sid="ws2526" data-col="#06D6A0">
                     &#x1F7E2; WS 2025/26
                   </div>
-                  <div class="sem-opt" data-sid="ss25" data-col="#9B5DE5">&#x1F4C1; SS 2025</div>
+                  <div class="sem-opt" data-sid="ss25" data-col="#2563EB">&#x1F4C1; SS 2025</div>
                   <div class="sem-opt" data-sid="ws2425" data-col="#FF6FB7">
                     &#x1F4C1; WS 2024/25
                   </div>
@@ -544,19 +544,19 @@
           style="display: none"
         ></div>
 
-        <!-- LECTURE NOTES — content injected by features/js/lecturenotes.js -->
+        <!-- LECTURE NOTES � content injected by features/js/lecturenotes.js -->
         <div id="psec-notes" class="portal-section" style="display: none"></div>
 
         <!-- CHAT -->
         <!-- CHATBOT PAGE -->
-        <!-- CHATBOT PAGE — content injected by features/chatbot/chatbot.js -->
+        <!-- CHATBOT PAGE � content injected by features/chatbot/chatbot.js -->
         <div
           id="psec-aipage"
           class="portal-section"
           style="display: none; padding: 0; height: 100%"
         ></div>
 
-        <!-- CHAT — content injected by features/js/chat.js -->
+        <!-- CHAT � content injected by features/js/chat.js -->
         <div
           id="psec-chat"
           class="portal-section"
@@ -590,7 +590,7 @@
           </div>
         </div>
 
-        <!-- GAMES — content injected by features/js/games.js -->
+        <!-- GAMES � content injected by features/js/games.js -->
         <div id="psec-games" class="portal-section" style="display: none; padding: 0"></div>
 
         <!-- STUDY LOUNGE -->
@@ -653,7 +653,7 @@
           <!-- Courses list -->
           <div class="lounge-section-hdr">&#x1F4DA; Courses Studied</div>
           <div class="lounge-course-chips" id="loungeCourseChips">
-            <div class="lounge-empty-msg">No courses yet — open a subject to get started</div>
+            <div class="lounge-empty-msg">No courses yet � open a subject to get started</div>
           </div>
 
           <!-- Recent files -->
@@ -674,7 +674,7 @@
           </div>
         </div>
 
-        <!-- PRACTICE — content injected by features/js/practice.js -->
+        <!-- PRACTICE � content injected by features/js/practice.js -->
         <div id="psec-german" class="portal-section" style="display: none"></div>
       </div>
       <!-- /main-scroll -->
@@ -702,7 +702,7 @@
                 <span class="ws-icon">&#x1F4C2;</span>
                 <div class="ws-title" data-i18n="welcome_title">Select a file to read</div>
                 <div class="ws-sub" data-i18n="welcome_sub">
-                  Open a subject in the sidebar and click any file — it loads here as a real
+                  Open a subject in the sidebar and click any file � it loads here as a real
                   document.
                 </div>
                 <div class="ws-hint" data-i18n="welcome_hint">
@@ -805,7 +805,7 @@
                       class="annot-tool-btn active"
                       id="annotToolPen"
                       title="Pen"
-                      style="background: rgba(155, 93, 229, 0.35)"
+                      style="background: rgba(37, 99, 235, 0.35)"
                     >
                       <svg
                         width="15"
@@ -876,13 +876,13 @@
                     ></div>
                     <div
                       class="annot-color-swatch"
-                      data-color="#9B5DE5"
-                      style="background: #9b5de5"
+                      data-color="#2563EB"
+                      style="background: #2563eb"
                     ></div>
                     <div
                       class="annot-color-swatch"
                       data-color="#FF6FB7"
-                      style="background: #ff6fb7"
+                      style="background: #38bdf8"
                     ></div>
                     <div
                       class="annot-color-swatch"
@@ -934,7 +934,7 @@
                       min="1"
                       max="20"
                       value="3"
-                      style="width: 72px; accent-color: #9b5de5"
+                      style="width: 72px; accent-color: #2563eb"
                     />
                     <svg
                       width="16"
@@ -980,7 +980,7 @@
                     title="Undo"
                     style="font-size: 0.75rem; padding: 4px 8px"
                   >
-                    ↩ Undo
+                    ? Undo
                   </button>
                   <button
                     class="pdf-tb-btn"
@@ -997,11 +997,11 @@
                     style="
                       font-size: 0.75rem;
                       padding: 4px 8px;
-                      background: rgba(155, 93, 229, 0.15);
-                      color: #9b5de5;
+                      background: rgba(37, 99, 235, 0.15);
+                      color: #2563eb;
                     "
                   >
-                    ⬇ Save PDF
+                    ? Save PDF
                   </button>
                   <button
                     class="pdf-tb-btn"
@@ -1014,7 +1014,7 @@
                       color: #06d6a0;
                     "
                   >
-                    ⇢ To course
+                    ? To course
                   </button>
                 </div>
 
@@ -1151,7 +1151,7 @@
                     class="ai-textarea"
                     id="aiInput"
                     data-i18n-ph="ai_placeholder"
-                    placeholder="Ask anything about this document…"
+                    placeholder="Ask anything about this document�"
                     rows="2"
                   ></textarea>
                   <div class="ai-bottom-row">
@@ -1265,12 +1265,12 @@
   <div
     style="
       background: var(--glass-bg);
-      border: 1px solid rgba(155, 93, 229, 0.3);
+      border: 1px solid rgba(37, 99, 235, 0.3);
       border-radius: 20px;
       padding: 28px 24px;
       max-width: 420px;
       width: 100%;
-      box-shadow: 0 0 40px rgba(155, 93, 229, 0.15);
+      box-shadow: 0 0 40px rgba(37, 99, 235, 0.15);
     "
   >
     <div
@@ -1319,7 +1319,7 @@
   </div>
 </div>
 
-<!-- AI response export modal (chatbot page — any course) -->
+<!-- AI response export modal (chatbot page � any course) -->
 <div
   id="aiExportModal"
   style="
@@ -1337,12 +1337,12 @@
   <div
     style="
       background: var(--glass-bg);
-      border: 1px solid rgba(155, 93, 229, 0.3);
+      border: 1px solid rgba(37, 99, 235, 0.3);
       border-radius: 20px;
       padding: 28px 24px;
       max-width: 420px;
       width: 100%;
-      box-shadow: 0 0 40px rgba(155, 93, 229, 0.15);
+      box-shadow: 0 0 40px rgba(37, 99, 235, 0.15);
     "
   >
     <div
@@ -1391,4 +1391,4 @@
   </div>
 </div>
 
-<!-- Widget panel, FAB and drag ghost — injected by features/js/dashboard.js -->
+<!-- Widget panel, FAB and drag ghost � injected by features/js/dashboard.js -->

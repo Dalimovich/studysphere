@@ -114,7 +114,7 @@ body:not(.night) .ph-avatar {
 .pf-save,
 .profile-save-btn {
   grid-column: span 2;
-  background: linear-gradient(135deg, #2563eb, #7c3aed);
+  background: linear-gradient(135deg, #2563eb, #2563eb);
   color: #fff;
   border: none;
   border-radius: 14px;

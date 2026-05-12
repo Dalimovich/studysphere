@@ -1,4 +1,4 @@
-﻿<!-- ── HUB ── -->
+<!-- -- HUB -- -->
 <div id="gamesHub" class="games-hub">
   <div class="games-hub-hero">
     <div class="games-hub-hero-title">&#x1F3AE; Game Room</div>
@@ -8,9 +8,9 @@
     <div class="gh-card" id="gameCardTetris">
       <div class="gh-card-preview gh-card-preview-tetris">
         <div class="gh-tetris-preview">
-          <div style="background: #c084fc; width: 8px; height: 8px; border-radius: 2px"></div>
-          <div style="background: #f472b6; width: 8px; height: 8px; border-radius: 2px"></div>
-          <div style="background: #a78bfa; width: 8px; height: 8px; border-radius: 2px"></div>
+          <div style="background: #3b82f6; width: 8px; height: 8px; border-radius: 2px"></div>
+          <div style="background: #0ea5e9; width: 8px; height: 8px; border-radius: 2px"></div>
+          <div style="background: #60a5fa; width: 8px; height: 8px; border-radius: 2px"></div>
           <div style="background: #34d399; width: 8px; height: 8px; border-radius: 2px"></div>
           <div style="background: #60a5fa; width: 8px; height: 8px; border-radius: 2px"></div>
           <div style="background: #fb923c; width: 8px; height: 8px; border-radius: 2px"></div>
@@ -36,8 +36,8 @@
               width: 22px;
               height: 22px;
               border-radius: 50%;
-              background: linear-gradient(135deg, #c084fc, #f472b6);
-              box-shadow: 0 0 12px rgba(192, 132, 252, 0.6);
+              background: linear-gradient(135deg, #3b82f6, #0ea5e9);
+              box-shadow: 0 0 12px rgba(59, 130, 246, 0.6);
             "
           ></div>
           <div style="display: flex; flex-direction: column; gap: 18px">
@@ -101,10 +101,10 @@
               height: 34px;
               background: linear-gradient(
                 135deg,
-                rgba(244, 114, 182, 0.3),
-                rgba(192, 132, 252, 0.2)
+                rgba(14, 165, 233, 0.3),
+                rgba(59, 130, 246, 0.2)
               );
-              border: 1px solid rgba(244, 114, 182, 0.4);
+              border: 1px solid rgba(14, 165, 233, 0.4);
               border-radius: 4px;
               display: flex;
               align-items: center;
@@ -120,10 +120,10 @@
               height: 40px;
               background: linear-gradient(
                 135deg,
-                rgba(192, 132, 252, 0.3),
+                rgba(59, 130, 246, 0.3),
                 rgba(167, 139, 250, 0.2)
               );
-              border: 1px solid rgba(192, 132, 252, 0.4);
+              border: 1px solid rgba(59, 130, 246, 0.4);
               border-radius: 4px;
               display: flex;
               align-items: center;
@@ -139,10 +139,10 @@
               height: 34px;
               background: linear-gradient(
                 135deg,
-                rgba(244, 114, 182, 0.3),
-                rgba(192, 132, 252, 0.2)
+                rgba(14, 165, 233, 0.3),
+                rgba(59, 130, 246, 0.2)
               );
-              border: 1px solid rgba(244, 114, 182, 0.4);
+              border: 1px solid rgba(14, 165, 233, 0.4);
               border-radius: 4px;
               display: flex;
               align-items: center;
@@ -176,7 +176,7 @@
       </div>
       <div class="gh-card-play">Play &#x25B6;</div>
     </div>
-    <!-- ── CHESS CARD ── -->
+    <!-- -- CHESS CARD -- -->
     <div class="gh-card" id="gameCardChess">
       <div
         class="gh-card-preview"
@@ -295,7 +295,7 @@
           justify-content: center;
         "
       >
-        <div style="font-size: 2.2rem">🎮</div>
+        <div style="font-size: 2.2rem">??</div>
       </div>
       <div class="gh-card-body">
         <div class="gh-card-name">Arcade</div>
@@ -309,20 +309,20 @@
   </div>
 </div>
 
-<!-- ── TETRIS LEVEL SELECT ── -->
+<!-- -- TETRIS LEVEL SELECT -- -->
 <div id="gamesTetrisLevels" style="display: none" class="games-level-screen">
   <div class="lvl-hero">
     <button class="game-back-btn" id="tetrisLevelBack">&#x2190; Games</button>
     <div class="lvl-hero-body">
       <div class="lvl-hero-title">&#x1F3AE; Choose Your Challenge</div>
-      <div class="lvl-hero-sub">Higher levels start faster &amp; score more — can you survive?</div>
+      <div class="lvl-hero-sub">Higher levels start faster &amp; score more � can you survive?</div>
       <div class="lvl-hero-stats">
         <div class="lvl-hero-stat">
-          <span class="lvl-hero-stat-val" id="lvlBestScore">—</span
+          <span class="lvl-hero-stat-val" id="lvlBestScore">�</span
           ><span class="lvl-hero-stat-label">Best Score</span>
         </div>
         <div class="lvl-hero-stat">
-          <span class="lvl-hero-stat-val" id="lvlBestLevel">—</span
+          <span class="lvl-hero-stat-val" id="lvlBestLevel">�</span
           ><span class="lvl-hero-stat-label">Best Level</span>
         </div>
       </div>
@@ -331,7 +331,7 @@
   <div class="lvl-tiers" id="tetrisLevelGrid"></div>
 </div>
 
-<!-- ── TETRIS PLAY ── -->
+<!-- -- TETRIS PLAY -- -->
 <div id="gamesPlayTetris" style="display: none" class="games-play-screen">
   <div class="game-play-hdr">
     <button class="game-back-btn" id="tetrisBack">&#x2190; Levels</button>
@@ -393,7 +393,7 @@
   </div>
 </div>
 
-<!-- ── SOLITAIRE PLAY ── -->
+<!-- -- SOLITAIRE PLAY -- -->
 <div id="gamesPlaySolitaire" style="display: none" class="games-play-screen">
   <!-- Variant picker -->
   <div id="solVariantPicker">
@@ -628,7 +628,7 @@
           style="
             padding: 7px 18px;
             font-size: 0.78rem;
-            background: linear-gradient(135deg, #a855f7, #6366f1);
+            background: linear-gradient(135deg, #2563eb, #6366f1);
           "
         >
           &#x1F4A1; Hint
@@ -660,7 +660,7 @@
       "
     >
       <span style="color: #f87171; font-weight: 700; font-size: 0.95rem"
-        >No moves left — this deal is stuck.</span
+        >No moves left � this deal is stuck.</span
       >
       <button
         id="solNoMovesNewGame"
@@ -673,8 +673,8 @@
   </div>
 </div>
 
-<!-- ── CHESS ── -->
-<!-- ── CHESS ── -->
+<!-- -- CHESS -- -->
+<!-- -- CHESS -- -->
 <div id="gamesPlayChess" style="display: none" class="games-play-screen chess-screen">
   <div class="game-play-hdr">
     <button class="game-back-btn" id="chessBack">&#x2190; Games</button>
@@ -707,7 +707,7 @@
       <div class="chess-player-bar" id="chessBarTop">
         <div class="chess-player-avatar" id="chessAvTop">?</div>
         <div class="chess-player-meta">
-          <div class="chess-player-name" id="chessNameTop">—</div>
+          <div class="chess-player-name" id="chessNameTop">�</div>
           <div class="chess-player-elo" id="chessEloTop"></div>
         </div>
         <div class="chess-caps-row" id="chessCapsTop"></div>
@@ -783,7 +783,7 @@
             <span>Play Online</span>
           </div>
           <button class="chess-big-btn" id="chessCreateBtn">&#x2795; Create Game</button>
-          <div class="chess-or-divider">— or —</div>
+          <div class="chess-or-divider">� or �</div>
           <div style="display: flex; gap: 8px">
             <input
               id="chessJoinInput"
@@ -805,7 +805,7 @@
         <div id="chessWaitingPanel" style="display: none">
           <div class="chess-waiting-box">
             <div class="chess-waiting-spinner"></div>
-            <div class="chess-waiting-label">Waiting for opponent…</div>
+            <div class="chess-waiting-label">Waiting for opponent�</div>
             <div class="chess-room-code-display" id="chessRoomCodeDisplay"></div>
             <div style="font-size: 0.72rem; color: rgba(255, 255, 255, 0.4); margin-top: 4px">
               Share this code with a friend
@@ -857,7 +857,7 @@
   </div>
 </div>
 
-<!-- ── GD ARCADE GAME ── -->
+<!-- -- GD ARCADE GAME -- -->
 <div id="gamesPlayGD" style="display: none" class="games-play-screen">
   <div class="game-play-hdr">
     <button class="game-back-btn" id="gdBack">&#x2190; Games</button>
@@ -874,7 +874,7 @@
   </div>
 </div>
 
-<!-- ── FLAPPY BIRD ── -->
+<!-- -- FLAPPY BIRD -- -->
 <div id="gamesPlayBird" style="display: none" class="games-play-screen">
   <div class="game-play-hdr">
     <button class="game-back-btn" id="birdBack">&#x2190; Games</button>

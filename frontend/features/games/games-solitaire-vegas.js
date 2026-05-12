@@ -1,4 +1,4 @@
-﻿// â”€â”€ VEGAS SOLITAIRE (Draw-3 Klondike) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── VEGAS SOLITAIRE (Draw-3 Klondike) ────────────────────────────────────
 (function () {
   var SUITS = ['\u2660', '\u2665', '\u2666', '\u2663'];
   var RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
@@ -167,7 +167,7 @@
       if (!waste.length) return;
       var wtop = waste[waste.length - 1];
       if (selected) {
-        // try to place selected onto waste? No â€” waste is source only
+        // try to place selected onto waste? No — waste is source only
         selected = null;
         selectedFrom = null;
         render();
@@ -215,7 +215,7 @@
       if (selected) {
         // Try to place
         var seq = selected._seq || [selected];
-        // Same card clicked again â€” keep selected
+        // Same card clicked again — keep selected
         if (
           selectedFrom.type === 'tableau' &&
           selectedFrom.idx === idx &&
@@ -343,7 +343,7 @@
       stockEl.appendChild(sfd);
     } else if (redeals < MAX_REDEALS) {
       stockEl.innerHTML =
-        '<div style="font-size:1.6rem;color:rgba(192,132,252,.35);line-height:88px;text-align:center">\u21BA</div>';
+        '<div style="font-size:1.6rem;color:rgba(59,130,246,.35);line-height:88px;text-align:center">\u21BA</div>';
       stockEl.dataset.type = 'stock';
       stockEl.dataset.idx = '0';
     } else {
@@ -352,11 +352,11 @@
     }
     var rdLabel = document.createElement('div');
     rdLabel.style.cssText =
-      'text-align:center;font-size:.6rem;color:rgba(192,132,252,.4);margin-top:2px';
+      'text-align:center;font-size:.6rem;color:rgba(59,130,246,.4);margin-top:2px';
     rdLabel.textContent = 'Redeals: ' + (MAX_REDEALS - redeals);
     stockEl.appendChild(rdLabel);
     topRow.appendChild(stockEl);
-    // Waste â€” show top 3 fanned
+    // Waste — show top 3 fanned
     var wasteEl = makeEmpty();
     wasteEl.dataset.type = 'waste';
     wasteEl.dataset.idx = '0';
@@ -401,7 +401,7 @@
         } else {
           var sl = document.createElement('div');
           sl.style.cssText =
-            'font-size:1.8rem;color:rgba(192,132,252,.22);line-height:88px;text-align:center;width:100%';
+            'font-size:1.8rem;color:rgba(59,130,246,.22);line-height:88px;text-align:center;width:100%';
           sl.textContent = SUITS[fi];
           fEl.appendChild(sl);
         }
@@ -444,7 +444,7 @@
       })(t);
     table.appendChild(tabRow);
   }
-  // â”€â”€ Drag & Drop â”€â”€
+  // ── Drag & Drop ──
   function vegDragStart(e) {
     var el = e.target.closest('[data-type]');
     if (!el) return;

@@ -1,4 +1,4 @@
-﻿// â”€â”€ SCORPION SOLITAIRE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── SCORPION SOLITAIRE ───────────────────────────────────────────────────
 (function () {
   var SUITS = ['\u2660', '\u2665', '\u2666', '\u2663'];
   var RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
@@ -244,12 +244,12 @@
       se.appendChild(fd);
       var lb = document.createElement('div');
       lb.style.cssText =
-        'position:absolute;bottom:3px;right:5px;font-size:.6rem;color:rgba(192,132,252,.7);font-weight:700';
+        'position:absolute;bottom:3px;right:5px;font-size:.6rem;color:rgba(59,130,246,.7);font-weight:700';
       lb.textContent = stock.length;
       se.appendChild(lb);
     } else {
       se.innerHTML =
-        '<div style="font-size:1rem;color:rgba(192,132,252,.3);line-height:88px;text-align:center">\u2713</div>';
+        '<div style="font-size:1rem;color:rgba(59,130,246,.3);line-height:88px;text-align:center">\u2713</div>';
     }
     topRow.appendChild(se);
     var sp2 = document.createElement('div');
@@ -270,7 +270,7 @@
         fe.appendChild(kc);
       } else {
         fe.innerHTML =
-          '<div style="font-size:.9rem;color:rgba(192,132,252,.15);line-height:88px;text-align:center">\u2606</div>';
+          '<div style="font-size:.9rem;color:rgba(59,130,246,.15);line-height:88px;text-align:center">\u2606</div>';
       }
       topRow.appendChild(fe);
     }
@@ -365,7 +365,7 @@
     selectedFrom = null;
     render();
   }
-  // â”€â”€ Scorpion Hint System â”€â”€
+  // ── Scorpion Hint System ──
   var scoHintTimer = null,
     scoHintIdx = 0;
   function scoClearHints() {
@@ -414,7 +414,7 @@
           // Destination is same suit (extending a run)
           if (tableau[di].length && tableau[di][tableau[di].length - 1].suit === seq[0].suit)
             score += 25;
-          // Complete a Kâ†’A run?
+          // Complete a K→A run?
           var destAfter = tableau[di].concat(seq);
           if (destAfter.length >= 13) {
             var base = destAfter.length - 13;

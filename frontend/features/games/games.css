@@ -1,4 +1,4 @@
-﻿/* ── GAMES HUB ── */
+/* -- GAMES HUB -- */
 #psec-games {
   min-height: 0;
 }
@@ -7,14 +7,14 @@
 }
 .games-hub-hero {
   padding: 28px 28px 20px;
-  background: linear-gradient(135deg, rgba(192, 132, 252, 0.1), rgba(244, 114, 182, 0.06));
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(14, 165, 233, 0.06));
   border-bottom: 1px solid var(--divider);
   border-radius: 20px 20px 0 0;
 }
 .games-hub-hero-title {
   font-family: 'Fredoka One', cursive;
   font-size: 2rem;
-  background: linear-gradient(135deg, #c084fc, #f472b6);
+  background: linear-gradient(135deg, #3b82f6, #0ea5e9);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -42,16 +42,16 @@
   flex-direction: column;
 }
 .gh-card:hover {
-  border-color: rgba(192, 132, 252, 0.45);
+  border-color: rgba(59, 130, 246, 0.45);
   transform: translateY(-4px);
-  box-shadow: 0 16px 40px rgba(192, 132, 252, 0.14);
+  box-shadow: 0 16px 40px rgba(59, 130, 246, 0.14);
 }
 .gh-card-preview {
   height: 110px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, rgba(192, 132, 252, 0.08), rgba(244, 114, 182, 0.05));
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(14, 165, 233, 0.05));
 }
 .gh-card-preview-tetris .gh-tetris-preview {
   display: grid;
@@ -81,27 +81,27 @@
   flex-wrap: wrap;
 }
 .gh-badge {
-  background: rgba(192, 132, 252, 0.12);
-  border: 1px solid rgba(192, 132, 252, 0.2);
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.2);
   border-radius: 20px;
   padding: 3px 10px;
   font-size: 0.66rem;
   font-weight: 800;
-  color: rgba(192, 132, 252, 0.8);
+  color: rgba(59, 130, 246, 0.8);
 }
 .gh-card-play {
   padding: 12px 16px;
   font-family: 'Nunito', sans-serif;
   font-weight: 800;
   font-size: 0.82rem;
-  color: #c084fc;
+  color: #3b82f6;
   border-top: 1px solid var(--divider);
   transition: background 0.15s;
 }
 .gh-card:hover .gh-card-play {
-  background: rgba(192, 132, 252, 0.08);
+  background: rgba(59, 130, 246, 0.08);
 }
-/* ── SHARED GAME SCREENS ── */
+/* -- SHARED GAME SCREENS -- */
 .games-level-screen,
 .games-play-screen {
   padding: 20px 24px;
@@ -150,22 +150,22 @@
 .game-play-title {
   font-family: 'Fredoka One', cursive;
   font-size: 1.25rem;
-  background: linear-gradient(135deg, #c084fc, #f472b6);
+  background: linear-gradient(135deg, #3b82f6, #0ea5e9);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 .game-play-level-badge {
-  background: rgba(192, 132, 252, 0.15);
-  border: 1px solid rgba(192, 132, 252, 0.3);
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.3);
   border-radius: 20px;
   padding: 4px 12px;
   font-size: 0.72rem;
   font-weight: 800;
-  color: rgba(192, 132, 252, 0.9);
+  color: rgba(59, 130, 246, 0.9);
 }
 .tetris-start-btn {
-  background: linear-gradient(135deg, #c084fc, #f472b6);
+  background: linear-gradient(135deg, #3b82f6, #0ea5e9);
   border: none;
   border-radius: 24px;
   padding: 10px 28px;
@@ -179,7 +179,7 @@
 .tetris-start-btn:hover {
   opacity: 0.85;
 }
-/* ── LEVEL SELECT ── */
+/* -- LEVEL SELECT -- */
 .lvl-hero {
   padding: 24px 24px 0;
 }
@@ -189,7 +189,7 @@
 .lvl-hero-title {
   font-family: 'Fredoka One', cursive;
   font-size: 1.8rem;
-  background: linear-gradient(135deg, #c084fc, #f472b6);
+  background: linear-gradient(135deg, #3b82f6, #0ea5e9);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -207,8 +207,8 @@
   margin-top: 16px;
 }
 .lvl-hero-stat {
-  background: rgba(192, 132, 252, 0.08);
-  border: 1px solid rgba(192, 132, 252, 0.18);
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.18);
   border-radius: 12px;
   padding: 10px 18px;
   display: flex;
@@ -219,7 +219,7 @@
 .lvl-hero-stat-val {
   font-family: 'Fredoka One', cursive;
   font-size: 1.2rem;
-  background: linear-gradient(135deg, #c084fc, #f472b6);
+  background: linear-gradient(135deg, #3b82f6, #0ea5e9);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -307,19 +307,19 @@
 /* tier colours */
 .lvl-btn-1 {
   background: linear-gradient(135deg, #3b2d6b, #2a2050);
-  border-color: rgba(192, 132, 252, 0.3);
+  border-color: rgba(59, 130, 246, 0.3);
 }
 .lvl-btn-2 {
   background: linear-gradient(135deg, #4a2a72, #341a5c);
-  border-color: rgba(192, 132, 252, 0.35);
+  border-color: rgba(59, 130, 246, 0.35);
 }
 .lvl-btn-3 {
   background: linear-gradient(135deg, #7c2d8a, #5a1a70);
-  border-color: rgba(244, 114, 182, 0.3);
+  border-color: rgba(14, 165, 233, 0.3);
 }
 .lvl-btn-4 {
   background: linear-gradient(135deg, #9a1f6e, #7b0f52);
-  border-color: rgba(244, 114, 182, 0.4);
+  border-color: rgba(14, 165, 233, 0.4);
 }
 .lvl-btn-5 {
   background: linear-gradient(135deg, #b91c1c, #7f1d1d);
@@ -344,15 +344,15 @@
 .lvl-btn-10 {
   background: linear-gradient(135deg, #0f0f0f, #1a0a2e);
   border-color: rgba(255, 255, 255, 0.25);
-  box-shadow: 0 0 18px rgba(192, 132, 252, 0.25);
+  box-shadow: 0 0 18px rgba(59, 130, 246, 0.25);
 }
 .level-btn:hover.lvl-btn-1,
 .level-btn:hover.lvl-btn-2 {
-  box-shadow: 0 8px 24px rgba(192, 132, 252, 0.3);
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.3);
 }
 .level-btn:hover.lvl-btn-3,
 .level-btn:hover.lvl-btn-4 {
-  box-shadow: 0 8px 24px rgba(244, 114, 182, 0.3);
+  box-shadow: 0 8px 24px rgba(14, 165, 233, 0.3);
 }
 .level-btn:hover.lvl-btn-5,
 .level-btn:hover.lvl-btn-6 {
@@ -366,9 +366,9 @@
   box-shadow: 0 8px 24px rgba(52, 211, 153, 0.3);
 }
 .level-btn:hover.lvl-btn-10 {
-  box-shadow: 0 8px 24px rgba(192, 132, 252, 0.4);
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.4);
 }
-/* ── TETRIS ── */
+/* -- TETRIS -- */
 .tetris-layout {
   display: flex;
   gap: 14px;
@@ -407,7 +407,7 @@
 .tstat-val {
   font-family: 'Fredoka One', cursive;
   font-size: 1.25rem;
-  background: linear-gradient(135deg, #c084fc, #f472b6);
+  background: linear-gradient(135deg, #3b82f6, #0ea5e9);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -426,9 +426,9 @@
 #tetrisCanvas {
   display: block;
   border-radius: 10px;
-  border: 2px solid rgba(192, 132, 252, 0.35);
+  border: 2px solid rgba(59, 130, 246, 0.35);
   background: #08060f;
-  box-shadow: 0 0 32px rgba(192, 132, 252, 0.12);
+  box-shadow: 0 0 32px rgba(59, 130, 246, 0.12);
 }
 #tetrisNext {
   display: block;
@@ -451,7 +451,7 @@
 .tetris-overlay-title {
   font-family: 'Fredoka One', cursive;
   font-size: 1.8rem;
-  background: linear-gradient(135deg, #c084fc, #f472b6);
+  background: linear-gradient(135deg, #3b82f6, #0ea5e9);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -491,13 +491,13 @@
 }
 .tetris-ctrl-btn:active,
 .tetris-ctrl-btn:hover {
-  background: rgba(192, 132, 252, 0.18);
-  border-color: rgba(192, 132, 252, 0.45);
+  background: rgba(59, 130, 246, 0.18);
+  border-color: rgba(59, 130, 246, 0.45);
 }
 .tetris-ctrl-drop {
   padding: 0 18px;
 }
-/* ── SOLITAIRE ── */
+/* -- SOLITAIRE -- */
 .sol-hdr-stats {
   display: flex;
   align-items: center;
@@ -533,11 +533,11 @@
   width: 62px;
   height: 88px;
   border-radius: 8px;
-  border: 2px dashed rgba(192, 132, 252, 0.2);
+  border: 2px dashed rgba(59, 130, 246, 0.2);
   flex-shrink: 0;
 }
 .sol-pile-foundation {
-  background: rgba(192, 132, 252, 0.06);
+  background: rgba(59, 130, 246, 0.06);
 }
 .sol-card {
   width: 62px;
@@ -559,12 +559,12 @@
   pointer-events: auto;
 }
 .sol-card:hover {
-  box-shadow: 0 0 0 2px rgba(192, 132, 252, 0.5);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
 }
 .sol-card.selected {
   box-shadow:
-    0 0 0 2px #c084fc,
-    0 6px 20px rgba(192, 132, 252, 0.35);
+    0 0 0 2px #3b82f6,
+    0 6px 20px rgba(59, 130, 246, 0.35);
 }
 .sol-card.face-down {
   background: linear-gradient(145deg, #120d22, #0d0a1a);
@@ -577,8 +577,8 @@
   border-radius: 5px;
   background: repeating-linear-gradient(
     45deg,
-    rgba(192, 132, 252, 0.07) 0,
-    rgba(192, 132, 252, 0.07) 2px,
+    rgba(59, 130, 246, 0.07) 0,
+    rgba(59, 130, 246, 0.07) 2px,
     transparent 2px,
     transparent 8px
   );
@@ -602,7 +602,7 @@
 }
 .sol-card.red .sol-card-rank,
 .sol-card.red .sol-card-suit {
-  color: #f472b6;
+  color: #0ea5e9;
 }
 .sol-card.black .sol-card-rank,
 .sol-card.black .sol-card-suit {
@@ -629,7 +629,7 @@
 }
 .sol-drop-hover {
   box-shadow:
-    0 0 0 2px #a78bfa,
+    0 0 0 2px #60a5fa,
     0 0 18px rgba(167, 139, 250, 0.4) !important;
   background: rgba(167, 139, 250, 0.12) !important;
 }
@@ -642,13 +642,13 @@
 @keyframes solHintSrc {
   from {
     box-shadow:
-      0 0 0 2px #f472b6,
-      0 0 12px rgba(244, 114, 182, 0.3);
+      0 0 0 2px #0ea5e9,
+      0 0 12px rgba(14, 165, 233, 0.3);
   }
   to {
     box-shadow:
-      0 0 0 3px #f472b6,
-      0 0 28px rgba(244, 114, 182, 0.6);
+      0 0 0 3px #0ea5e9,
+      0 0 28px rgba(14, 165, 233, 0.6);
     transform: translateY(-4px);
   }
 }
@@ -677,11 +677,11 @@
   height: 88px;
   border-radius: 8px;
   background: linear-gradient(145deg, #1e1535, #160f2a);
-  border: 1px solid rgba(192, 132, 252, 0.3);
+  border: 1px solid rgba(59, 130, 246, 0.3);
   animation: solShuffleDeck 0.6s ease infinite alternate;
   box-shadow:
-    4px 4px 0 rgba(192, 132, 252, 0.15),
-    8px 8px 0 rgba(192, 132, 252, 0.08);
+    4px 4px 0 rgba(59, 130, 246, 0.15),
+    8px 8px 0 rgba(59, 130, 246, 0.08);
 }
 @keyframes solShuffleDeck {
   from {
@@ -694,7 +694,7 @@
 .sol-shuffle-label {
   font-family: 'Fredoka One', cursive;
   font-size: 1rem;
-  background: linear-gradient(135deg, #c084fc, #f472b6);
+  background: linear-gradient(135deg, #3b82f6, #0ea5e9);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -742,7 +742,7 @@
 }
 .sol-gameover-btn {
   padding: 9px 26px;
-  background: linear-gradient(135deg, #6366f1, #7c3aed);
+  background: linear-gradient(135deg, #6366f1, #2563eb);
   color: #fff;
   border: none;
   border-radius: 10px;
@@ -755,14 +755,14 @@
   filter: brightness(1.12);
 }
 
-/* ── STUDY LOUNGE ── */
+/* -- STUDY LOUNGE -- */
 .lounge-streak-banner {
   display: flex;
   align-items: center;
   gap: 16px;
   padding: 18px 24px;
-  background: linear-gradient(135deg, rgba(192, 132, 252, 0.15), rgba(244, 114, 182, 0.1));
-  border: 1px solid rgba(192, 132, 252, 0.25);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(14, 165, 233, 0.1));
+  border: 1px solid rgba(59, 130, 246, 0.25);
   border-radius: 16px;
   margin-bottom: 28px;
 }
@@ -773,7 +773,7 @@
 .lounge-streak-val {
   font-size: 2rem;
   font-weight: 800;
-  background: linear-gradient(135deg, #c084fc, #f472b6);
+  background: linear-gradient(135deg, #3b82f6, #0ea5e9);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -816,8 +816,8 @@
     background 0.2s;
 }
 .lounge-stat-card:hover {
-  background: rgba(192, 132, 252, 0.07);
-  border-color: rgba(192, 132, 252, 0.25);
+  background: rgba(59, 130, 246, 0.07);
+  border-color: rgba(59, 130, 246, 0.25);
 }
 .lounge-stat-icon {
   font-size: 1.6rem;
@@ -833,7 +833,7 @@
 .lounge-stat-lbl {
   font-size: 0.72rem;
   font-weight: 700;
-  color: rgba(192, 132, 252, 0.8);
+  color: rgba(59, 130, 246, 0.8);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -846,7 +846,7 @@
 .lounge-section-hdr {
   font-size: 0.78rem;
   font-weight: 800;
-  color: rgba(192, 132, 252, 0.6);
+  color: rgba(59, 130, 246, 0.6);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   margin-bottom: 12px;
@@ -861,12 +861,12 @@
 }
 .lounge-course-chip {
   padding: 6px 14px;
-  background: rgba(192, 132, 252, 0.12);
-  border: 1px solid rgba(192, 132, 252, 0.25);
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.25);
   border-radius: 20px;
   font-size: 0.8rem;
   font-weight: 700;
-  color: rgba(192, 132, 252, 0.9);
+  color: rgba(59, 130, 246, 0.9);
 }
 .lounge-recent-list {
   display: flex;
@@ -918,12 +918,12 @@
 #birdCanvas {
   display: block;
   border-radius: 16px;
-  border: 2px solid rgba(192, 132, 252, 0.3);
+  border: 2px solid rgba(59, 130, 246, 0.3);
   cursor: pointer;
-  box-shadow: 0 0 40px rgba(192, 132, 252, 0.12);
+  box-shadow: 0 0 40px rgba(59, 130, 246, 0.12);
 }
 
-/* ── CHESS ── */
+/* -- CHESS -- */
 .chess-screen {
   padding: 12px 16px !important;
 }
@@ -979,7 +979,7 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #7c3aed, #a855f7);
+  background: linear-gradient(135deg, #2563eb, #2563eb);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1039,7 +1039,7 @@
 }
 .chess-overlay-box {
   background: linear-gradient(135deg, #1a0d2e, #0f1623);
-  border: 1px solid rgba(192, 132, 252, 0.3);
+  border: 1px solid rgba(59, 130, 246, 0.3);
   border-radius: 16px;
   padding: 28px 36px;
   text-align: center;
@@ -1047,7 +1047,7 @@
 .chess-overlay-title {
   font-family: 'Fredoka One', cursive;
   font-size: 1.6rem;
-  background: linear-gradient(135deg, #c084fc, #f472b6);
+  background: linear-gradient(135deg, #3b82f6, #0ea5e9);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -1091,8 +1091,8 @@
   color: rgba(255, 255, 255, 0.7);
 }
 .chess-ptab-active {
-  color: #c084fc !important;
-  border-bottom: 2px solid #c084fc;
+  color: #3b82f6 !important;
+  border-bottom: 2px solid #3b82f6;
   margin-bottom: -1px;
 }
 .chess-tab-body {
@@ -1123,8 +1123,8 @@
   color: #fff;
 }
 .chess-mode-btn:hover {
-  background: rgba(192, 132, 252, 0.12);
-  border-color: rgba(192, 132, 252, 0.35);
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.35);
   transform: translateX(2px);
 }
 .chess-mode-icon {
@@ -1203,7 +1203,7 @@
 .chess-big-btn {
   width: 100%;
   padding: 11px;
-  background: linear-gradient(135deg, #7c3aed, #a855f7);
+  background: linear-gradient(135deg, #2563eb, #2563eb);
   border: none;
   border-radius: 10px;
   font-family: 'Nunito', sans-serif;
@@ -1215,7 +1215,7 @@
 }
 .chess-big-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 20px rgba(168, 85, 247, 0.4);
+  box-shadow: 0 4px 20px rgba(37, 99, 235, 0.4);
 }
 .chess-or-divider {
   text-align: center;
@@ -1253,8 +1253,8 @@
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  border: 3px solid rgba(192, 132, 252, 0.2);
-  border-top-color: #c084fc;
+  border: 3px solid rgba(59, 130, 246, 0.2);
+  border-top-color: #3b82f6;
   animation: spin 0.8s linear infinite;
   margin: 0 auto 12px;
 }
@@ -1273,10 +1273,10 @@
   font-size: 1.6rem;
   font-weight: 800;
   letter-spacing: 0.18em;
-  color: #c084fc;
+  color: #3b82f6;
   font-family: monospace;
-  background: rgba(192, 132, 252, 0.1);
-  border: 1px solid rgba(192, 132, 252, 0.3);
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
   border-radius: 8px;
   padding: 8px 16px;
   margin: 4px 0;
@@ -1316,11 +1316,11 @@
 }
 .chess-mv-w:hover,
 .chess-mv-b:hover {
-  background: rgba(192, 132, 252, 0.15);
+  background: rgba(59, 130, 246, 0.15);
   color: #fff;
 }
 .chess-mv-active {
-  background: rgba(192, 132, 252, 0.25) !important;
+  background: rgba(59, 130, 246, 0.25) !important;
   color: #fff !important;
 }
 /* Ratings */
@@ -1333,7 +1333,7 @@
 .chess-rating-big {
   font-family: 'Fredoka One', cursive;
   font-size: 2.4rem;
-  background: linear-gradient(135deg, #c084fc, #f472b6);
+  background: linear-gradient(135deg, #3b82f6, #0ea5e9);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;

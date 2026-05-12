@@ -75,7 +75,7 @@ body:not(.night) .toggle-track {
   background: rgba(0, 0, 0, 0.1);
 }
 .toggle input:checked + .toggle-track {
-  background: linear-gradient(90deg, #2563eb, #7c3aed);
+  background: linear-gradient(90deg, #2563eb, #2563eb);
 }
 .toggle-track::after {
   content: '';

@@ -1,5 +1,5 @@
 export function spawnConfetti() {
-  var cols = ['#FFD93D', '#FF6B35', '#FF6FB7', '#9B5DE5', '#4CC9F0', '#06D6A0'];
+  var cols = ['#FFD93D', '#FF6B35', '#FF6FB7', '#2563EB', '#4CC9F0', '#06D6A0'];
   for (var i = 0; i < 16; i++) {
     (function () {
       var el = document.createElement('div');

@@ -16,7 +16,7 @@ export async function aiMakePdfBlob(title, text) {
 
   var titleEl = document.createElement('div');
   titleEl.style.cssText =
-    'font-size:19px;font-weight:700;color:#5028a0;margin-bottom:10px;padding-bottom:10px;border-bottom:2px solid #9b5de5;';
+    'font-size:19px;font-weight:700;color:#5028a0;margin-bottom:10px;padding-bottom:10px;border-bottom:2px solid #2563eb;';
   titleEl.textContent = title;
   container.appendChild(titleEl);
 
@@ -126,7 +126,7 @@ export function ufDestPicker(uid, course, onPick) {
     b.innerHTML =
       '<span style="font-size:1.1rem">' + icon + '</span><span style="flex:1">' + label + '</span>';
     b.addEventListener('mouseenter', function () {
-      b.style.background = 'rgba(155,93,229,.2)';
+      b.style.background = 'rgba(37,99,235,.2)';
     });
     b.addEventListener('mouseleave', function () {
       b.style.background = 'rgba(255,255,255,.06)';
@@ -148,7 +148,7 @@ export function ufDestPicker(uid, course, onPick) {
     });
   var nb = document.createElement('button');
   nb.style.cssText =
-    'display:flex;align-items:center;gap:10px;background:rgba(155,93,229,.08);border:1px dashed rgba(155,93,229,.35);border-radius:12px;padding:10px 14px;cursor:pointer;color:var(--purple);font-family:Nunito,sans-serif;font-size:.85rem;font-weight:700;text-align:left;width:100%;margin-top:2px;';
+    'display:flex;align-items:center;gap:10px;background:rgba(37,99,235,.08);border:1px dashed rgba(37,99,235,.35);border-radius:12px;padding:10px 14px;cursor:pointer;color:var(--purple);font-family:Nunito,sans-serif;font-size:.85rem;font-weight:700;text-align:left;width:100%;margin-top:2px;';
   nb.innerHTML = '<span style="font-size:1.1rem">➕</span><span>New folder…</span>';
   nb.addEventListener('click', function () {
     var name = prompt('Folder name:');
@@ -230,7 +230,7 @@ export function glMoveDestPicker(uid, fromCourse, onPick) {
         label +
         '</span>';
       b.addEventListener('mouseenter', function () {
-        b.style.background = 'rgba(155,93,229,.2)';
+        b.style.background = 'rgba(37,99,235,.2)';
       });
       b.addEventListener('mouseleave', function () {
         b.style.background = 'rgba(255,255,255,.06)';
@@ -252,7 +252,7 @@ export function glMoveDestPicker(uid, fromCourse, onPick) {
       });
     var nb2 = document.createElement('button');
     nb2.style.cssText =
-      'display:flex;align-items:center;gap:10px;background:rgba(155,93,229,.08);border:1px dashed rgba(155,93,229,.35);border-radius:12px;padding:10px 14px;cursor:pointer;color:var(--purple);font-family:Nunito,sans-serif;font-size:.85rem;font-weight:700;text-align:left;width:100%;margin-top:2px;';
+      'display:flex;align-items:center;gap:10px;background:rgba(37,99,235,.08);border:1px dashed rgba(37,99,235,.35);border-radius:12px;padding:10px 14px;cursor:pointer;color:var(--purple);font-family:Nunito,sans-serif;font-size:.85rem;font-weight:700;text-align:left;width:100%;margin-top:2px;';
     nb2.innerHTML = '<span style="font-size:1.1rem">➕</span><span>New folder…</span>';
     nb2.addEventListener('click', function () {
       var name = prompt('Folder name:');
@@ -291,9 +291,9 @@ export function glMoveDestPicker(uid, fromCourse, onPick) {
       var b = document.createElement('button');
       b.style.cssText =
         'display:flex;align-items:center;gap:10px;background:' +
-        (isCurrent ? 'rgba(155,93,229,.18)' : 'rgba(255,255,255,.06)') +
+        (isCurrent ? 'rgba(37,99,235,.18)' : 'rgba(255,255,255,.06)') +
         ';border:1px solid ' +
-        (isCurrent ? 'rgba(155,93,229,.4)' : 'rgba(255,255,255,.1)') +
+        (isCurrent ? 'rgba(37,99,235,.4)' : 'rgba(255,255,255,.1)') +
         ';border-radius:12px;padding:10px 14px;cursor:pointer;color:var(--on-glass);font-family:Nunito,sans-serif;font-size:.85rem;font-weight:700;text-align:left;width:100%;transition:background .13s;';
       b.innerHTML =
         '<span style="font-size:1.1rem">📚</span><span style="flex:1">' +
@@ -301,10 +301,10 @@ export function glMoveDestPicker(uid, fromCourse, onPick) {
         (isCurrent ? ' (current)' : '') +
         '</span>';
       b.addEventListener('mouseenter', function () {
-        b.style.background = 'rgba(155,93,229,.25)';
+        b.style.background = 'rgba(37,99,235,.25)';
       });
       b.addEventListener('mouseleave', function () {
-        b.style.background = isCurrent ? 'rgba(155,93,229,.18)' : 'rgba(255,255,255,.06)';
+        b.style.background = isCurrent ? 'rgba(37,99,235,.18)' : 'rgba(255,255,255,.06)';
       });
       b.addEventListener('click', function () {
         overlay.remove();
@@ -396,7 +396,7 @@ export function aiShowExportModal(title, text) {
         (course.name || course.short) +
         '</span>';
       btn.addEventListener('mouseenter', function () {
-        this.style.background = 'rgba(155,93,229,.2)';
+        this.style.background = 'rgba(37,99,235,.2)';
       });
       btn.addEventListener('mouseleave', function () {
         this.style.background = 'rgba(255,255,255,.06)';

@@ -89,7 +89,7 @@
   width: 50px;
   height: 50px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #2563eb, #7c3aed);
+  background: linear-gradient(135deg, #2563eb, #2563eb);
   border: none;
   color: #fff;
   font-size: 1.7rem;
@@ -1234,7 +1234,7 @@ body:not(.night) .gcw-reminder-close:hover {
 .sw-bar-fill {
   height: 100%;
   border-radius: 3px;
-  background: linear-gradient(90deg, #2563eb, #7c3aed);
+  background: linear-gradient(90deg, #2563eb, #2563eb);
 }
 .dlw-row {
   display: flex;
@@ -1307,7 +1307,7 @@ body:not(.night) .gcw-reminder-close:hover {
   padding: 7px 12px;
   border-radius: 10px;
   border: none;
-  background: linear-gradient(135deg, #2563eb, #7c3aed);
+  background: linear-gradient(135deg, #2563eb, #2563eb);
   color: #fff;
   font-size: 0.78rem;
   font-weight: 800;

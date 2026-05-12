@@ -189,7 +189,7 @@ function _annotToggle() {
   var body = document.getElementById('pdfBody');
   if (_annotActive) {
     toolbar.style.display = 'flex';
-    toggleBtn.style.background = 'rgba(155,93,229,.35)';
+    toggleBtn.style.background = 'rgba(37,99,235,.35)';
     body.classList.add('annot-active');
     _annotAttachCanvases();
   } else {
@@ -494,13 +494,13 @@ function _annotOpenTextEditor(committed, live, e, existingStroke, existingIdx, e
   var panel = document.createElement('div');
   panel.style.cssText =
     'position:absolute;z-index:20;display:flex;flex-direction:column;min-width:120px;' +
-    'border:1.5px dashed rgba(155,93,229,.8);border-radius:6px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.3);';
+    'border:1.5px dashed rgba(37,99,235,.8);border-radius:6px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.3);';
   panel.style.left = xDom + 'px';
   panel.style.top = yDom + 'px';
 
   var handle = document.createElement('div');
   handle.style.cssText =
-    'background:rgba(155,93,229,.85);cursor:grab;padding:3px 8px;font-size:.68rem;' +
+    'background:rgba(37,99,235,.85);cursor:grab;padding:3px 8px;font-size:.68rem;' +
     'color:#fff;font-family:Nunito,sans-serif;font-weight:700;user-select:none;display:flex;justify-content:space-between;align-items:center;';
   handle.innerHTML =
     '<span>⠿ drag</span><span id="_atDone" style="cursor:pointer;opacity:.85">✓ Done</span>';
@@ -671,7 +671,7 @@ function _annotEditText(committed, stroke, strokeIdx, pn) {
         b.style.background = '';
       });
       this.classList.add('active');
-      this.style.background = 'rgba(155,93,229,.35)';
+      this.style.background = 'rgba(37,99,235,.35)';
       _annotMode = id.replace('annotTool', '').toLowerCase();
       _annotUpdateCursor();
       var txtCtrl = $id('annotTextControls');
@@ -893,7 +893,7 @@ document.getElementById('annotTransfer').addEventListener('click', function () {
         (course.name || course.short) +
         '</span>';
       btn.addEventListener('mouseenter', function () {
-        this.style.background = 'rgba(155,93,229,.2)';
+        this.style.background = 'rgba(37,99,235,.2)';
       });
       btn.addEventListener('mouseleave', function () {
         this.style.background = 'rgba(255,255,255,.06)';

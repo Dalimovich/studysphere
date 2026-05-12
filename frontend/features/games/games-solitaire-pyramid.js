@@ -1,4 +1,4 @@
-﻿// â”€â”€ PYRAMID SOLITAIRE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── PYRAMID SOLITAIRE ────────────────────────────────────────────────────
 (function () {
   var SUITS = ['\u2660', '\u2665', '\u2666', '\u2663'];
   var RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
@@ -443,9 +443,9 @@
           render();
           return;
         }
-        // Try to pair â€” second card may be covered (relaxed rule for end-game)
+        // Try to pair — second card may be covered (relaxed rule for end-game)
         if (tryRemovePair(sel1.idx, idx)) return;
-        // Not a valid pair â€” if uncovered, select it instead
+        // Not a valid pair — if uncovered, select it instead
         if (uncovIdx) {
           sel1 = { type: 'pyramid', idx: idx };
           render();
@@ -498,17 +498,17 @@
     table.innerHTML = '';
     table.className = 'sol-table sol-pyramid-table';
 
-    // â”€â”€ Outer layout: left panel + pyramid area â”€â”€
+    // ── Outer layout: left panel + pyramid area ──
     var layout = document.createElement('div');
     layout.style.cssText = 'display:flex;gap:16px;align-items:flex-start;justify-content:center';
 
-    // â”€â”€ Left panel: selected-card holder + removed count â”€â”€
+    // ── Left panel: selected-card holder + removed count ──
     var leftPanel = document.createElement('div');
     leftPanel.style.cssText =
       'display:flex;flex-direction:column;align-items:center;gap:8px;min-width:70px;padding-top:4px';
     var holderLabel = document.createElement('div');
     holderLabel.style.cssText =
-      'font-size:.65rem;color:rgba(192,132,252,.5);text-align:center;letter-spacing:.04em';
+      'font-size:.65rem;color:rgba(59,130,246,.5);text-align:center;letter-spacing:.04em';
     holderLabel.textContent = 'HELD';
     var holder = document.createElement('div');
     holder.className = 'sol-pile-empty';
@@ -531,10 +531,10 @@
       holder.appendChild(hc2);
     } else {
       holder.innerHTML =
-        '<div style="font-size:1.4rem;line-height:88px;text-align:center;color:rgba(192,132,252,.15)">?</div>';
+        '<div style="font-size:1.4rem;line-height:88px;text-align:center;color:rgba(59,130,246,.15)">?</div>';
     }
     var removedCount = document.createElement('div');
-    removedCount.style.cssText = 'font-size:.65rem;color:rgba(192,132,252,.4);text-align:center';
+    removedCount.style.cssText = 'font-size:.65rem;color:rgba(59,130,246,.4);text-align:center';
     var gone =
       28 -
       pyramid.filter(function (c) {
@@ -546,7 +546,7 @@
     leftPanel.appendChild(removedCount);
     layout.appendChild(leftPanel);
 
-    // â”€â”€ Right: pyramid + bottom row â”€â”€
+    // ── Right: pyramid + bottom row ──
     var rightCol = document.createElement('div');
     rightCol.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:16px';
 
@@ -636,12 +636,12 @@
       se.appendChild(fd);
       var slbl = document.createElement('div');
       slbl.style.cssText =
-        'text-align:center;font-size:.62rem;color:rgba(192,132,252,.45);margin-top:2px';
+        'text-align:center;font-size:.62rem;color:rgba(59,130,246,.45);margin-top:2px';
       slbl.textContent = stock.length + ' left';
       se.appendChild(slbl);
     } else {
       se.innerHTML =
-        '<div style="font-size:1rem;color:rgba(192,132,252,.3);line-height:88px;text-align:center">\u21BA</div>';
+        '<div style="font-size:1rem;color:rgba(59,130,246,.3);line-height:88px;text-align:center">\u21BA</div>';
     }
     botRow.appendChild(se);
     var we = document.createElement('div');
@@ -660,7 +660,7 @@
       we.appendChild(wcel);
     } else {
       we.innerHTML =
-        '<div style="font-size:.8rem;color:rgba(192,132,252,.2);line-height:88px;text-align:center">Waste</div>';
+        '<div style="font-size:.8rem;color:rgba(59,130,246,.2);line-height:88px;text-align:center">Waste</div>';
     }
     botRow.appendChild(we);
     rightCol.appendChild(botRow);

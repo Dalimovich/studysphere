@@ -81,7 +81,7 @@
         vx: (Math.random() - 0.5) * 6,
         vy: (Math.random() - 0.5) * 6,
         life: 1,
-        color: color || '#c084fc'
+        color: color || '#3b82f6'
       });
   }
 
@@ -130,7 +130,7 @@
     gGrad.addColorStop(1, '#0d0820');
     ctx.fillStyle = gGrad;
     ctx.fillRect(0, H - 40, W, 40);
-    ctx.strokeStyle = 'rgba(192,132,252,.3)';
+    ctx.strokeStyle = 'rgba(59,130,246,.3)';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(0, H - 40);
@@ -158,7 +158,7 @@
     ctx.fillStyle = '#3d2070';
     ctx.fillRect(pipe.x - 4, botY, PIPE_W + 8, 16);
     // Edge highlight
-    ctx.strokeStyle = 'rgba(192,132,252,.25)';
+    ctx.strokeStyle = 'rgba(59,130,246,.25)';
     ctx.lineWidth = 1;
     ctx.strokeRect(pipe.x, 0, PIPE_W, topH);
     ctx.strokeRect(pipe.x, botY, PIPE_W, H - botY - 40);
@@ -170,7 +170,7 @@
     b.trail.forEach(function (t, i) {
       var a = (i / b.trail.length) * 0.3;
       ctx.globalAlpha = a;
-      ctx.fillStyle = '#f472b6';
+      ctx.fillStyle = '#0ea5e9';
       ctx.beginPath();
       ctx.arc(t.x, t.y, b.r * (i / b.trail.length) * 0.7, 0, Math.PI * 2);
       ctx.fill();
@@ -182,14 +182,14 @@
     ctx.rotate(Math.max(-0.5, Math.min(Math.PI / 2, b.rot)));
 
     // Glow
-    ctx.shadowColor = 'rgba(192,132,252,.8)';
+    ctx.shadowColor = 'rgba(59,130,246,.8)';
     ctx.shadowBlur = 18;
 
     // Body gradient
     var bg = ctx.createRadialGradient(-3, -3, 2, 0, 0, b.r);
     bg.addColorStop(0, '#e0aaff');
-    bg.addColorStop(0.5, '#c084fc');
-    bg.addColorStop(1, '#7c3aed');
+    bg.addColorStop(0.5, '#3b82f6');
+    bg.addColorStop(1, '#2563eb');
     ctx.fillStyle = bg;
     ctx.beginPath();
     ctx.arc(0, 0, b.r, 0, Math.PI * 2);
@@ -234,7 +234,7 @@
     ctx.textAlign = 'center';
     if (started && !dead) {
       ctx.font = 'bold 36px "Fredoka One", cursive';
-      ctx.shadowColor = 'rgba(192,132,252,.6)';
+      ctx.shadowColor = 'rgba(59,130,246,.6)';
       ctx.shadowBlur = 12;
       ctx.fillStyle = 'rgba(255,255,255,.9)';
       ctx.fillText(score, W / 2, 60);
@@ -252,8 +252,8 @@
     if (dead) {
       ctx.font = 'bold 42px "Fredoka One", cursive';
       var grad = ctx.createLinearGradient(0, H / 2 - 60, 0, H / 2 - 20);
-      grad.addColorStop(0, '#f472b6');
-      grad.addColorStop(1, '#c084fc');
+      grad.addColorStop(0, '#0ea5e9');
+      grad.addColorStop(1, '#3b82f6');
       ctx.fillStyle = grad;
       ctx.fillText('Game Over', W / 2, H / 2 - 30);
 
@@ -263,8 +263,8 @@
     } else {
       ctx.font = 'bold 40px "Fredoka One", cursive';
       var grad2 = ctx.createLinearGradient(0, H / 2 - 80, 0, H / 2 - 30);
-      grad2.addColorStop(0, '#c084fc');
-      grad2.addColorStop(1, '#f472b6');
+      grad2.addColorStop(0, '#3b82f6');
+      grad2.addColorStop(1, '#0ea5e9');
       ctx.fillStyle = grad2;
       ctx.fillText('Flappy Bird', W / 2, H / 2 - 30);
 
@@ -277,8 +277,8 @@
     var bx = W / 2,
       by = dead ? H / 2 + 70 : H / 2 + 55;
     var btnGrad = ctx.createLinearGradient(bx - 60, by - 22, bx + 60, by + 22);
-    btnGrad.addColorStop(0, '#c084fc');
-    btnGrad.addColorStop(1, '#f472b6');
+    btnGrad.addColorStop(0, '#3b82f6');
+    btnGrad.addColorStop(1, '#0ea5e9');
     ctx.fillStyle = btnGrad;
     ctx.beginPath();
     ctx.roundRect(bx - 60, by - 22, 120, 44, 22);
@@ -322,7 +322,7 @@
         score++;
         document.getElementById('birdScore').textContent = score;
         sfxScore();
-        spawnParticles(bird.x, bird.y, '#f472b6');
+        spawnParticles(bird.x, bird.y, '#0ea5e9');
         if (score > bestScore) {
           bestScore = score;
           localStorage.setItem('ss_bird_best', score);
@@ -354,7 +354,7 @@
     running = false;
     sfxDie();
     spawnParticles(bird.x, bird.y, '#ef4444');
-    spawnParticles(bird.x, bird.y, '#f472b6');
+    spawnParticles(bird.x, bird.y, '#0ea5e9');
     if (score > bestScore) {
       bestScore = score;
       localStorage.setItem('ss_bird_best', score);
@@ -391,7 +391,7 @@
     bird.vy = JUMP;
     bird.rot = -0.4;
     sfxFlap();
-    spawnParticles(bird.x, bird.y + bird.r, '#a78bfa');
+    spawnParticles(bird.x, bird.y + bird.r, '#60a5fa');
   }
 
   window._birdInit = function () {

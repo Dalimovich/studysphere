@@ -256,7 +256,7 @@
         console.error('✗ Could not load landing.html:', err);
         root.innerHTML =
           '<div style="display:flex;align-items:center;justify-content:center;' +
-          'height:100vh;font-family:Nunito,sans-serif;color:#c084fc;font-size:1.1rem">' +
+          'height:100vh;font-family:Nunito,sans-serif;color:#3b82f6;font-size:1.1rem">' +
           'StudySphere — ' +
           '<button id="landingFallbackGoogleBtn" ' +
           'style="margin-left:12px;padding:10px 24px;' +

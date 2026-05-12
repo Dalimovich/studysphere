@@ -1,4 +1,4 @@
-﻿// â”€â”€ Widget Dashboard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Widget Dashboard ──────────────────────────────────────────────────────────
 (function () {
   var container = document.getElementById('psec-dashboard');
   if (!container) return;
@@ -8,7 +8,7 @@
       return r.text();
     })
     .then(function (html) {
-      // Inject inner content â€” split out the widget panel/FAB/ghost into body
+      // Inject inner content — split out the widget panel/FAB/ghost into body
       var tmp = document.createElement('div');
       tmp.innerHTML = html;
       // Move #psec-dashboard children into the real container
@@ -39,7 +39,7 @@
     var DEFS = [
       {
         type: 'courses',
-        icon: 'ðŸ“š',
+        icon: '📚',
         name: 'Course Shortcuts',
         cols: 2,
         rows: 1,
@@ -47,7 +47,7 @@
       },
       {
         type: 'mail',
-        icon: 'âœ‰ï¸',
+        icon: '✉️',
         name: 'New Mails',
         cols: 2,
         rows: 2,
@@ -55,16 +55,16 @@
       },
       {
         type: 'notes',
-        icon: 'ðŸ“',
+        icon: '📝',
         name: 'Quick Notes',
         cols: 2,
         rows: 2,
         desc: 'Personal scratch pad'
       },
-      { type: 'stats', icon: 'ðŸ“Š', name: 'Study Stats', cols: 2, rows: 1, desc: 'Weekly progress' },
+      { type: 'stats', icon: '📊', name: 'Study Stats', cols: 2, rows: 1, desc: 'Weekly progress' },
       {
         type: 'deadlines',
-        icon: 'â°',
+        icon: '⏰',
         name: 'Deadlines',
         cols: 2,
         rows: 2,
@@ -72,7 +72,7 @@
       },
       {
         type: 'weather',
-        icon: 'ðŸŒ¤ï¸',
+        icon: '🌤️',
         name: 'Campus Weather',
         cols: 1,
         rows: 1,
@@ -80,7 +80,7 @@
       },
       {
         type: 'ai',
-        icon: 'ðŸ¤–',
+        icon: '🤖',
         name: 'AI Quick Chat',
         cols: 2,
         rows: 2,
@@ -88,7 +88,7 @@
       },
       {
         type: 'gcal',
-        icon: 'ðŸ“†',
+        icon: '📆',
         name: 'Google Calendar',
         cols: 1,
         rows: 3,
@@ -163,7 +163,7 @@
                 );
               })
               .join('')
-          : '<div class="tw-none">No classes today ðŸŽ‰</div>';
+          : '<div class="tw-none">No classes today 🎉</div>';
         return (
           '<div class="tw-date">' +
           DAYS[day] +
@@ -179,7 +179,7 @@
         var sem = SEMS[window.sdActiveSemId];
         var courses = sem && sem.courses && sem.courses.length ? sem.courses : [];
         if (!courses.length)
-          return '<div class="tw-none" style="padding:16px;text-align:center;opacity:.5;font-size:.82rem">No courses yet â€” add some in Subjects</div>';
+          return '<div class="tw-none" style="padding:16px;text-align:center;opacity:.5;font-size:.82rem">No courses yet — add some in Subjects</div>';
         return (
           '<div class="cw-pills">' +
           courses
@@ -197,13 +197,13 @@
         return (
           '<div class="nw-list"></div>' +
           '<div class="nw-compose" style="display:none;flex-direction:column;gap:8px">' +
-          '<textarea class="nw-ta" placeholder="Write your noteâ€¦" spellcheck="false" style="flex:1;min-height:80px;resize:none;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px 12px;font-family:\'Nunito\',sans-serif;font-size:.82rem;color:#fff;outline:none"></textarea>' +
+          '<textarea class="nw-ta" placeholder="Write your note…" spellcheck="false" style="flex:1;min-height:80px;resize:none;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px 12px;font-family:\'Nunito\',sans-serif;font-size:.82rem;color:#fff;outline:none"></textarea>' +
           '<div style="display:flex;gap:8px">' +
           '<button class="nw-cancel" style="flex:1;padding:8px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:20px;font-family:\'Nunito\',sans-serif;font-weight:800;font-size:.78rem;color:rgba(255,255,255,.6);cursor:pointer">Cancel</button>' +
-          '<button class="nw-save" style="flex:1;padding:8px;background:linear-gradient(135deg,#c084fc,#f472b6);border:none;border-radius:20px;font-family:\'Nunito\',sans-serif;font-weight:800;font-size:.78rem;color:#fff;cursor:pointer">Save</button>' +
+          '<button class="nw-save" style="flex:1;padding:8px;background:linear-gradient(135deg,#3b82f6,#0ea5e9);border:none;border-radius:20px;font-family:\'Nunito\',sans-serif;font-weight:800;font-size:.78rem;color:#fff;cursor:pointer">Save</button>' +
           '</div>' +
           '</div>' +
-          '<button class="nw-add-btn" style="margin-top:8px;width:100%;padding:8px;background:rgba(192,132,252,.1);border:1px dashed rgba(192,132,252,.35);border-radius:10px;font-family:\'Nunito\',sans-serif;font-weight:800;font-size:.78rem;color:rgba(192,132,252,.8);cursor:pointer">+ Add note</button>'
+          '<button class="nw-add-btn" style="margin-top:8px;width:100%;padding:8px;background:rgba(59,130,246,.1);border:1px dashed rgba(59,130,246,.35);border-radius:10px;font-family:\'Nunito\',sans-serif;font-weight:800;font-size:.78rem;color:rgba(59,130,246,.8);cursor:pointer">+ Add note</button>'
         );
       if (type === 'stats') {
         var fileCount = 0;
@@ -229,7 +229,7 @@
         return '<div class="tw-none" style="padding:16px;text-align:center;opacity:.55;font-size:.82rem">Weather data is not connected yet.</div>';
       if (type === 'ai')
         return (
-          '<div class="aw-row"><input class="aw-in" placeholder="Ask AI anythingâ€¦"/><button class="aw-btn">â†’</button></div>' +
+          '<div class="aw-row"><input class="aw-in" placeholder="Ask AI anything…"/><button class="aw-btn">→</button></div>' +
           '<div class="aw-response" style="flex:1;overflow-y:auto;font-size:.8rem;line-height:1.6;color:rgba(255,255,255,.8);padding:4px 2px;display:none"></div>' +
           '<div class="aw-hint">Powered by StudySphere AI</div>'
         );
@@ -253,7 +253,7 @@
     var dragging = null,
       resizing = null;
 
-    // â”€â”€ Persist widget layout per user â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Persist widget layout per user ────────────────────────────────────────
     var _dwSaveTimer = null;
     function _dwSave() {
       clearTimeout(_dwSaveTimer);
@@ -525,9 +525,9 @@
         if (!q || btn.disabled) return;
         inp.value = '';
         btn.disabled = true;
-        btn.textContent = 'â€¦';
+        btn.textContent = '…';
         resp.style.display = 'block';
-        resp.textContent = 'Thinkingâ€¦';
+        resp.textContent = 'Thinking…';
         if (hint) hint.style.display = 'none';
         fetch(BACKEND_URL + '/api/ai', {
           method: 'POST',
@@ -561,7 +561,7 @@
           })
           .then(function () {
             btn.disabled = false;
-            btn.textContent = 'â†’';
+            btn.textContent = '→';
           });
       }
       canvas.querySelectorAll('.dw-body').forEach(function (body) {

@@ -1,4 +1,4 @@
-﻿// â”€â”€ SPIDER SOLITAIRE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── SPIDER SOLITAIRE ─────────────────────────────────────────────────────
 (function () {
   var ALL_SUITS = ['\u2660', '\u2665', '\u2666', '\u2663'];
   var RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
@@ -281,12 +281,12 @@
       se.appendChild(fd);
       var lb = document.createElement('div');
       lb.style.cssText =
-        'position:absolute;bottom:3px;right:5px;font-size:.6rem;color:rgba(192,132,252,.7);font-weight:700';
+        'position:absolute;bottom:3px;right:5px;font-size:.6rem;color:rgba(59,130,246,.7);font-weight:700';
       lb.textContent = Math.ceil(stock.length / 10) + 'x';
       se.appendChild(lb);
     } else {
       se.innerHTML =
-        '<div style="font-size:1rem;color:rgba(192,132,252,.3);line-height:88px;text-align:center">\u2713</div>';
+        '<div style="font-size:1rem;color:rgba(59,130,246,.3);line-height:88px;text-align:center">\u2713</div>';
     }
     topRow.appendChild(se);
     var sp = document.createElement('div');
@@ -307,7 +307,7 @@
         fe.appendChild(kc);
       } else {
         fe.innerHTML =
-          '<div style="font-size:.9rem;color:rgba(192,132,252,.15);line-height:88px;text-align:center">\u2606</div>';
+          '<div style="font-size:.9rem;color:rgba(59,130,246,.15);line-height:88px;text-align:center">\u2606</div>';
       }
       topRow.appendChild(fe);
     }
@@ -341,7 +341,7 @@
       })(t);
     table.appendChild(tabRow);
   }
-  // â”€â”€ Drag & Drop â”€â”€
+  // ── Drag & Drop ──
   function onDragStart(e) {
     var el = e.target.closest('[data-type]');
     if (!el || el.dataset.type !== 'tableau') return;
@@ -402,7 +402,7 @@
     selectedFrom = null;
     render();
   }
-  // â”€â”€ Touch Drag â”€â”€
+  // ── Touch Drag ──
   function removeTG() {
     if (touchGhost) {
       touchGhost.remove();
@@ -510,7 +510,7 @@
     render();
   }
 
-  // â”€â”€ Hint System â”€â”€
+  // ── Hint System ──
   var spHintTimer = null,
     spHintIdx = 0;
   function spClearHints() {
@@ -560,7 +560,7 @@
           if (!canPlace(seq[0], tableau[di])) continue;
           // --- Score this move ---
           var score = 0;
-          // 1. Does this complete a Kâ†’A same-suit run?
+          // 1. Does this complete a K→A same-suit run?
           var destAfter = tableau[di].concat(seq);
           if (destAfter.length >= 13) {
             var base = destAfter.length - 13;
@@ -590,7 +590,7 @@
             tableau[di][tableau[di].length - 1].suit === seq[seq.length - 1].suit
           )
             score += 20;
-          // 5. Moving to empty column â€” only worth it for long sequences or kings
+          // 5. Moving to empty column — only worth it for long sequences or kings
           if (!tableau[di].length) {
             if (seq[0].value === 13) score += 15;
             else score -= 20; // wasting empty column
@@ -622,7 +622,7 @@
       spHintIdx++;
       return;
     }
-    // No tableau moves â€” suggest dealing from stock
+    // No tableau moves — suggest dealing from stock
     if (stock.length) {
       showToast('Deal from stock', 'No tableau moves \u2014 click the stock pile');
       var se = document.querySelector('#solTable [data-type="stock"]');
@@ -656,7 +656,7 @@
   window._spiderStart = function () {
     var table = document.getElementById('solTable');
     if (!table) return;
-    var titles = { 1: 'Spider â€” One Suit', 2: 'Spider â€” Two Suits', 4: 'Spider â€” Four Suits' };
+    var titles = { 1: 'Spider — One Suit', 2: 'Spider — Two Suits', 4: 'Spider — Four Suits' };
     document.getElementById('solGameTitle').textContent = titles[suitMode] || 'Spider';
     var hb = document.getElementById('solitaireHint');
     if (hb) hb.style.display = '';

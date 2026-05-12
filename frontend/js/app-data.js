@@ -1,9 +1,9 @@
-var COLORS = ['#9B5DE5', '#FF6FB7', '#4CC9F0', '#06D6A0', '#FF6B35', '#FFD93D'];
+var COLORS = ['#2563EB', '#FF6FB7', '#4CC9F0', '#06D6A0', '#FF6B35', '#FFD93D'];
 
 // ── DATA ──────────────────────────────────────────────────────────────────
 var SEMS = {
   ws2526: { color: '#06D6A0', courses: [] },
-  ss25: { color: '#9B5DE5', courses: [] },
+  ss25: { color: '#2563EB', courses: [] },
   ws2425: { color: '#FF6FB7', courses: [] },
   ss24: { color: '#4CC9F0', courses: [] },
   ws2324: { color: '#FF6B35', courses: [] }

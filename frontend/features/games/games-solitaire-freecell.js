@@ -1,4 +1,4 @@
-﻿// â”€â”€ FREECELL SOLITAIRE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── FREECELL SOLITAIRE ───────────────────────────────────────────────────
 (function () {
   var SUITS = ['\u2660', '\u2665', '\u2666', '\u2663'];
   var RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
@@ -322,7 +322,7 @@
           fe.appendChild(c);
         } else {
           fe.innerHTML =
-            '<div style="font-size:.7rem;color:rgba(192,132,252,.25);text-align:center;line-height:88px">Free</div>';
+            '<div style="font-size:.7rem;color:rgba(59,130,246,.25);text-align:center;line-height:88px">Free</div>';
         }
         topRow.appendChild(fe);
       })(f);
@@ -343,7 +343,7 @@
           fe.appendChild(c);
         } else {
           fe.innerHTML =
-            '<div style="font-size:1.6rem;color:rgba(192,132,252,.2);line-height:88px;text-align:center">' +
+            '<div style="font-size:1.6rem;color:rgba(59,130,246,.2);line-height:88px;text-align:center">' +
             SUITS[fi] +
             '</div>';
         }
@@ -380,7 +380,7 @@
       })(t);
     table.appendChild(tabRow);
   }
-  // â”€â”€ FreeCell Drag & Drop â”€â”€
+  // ── FreeCell Drag & Drop ──
   function fcDragStart(e) {
     var el = e.target.closest('[data-type]');
     if (!el) return;

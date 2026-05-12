@@ -95,7 +95,7 @@
       lnSummaries = summaries || [];
       if (lnSummaries.length === 0) {
         content.innerHTML =
-          '<div class="ln-empty"><span class="ln-empty-icon">🎓</span>No lecture summaries yet.<br>Install the <strong style="color:rgba(192,132,252,.7)">StudySphere Extension</strong>, watch a lecture on YouTube or Opencast,<br>then press <strong style="color:rgba(192,132,252,.7)">✨ Summarize</strong> — your notes will appear here automatically.</div>';
+          '<div class="ln-empty"><span class="ln-empty-icon">🎓</span>No lecture summaries yet.<br>Install the <strong style="color:rgba(59,130,246,.7)">StudySphere Extension</strong>, watch a lecture on YouTube or Opencast,<br>then press <strong style="color:rgba(59,130,246,.7)">✨ Summarize</strong> — your notes will appear here automatically.</div>';
         return;
       }
       var html = '<div class="ln-grid">';
@@ -293,7 +293,7 @@
         if (lnSyncing) return;
         lnSyncing = true;
         document.getElementById('lnSyncLabel').textContent = _t('sync_syncing');
-        document.getElementById('lnSyncDot').style.background = '#f472b6';
+        document.getElementById('lnSyncDot').style.background = '#0ea5e9';
         window.postMessage({ type: 'SS_REQUEST_SUMMARIES' }, location.origin);
         setTimeout(function () {
           if (lnSyncing) {
@@ -302,7 +302,7 @@
             document.getElementById('lnSyncDot').style.background = '#ff6b35';
             setTimeout(function () {
               document.getElementById('lnSyncLabel').textContent = _t('ln_sync_btn');
-              document.getElementById('lnSyncDot').style.background = '#c084fc';
+              document.getElementById('lnSyncDot').style.background = '#3b82f6';
             }, 2500);
           }
         }, 3000);
@@ -334,7 +334,7 @@
       document.getElementById('lnSyncDot').style.background = '#06D6A0';
       setTimeout(function () {
         document.getElementById('lnSyncLabel').textContent = _t('ln_sync_btn');
-        document.getElementById('lnSyncDot').style.background = '#c084fc';
+        document.getElementById('lnSyncDot').style.background = '#3b82f6';
       }, 2000);
 
       if (lnPrevCount > 0 && summaries.length > lnPrevCount) {

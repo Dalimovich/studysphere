@@ -195,7 +195,7 @@ body:not(.night) #portal .sidebar .sb-item.active {
   width: 3px;
   height: 60%;
   border-radius: 3px;
-  background: linear-gradient(#2563eb, #7c3aed);
+  background: linear-gradient(#2563eb, #2563eb);
 }
 .sb-icon-img {
   width: 22px;
@@ -443,7 +443,7 @@ body.night #portal .sidebar:hover .sb-night-track-label {
   gap: 7px;
   padding: 8px 16px;
   border-radius: 12px;
-  background: linear-gradient(135deg, #2563eb, #7c3aed);
+  background: linear-gradient(135deg, #2563eb, #2563eb);
   color: #fff;
   font-weight: 900;
   font-size: 0.78rem;

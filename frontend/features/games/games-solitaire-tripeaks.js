@@ -1,4 +1,4 @@
-﻿// â”€â”€ TRI-PEAKS SOLITAIRE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── TRI-PEAKS SOLITAIRE ──────────────────────────────────────────────────
 (function () {
   var SUITS = ['\u2660', '\u2665', '\u2666', '\u2663'];
   var RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
@@ -29,11 +29,11 @@
     16: [25, 26],
     17: [26, 27]
   };
-  // Position (col-offset) for rendering â€” each unit = card width (60px) + gap
+  // Position (col-offset) for rendering — each unit = card width (60px) + gap
   // Row3 has 10 cards spanning full width; peaks are centered above
   var COLS = 10; // base width in card units
   var POS = [
-    // Row 0: peak tops â€” peak1 at col1.5, peak2 at col4.5, peak3 at col7.5 (0-indexed center)
+    // Row 0: peak tops — peak1 at col1.5, peak2 at col4.5, peak3 at col7.5 (0-indexed center)
     { r: 0, c: 1.5 },
     { r: 0, c: 4.5 },
     { r: 0, c: 7.5 },
@@ -294,12 +294,12 @@
       se.appendChild(fd);
       var lb = document.createElement('div');
       lb.style.cssText =
-        'text-align:center;font-size:.65rem;color:rgba(192,132,252,.5);margin-top:2px';
+        'text-align:center;font-size:.65rem;color:rgba(59,130,246,.5);margin-top:2px';
       lb.textContent = stock.length + ' left';
       se.appendChild(lb);
     } else {
       se.innerHTML =
-        '<div style="font-size:1rem;color:rgba(192,132,252,.3);line-height:88px;text-align:center">\u2205</div>';
+        '<div style="font-size:1rem;color:rgba(59,130,246,.3);line-height:88px;text-align:center">\u2205</div>';
     }
     botRow.appendChild(se);
     var we = document.createElement('div');
@@ -320,12 +320,12 @@
       we.appendChild(wcel);
     } else {
       we.innerHTML =
-        '<div style="font-size:.8rem;color:rgba(192,132,252,.2);line-height:88px;text-align:center">Waste</div>';
+        '<div style="font-size:.8rem;color:rgba(59,130,246,.2);line-height:88px;text-align:center">Waste</div>';
     }
     botRow.appendChild(we);
     var rem = document.createElement('span');
     rem.style.cssText =
-      'color:rgba(192,132,252,.5);font-size:.8rem;align-self:center;margin-left:8px';
+      'color:rgba(59,130,246,.5);font-size:.8rem;align-self:center;margin-left:8px';
     rem.textContent =
       peaks.filter(function (c) {
         return !c.removed;

@@ -41,7 +41,7 @@ function fileRowHtml(f, inFolder) {
     '</div>' +
     ragBtn +
     reindexBtn +
-    '<span class="co-open-btn" style="font-size:.69rem;font-weight:800;padding:3px 10px;border-radius:20px;background:rgba(192,132,252,.18);color:rgba(192,132,252,.9);border:1px solid rgba(192,132,252,.3);cursor:pointer;flex-shrink:0">Open</span>' +
+    '<span class="co-open-btn" style="font-size:.69rem;font-weight:800;padding:3px 10px;border-radius:20px;background:rgba(59,130,246,.18);color:rgba(59,130,246,.9);border:1px solid rgba(59,130,246,.3);cursor:pointer;flex-shrink:0">Open</span>' +
     (f._uploaded
       ? delBtn
       : '<span class="co-dl-btn" data-fname="' + eName +

@@ -469,7 +469,7 @@
         if (!btn) return;
         btn.style.background = t === type ? 'rgba(167,139,250,.18)' : 'rgba(255,255,255,.05)';
         btn.style.borderColor = t === type ? 'rgba(167,139,250,.5)' : 'rgba(255,255,255,.1)';
-        btn.style.color = t === type ? '#a78bfa' : 'rgba(255,255,255,.5)';
+        btn.style.color = t === type ? '#60a5fa' : 'rgba(255,255,255,.5)';
       });
     };
 
@@ -482,7 +482,7 @@
           (id === 'edPdfModeCursor' && mode === 'cursor');
         el.style.background = isActive ? 'rgba(167,139,250,.2)' : 'rgba(255,255,255,.06)';
         el.style.borderColor = isActive ? 'rgba(167,139,250,.4)' : 'rgba(255,255,255,.1)';
-        el.style.color = isActive ? '#a78bfa' : 'rgba(255,255,255,.5)';
+        el.style.color = isActive ? '#60a5fa' : 'rgba(255,255,255,.5)';
       });
     };
 
@@ -799,7 +799,7 @@
               'Important!': '#ef4444',
               Approved: '#16a34a',
               Review: '#f97316',
-              'Key Concept': '#7c3aed',
+              'Key Concept': '#2563eb',
               Note: '#2563eb',
               Rejected: '#dc2626'
             };
@@ -950,7 +950,7 @@
             'Important!': '#ef4444',
             Approved: '#16a34a',
             Review: '#f97316',
-            'Key Concept': '#7c3aed',
+            'Key Concept': '#2563eb',
             Note: '#2563eb',
             Rejected: '#dc2626'
           };
@@ -1565,7 +1565,7 @@
                 'Important!': '#ef4444',
                 Approved: '#16a34a',
                 Review: '#f97316',
-                'Key Concept': '#7c3aed',
+                'Key Concept': '#2563eb',
                 Note: '#2563eb',
                 Rejected: '#dc2626'
               };
@@ -1894,7 +1894,7 @@
         if (pageInfo) pageInfo.textContent = _currentPage + ' / ' + _pdf.numPages;
         if (thumbs) {
           thumbs.querySelectorAll('.epdf-thumb').forEach(function (t, i) {
-            t.style.borderColor = i + 1 === _currentPage ? '#a78bfa' : 'rgba(255,255,255,.08)';
+            t.style.borderColor = i + 1 === _currentPage ? '#60a5fa' : 'rgba(255,255,255,.08)';
             t.style.background =
               i + 1 === _currentPage ? 'rgba(167,139,250,.15)' : 'rgba(255,255,255,.03)';
           });
@@ -2104,12 +2104,12 @@
         if (!list) return;
         var typeLabels = {
           highlight: { label: 'Highlight', color: '#facc15' },
-          pen: { label: 'Pen', color: '#f472b6' },
+          pen: { label: 'Pen', color: '#0ea5e9' },
           text: { label: 'Text Box', color: '#60a5fa' },
           'text-replace': { label: 'Text Edit', color: '#818cf8' },
           comment: { label: 'Comment', color: '#34d399' },
           sticky: { label: 'Sticky Note', color: '#fbbf24' },
-          stamp: { label: 'Stamp', color: '#a78bfa' },
+          stamp: { label: 'Stamp', color: '#60a5fa' },
           arrow: { label: 'Arrow', color: '#fb923c' },
           shapes: { label: 'Shape', color: '#38bdf8' },
           ellipse: { label: 'Ellipse', color: '#38bdf8' },
@@ -2380,7 +2380,7 @@
             b.style.background = 'rgba(255,255,255,.2)';
             b.style.outline = '';
           });
-          btn.style.background = '#a78bfa';
+          btn.style.background = '#60a5fa';
           btn.style.outline = '2px solid rgba(167,139,250,.6)';
         });
       });
@@ -2478,7 +2478,7 @@
         var insertBtn = document.createElement('button');
         insertBtn.textContent = 'Insert';
         insertBtn.style.cssText =
-          'padding:8px 18px;background:rgba(167,139,250,.25);border:1px solid rgba(167,139,250,.4);border-radius:20px;color:#a78bfa;font-family:Nunito,sans-serif;font-weight:800;font-size:.85rem;cursor:pointer';
+          'padding:8px 18px;background:rgba(167,139,250,.25);border:1px solid rgba(167,139,250,.4);border-radius:20px;color:#60a5fa;font-family:Nunito,sans-serif;font-weight:800;font-size:.85rem;cursor:pointer';
         insertBtn.addEventListener('click', function () {
           var dataUrl = sigCanvas.toDataURL();
           document.body.removeChild(modal);

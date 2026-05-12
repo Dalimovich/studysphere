@@ -1,6 +1,6 @@
-﻿// â”€â”€ SOLITAIRE (Klondike) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── SOLITAIRE (Klondike) ──────────────────────────────────────────────────
 (function () {
-  var SUITS = ['\u2660', '\u2665', '\u2666', '\u2663']; // â™ â™¥â™¦â™£
+  var SUITS = ['\u2660', '\u2665', '\u2666', '\u2663']; // ♠♥♦♣
   var RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
   var stock = [],
     waste = [],
@@ -26,7 +26,7 @@
     return s === '\u2665' || s === '\u2666';
   }
 
-  // â”€â”€ Sound â”€â”€
+  // ── Sound ──
   function playCardSound(type) {
     try {
       var ac = new (window.AudioContext || window.webkitAudioContext)();
@@ -102,7 +102,7 @@
     } catch (e) {}
   }
 
-  // â”€â”€ Deck / Deal â”€â”€
+  // ── Deck / Deal ──
   function shuffle(d) {
     for (var i = d.length - 1; i > 0; i--) {
       var j = Math.floor(Math.random() * (i + 1));
@@ -123,7 +123,7 @@
     return shuffle(d);
   }
 
-  // â”€â”€ Omniscient solver: checks if a deal is winnable with full card knowledge â”€â”€
+  // ── Omniscient solver: checks if a deal is winnable with full card knowledge ──
   function quickSolvable(tab0, stk0) {
     try {
       // Encode cards as integers 0-51 (suit*13 + value-1)
@@ -136,7 +136,7 @@
       function rv(e) {
         var s = sv(e);
         return s === 1 || s === 2;
-      } // red: â™¥=1,â™¦=2
+      } // red: ♥=1,♦=2
 
       var tab = tab0.map(function (p) {
         return p.map(function (c) {
@@ -151,7 +151,7 @@
 
       var visited = new Set();
       var nodes = 0;
-      var LIMIT = 60000; // per-attempt cap â€” fast enough, still catches most solvable deals
+      var LIMIT = 60000; // per-attempt cap — fast enough, still catches most solvable deals
       var MAXDEPTH = 160; // prevent call-stack overflow
 
       function key() {
@@ -200,7 +200,7 @@
 
         var mvs = [];
 
-        // Tableau â†’ tableau
+        // Tableau → tableau
         for (var fr = 0; fr < 7; fr++) {
           if (!tab[fr].length) continue;
           var cs = tab[fr].length - 1;
@@ -228,7 +228,7 @@
           }
         }
 
-        // Waste â†’ tableau
+        // Waste → tableau
         if (wst.length) {
           var wc2 = wst[wst.length - 1];
           for (var to3 = 0; to3 < 7; to3++) {
@@ -270,7 +270,7 @@
           } else if (type === 4) {
             wst.push(stk.pop());
           } else if (type === 5) {
-            // recycle: wasteâ†’stock (draw-1: waste reversed becomes new stock)
+            // recycle: waste→stock (draw-1: waste reversed becomes new stock)
             while (wst.length) stk.push(wst.pop());
           }
 
@@ -350,7 +350,7 @@
     }, 1000);
   }
 
-  // â”€â”€ Rules â”€â”€
+  // ── Rules ──
   function canPlaceTab(card, pile) {
     if (!pile.length) return card.rank === 'K';
     var top = pile[pile.length - 1];
@@ -380,7 +380,7 @@
     }
   }
 
-  // â”€â”€ Undo â”€â”€
+  // ── Undo ──
   function cloneCard(c) {
     return { suit: c.suit, rank: c.rank, value: c.value, faceUp: c.faceUp };
   }
@@ -430,7 +430,7 @@
     render();
   }
 
-  // â”€â”€ Auto-play safe cards to foundation â”€â”€
+  // ── Auto-play safe cards to foundation ──
   // A card is "safe" when both opposite-color suits of value-1 are already on foundation
   // (meaning it can never be needed as a stepping stone on the tableau)
   function isSafeToFoundation(card) {
@@ -478,7 +478,7 @@
     }
   }
 
-  // Auto-complete: when stock empty, waste empty, and all tableau face-up â†’ animate cards to foundations
+  // Auto-complete: when stock empty, waste empty, and all tableau face-up → animate cards to foundations
   var _acRunning = false;
   function canAutoComplete() {
     if (_acRunning) return false;
@@ -487,8 +487,8 @@
     for (var t = 0; t < 7; t++) {
       for (var c = 0; c < tableau[t].length; c++) {
         var card = tableau[t][c];
-        if (!card.faceUp) return false; // hidden card â†’ not ready
-        if (card.value < 10) return false; // card below 10 still on board â†’ not ready
+        if (!card.faceUp) return false; // hidden card → not ready
+        if (card.value < 10) return false; // card below 10 still on board → not ready
         hasCard = true;
       }
     }
@@ -555,7 +555,7 @@
   function hasAnyMove() {
     // Any stock card to draw or waste to recycle?
     if (stock.length || waste.length > 1) return true;
-    // Any wasteâ†’foundation or wasteâ†’tableau?
+    // Any waste→foundation or waste→tableau?
     if (waste.length) {
       var wc = waste[waste.length - 1];
       if (canPlaceAnyFound(wc) >= 0) return true;
@@ -645,7 +645,7 @@
     return false;
   }
 
-  // â”€â”€ Click handler â”€â”€
+  // ── Click handler ──
   function handleClick(type, idx, cardIdx) {
     clearHints();
     if (type === 'stock') {
@@ -718,7 +718,7 @@
     }
   }
 
-  // â”€â”€ Double-click: auto-move to foundation â”€â”€
+  // ── Double-click: auto-move to foundation ──
   function handleDblClick(type, idx, cardIdx) {
     clearHints();
     var card = null;
@@ -745,7 +745,7 @@
     afterMove();
   }
 
-  // â”€â”€ Smart Hint System â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Smart Hint System ──────────────────────────────────────────────────────
   // Returns all playable moves from the current live state, scored by priority.
   // Scores:  foundation=100, reveals face-down=60+, tableau move=20, stock draw=5
   function getAllMoves(stk, wst, fnd, tab) {
@@ -772,7 +772,7 @@
     for (var ti = 0; ti < 7; ti++) {
       var pile = tab[ti];
       if (!pile.length) continue;
-      // Top card â†’ foundation
+      // Top card → foundation
       var top = pile[pile.length - 1];
       if (top.faceUp) {
         var fi = canPlaceAnyFoundS(top, fnd);
@@ -787,14 +787,14 @@
             score: 100
           });
       }
-      // Sequences â†’ other tableau piles
+      // Sequences → other tableau piles
       for (var ci = 0; ci < pile.length; ci++) {
         if (!pile[ci].faceUp) continue;
         var seq = pile.slice(ci);
         for (var tj = 0; tj < 7; tj++) {
           if (ti === tj) continue;
           if (canPlaceTabS(seq[0], tab[tj])) {
-            // Ignore moving a lone King to another empty pile â€” never helps
+            // Ignore moving a lone King to another empty pile — never helps
             if (seq[0].rank === 'K' && ci === 0 && !tab[tj].length) continue;
             // Bonus if this reveals a face-down card
             var revealsHidden = ci > 0 && !pile[ci - 1].faceUp ? 60 : 0;
@@ -835,7 +835,7 @@
     return -1;
   }
 
-  // Simulate cycling the stock to find the next playable card â€” returns draw-count or -1
+  // Simulate cycling the stock to find the next playable card — returns draw-count or -1
   function stockSearchHint() {
     // Build a combined list: current waste (top=end) + stock (bottom-first)
     var combined = waste.slice().reverse().concat(stock.slice().reverse());
@@ -923,7 +923,7 @@
       applyHintHighlight(hint);
       return;
     }
-    // No direct moves â€” search through stock
+    // No direct moves — search through stock
     var stockHint = stockSearchHint();
     if (!stockHint) {
       // Truly stuck
@@ -931,7 +931,7 @@
       return;
     }
     if (stockHint.draws === 0) {
-      // Waste top is playable â€” just highlight it
+      // Waste top is playable — just highlight it
       var fi = canPlaceAnyFoundS(stockHint.card, foundations);
       var t = -1;
       if (fi < 0)
@@ -949,7 +949,7 @@
       });
       return;
     }
-    // Need to draw from stock N times â€” auto-draw one step and re-highlight stock
+    // Need to draw from stock N times — auto-draw one step and re-highlight stock
     showToast(
       'Draw from stock',
       'Click the stock pile \u2014 ' +
@@ -965,7 +965,7 @@
     }
   }
 
-  // â”€â”€ HTML5 Drag & Drop â”€â”€
+  // ── HTML5 Drag & Drop ──
   function onDragStart(e) {
     var el = e.target.closest('[data-type]');
     if (!el) return;
@@ -1039,7 +1039,7 @@
     render();
   }
 
-  // â”€â”€ Touch Drag â”€â”€
+  // ── Touch Drag ──
   function removeTouchGhost() {
     if (touchGhost) {
       touchGhost.remove();
@@ -1152,7 +1152,7 @@
     touchDragging = false;
   }
 
-  // â”€â”€ Render â”€â”€
+  // ── Render ──
   function render(animate) {
     var table = document.getElementById('solTable');
     if (!table) return;
@@ -1172,7 +1172,7 @@
       stockEl.appendChild(fd);
     } else
       stockEl.innerHTML =
-        '<div style="font-size:1.6rem;color:rgba(192,132,252,.35);line-height:88px;text-align:center">\u21BA</div>';
+        '<div style="font-size:1.6rem;color:rgba(59,130,246,.35);line-height:88px;text-align:center">\u21BA</div>';
     topRow.appendChild(stockEl);
 
     // Waste
@@ -1224,7 +1224,7 @@
         } else {
           var sl = document.createElement('div');
           sl.style.cssText =
-            'font-size:1.8rem;color:rgba(192,132,252,.22);line-height:88px;text-align:center;width:100%';
+            'font-size:1.8rem;color:rgba(59,130,246,.22);line-height:88px;text-align:center;width:100%';
           sl.textContent = SUITS[fi];
           fEl.appendChild(sl);
         }

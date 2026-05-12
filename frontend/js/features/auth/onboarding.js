@@ -18,7 +18,7 @@ function _obShowStep(step) {
   });
   var target = document.getElementById('obStep' + step);
   if (target) target.style.display = 'flex';
-  var grad = 'linear-gradient(90deg,#c084fc,#f472b6)',
+  var grad = 'linear-gradient(90deg,#3b82f6,#0ea5e9)',
     dim = 'rgba(255,255,255,.12)';
   var p1 = document.getElementById('obProg1'),
     p2 = document.getElementById('obProg2'),
@@ -127,9 +127,9 @@ export function initOnboarding() {
         var opt = document.createElement('div');
         opt.textContent = v;
         opt.style.cssText =
-          "padding:9px 14px;cursor:pointer;font-size:.85rem;color:rgba(255,255,255,.85);border-bottom:1px solid rgba(192,132,252,.1);font-family:'Nunito',sans-serif;font-weight:700";
+          "padding:9px 14px;cursor:pointer;font-size:.85rem;color:rgba(255,255,255,.85);border-bottom:1px solid rgba(59,130,246,.1);font-family:'Nunito',sans-serif;font-weight:700";
         opt.addEventListener('mouseenter', function () {
-          opt.style.background = 'rgba(192,132,252,.15)';
+          opt.style.background = 'rgba(59,130,246,.15)';
         });
         opt.addEventListener('mouseleave', function () {
           opt.style.background = '';
@@ -196,9 +196,9 @@ export function initOnboarding() {
         var opt = document.createElement('div');
         opt.textContent = v;
         opt.style.cssText =
-          "padding:9px 14px;cursor:pointer;font-size:.85rem;color:rgba(255,255,255,.85);border-bottom:1px solid rgba(192,132,252,.1);font-family:'Nunito',sans-serif;font-weight:700";
+          "padding:9px 14px;cursor:pointer;font-size:.85rem;color:rgba(255,255,255,.85);border-bottom:1px solid rgba(59,130,246,.1);font-family:'Nunito',sans-serif;font-weight:700";
         opt.addEventListener('mouseenter', function () {
-          opt.style.background = 'rgba(192,132,252,.15)';
+          opt.style.background = 'rgba(59,130,246,.15)';
         });
         opt.addEventListener('mouseleave', function () {
           opt.style.background = '';
@@ -246,9 +246,9 @@ export function initOnboarding() {
         var opt = document.createElement('div');
         opt.textContent = v;
         opt.style.cssText =
-          "padding:9px 14px;cursor:pointer;font-size:.85rem;color:rgba(255,255,255,.85);border-bottom:1px solid rgba(192,132,252,.1);font-family:'Nunito',sans-serif;font-weight:700";
+          "padding:9px 14px;cursor:pointer;font-size:.85rem;color:rgba(255,255,255,.85);border-bottom:1px solid rgba(59,130,246,.1);font-family:'Nunito',sans-serif;font-weight:700";
         opt.addEventListener('mouseenter', function () {
-          opt.style.background = 'rgba(192,132,252,.15)';
+          opt.style.background = 'rgba(59,130,246,.15)';
         });
         opt.addEventListener('mouseleave', function () {
           opt.style.background = '';

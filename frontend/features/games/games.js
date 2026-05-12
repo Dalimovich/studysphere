@@ -84,7 +84,7 @@
         var tiers = [
           {
             label: '🟣 Casual',
-            color: 'rgba(192,132,252,.7)',
+            color: 'rgba(59,130,246,.7)',
             levels: [
               { n: 1, label: 'Beginner', speed: 'Relaxed' },
               { n: 2, label: 'Easy', speed: 'Slow' }
@@ -92,7 +92,7 @@
           },
           {
             label: '🔴 Challenging',
-            color: 'rgba(244,114,182,.7)',
+            color: 'rgba(14,165,233,.7)',
             levels: [
               { n: 3, label: 'Normal', speed: 'Medium' },
               { n: 4, label: 'Steady', speed: 'Picking up' },
