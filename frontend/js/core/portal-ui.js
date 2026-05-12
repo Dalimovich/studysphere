@@ -88,6 +88,12 @@ export function initPortalUi(options) {
   })();
 
   bindIf('pcStudip', 'click', function () {
+    // Prefer the resume-to-file path; only push the studip URL if no file
+    // was waiting to be resumed.
+    var resumed = typeof options.showStudipResume === 'function'
+      ? options.showStudipResume()
+      : false;
+    if (resumed) return;
     options.showStudip();
     options.pushHistory({ view: 'studip' }, '#studip');
   });

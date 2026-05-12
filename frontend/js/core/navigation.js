@@ -122,60 +122,100 @@ export function showPortal() {
   } catch (e) {}
 }
 
-// Try to re-open the file the user was viewing when they navigated to a
-// portal section. Looks up the file in the user's course list by name and
-// invokes window.openFile(file, course). Returns true if a restore was
-// attempted, false otherwise.
-function _tryResumeOpenFile() {
+// ─── Resume-to-file helpers ─────────────────────────────────────────────────
+// The user wants the Courses sidebar button to jump straight back to the PDF
+// they were viewing before they hopped over to Chat / Settings / Editor etc.
+//
+// Previous attempt put the restore logic inside showStudip, which broke things
+// because showStudip is called from many side-effect paths (URL routing on
+// reload, history.back, internal redirects). Those calls would silently eat
+// the stash and leave nav / URL / content out of sync.
+//
+// New design:
+//   - stashResumeFile() : explicitly called from navTo when we leave a file
+//     view by clicking a sidebar item. Only stashes if not already stashed,
+//     so PDF → Editor → Settings still resumes the PDF (not the Editor).
+//   - clearResumeFile() : called when the user opens any file directly
+//     (window.openFile wrapper in app.js) so a fresh open invalidates the
+//     pending resume.
+//   - showStudipResume() : called ONLY from the Courses sidebar click. Tries
+//     to re-open the stashed file, falls back to showStudip() if anything's
+//     missing. Side-effect calls to showStudip do not run the resume.
+function _findCourseFile(resume) {
+  var sems = (window.SEMS || window._SEMS || {});
+  var activeSemId = window.activeSemesterId || window._activeSemesterId;
+  var course = null;
+  if (activeSemId && sems[activeSemId]) {
+    course = (sems[activeSemId].courses || []).find(function (c) {
+      return c.id === resume.courseId;
+    });
+  }
+  if (!course) {
+    Object.keys(sems).some(function (sid) {
+      var c = (sems[sid].courses || []).find(function (cc) { return cc.id === resume.courseId; });
+      if (c) { course = c; return true; }
+      return false;
+    });
+  }
+  if (!course) return null;
+
+  var files = Array.isArray(course.files) ? course.files : [];
+  var file = files.find(function (f) { return f.name === resume.fileName; });
+  if (!file) {
+    (course.userFolders || []).some(function (fd) {
+      var hit = (fd.files || []).find(function (f) { return f.name === resume.fileName; });
+      if (hit) { file = hit; return true; }
+      return false;
+    });
+  }
+  return file ? { file: file, course: course } : null;
+}
+
+export function stashResumeFile() {
+  if (!window.activeFileName || !window.activeCourseId) return;
   try {
-    var raw = sessionStorage.getItem('ss_resume_file');
-    if (!raw) return false;
-    var resume = JSON.parse(raw);
-    sessionStorage.removeItem('ss_resume_file');
-    if (!resume || !resume.courseId || !resume.fileName) return false;
+    if (sessionStorage.getItem('ss_resume_file')) return; // don't overwrite
+    sessionStorage.setItem('ss_resume_file', JSON.stringify({
+      courseId: window.activeCourseId,
+      fileName: window.activeFileName
+    }));
+  } catch (e) {}
+}
 
-    var sems = (window.SEMS || window._SEMS || {});
-    var activeSemId = window.activeSemesterId || window._activeSemesterId;
-    var course = null;
-    if (activeSemId && sems[activeSemId]) {
-      course = (sems[activeSemId].courses || []).find(function (c) {
-        return c.id === resume.courseId;
-      });
-    }
-    // Fall back to scanning every semester
-    if (!course) {
-      Object.keys(sems).some(function (sid) {
-        var c = (sems[sid].courses || []).find(function (cc) { return cc.id === resume.courseId; });
-        if (c) { course = c; return true; }
-        return false;
-      });
-    }
-    if (!course || !Array.isArray(course.files)) return false;
+export function clearResumeFile() {
+  try { sessionStorage.removeItem('ss_resume_file'); } catch (e) {}
+}
 
-    var file = course.files.find(function (f) { return f.name === resume.fileName; });
-    if (!file) {
-      // Maybe nested in a user folder
-      (course.userFolders || []).some(function (fd) {
-        var hit = (fd.files || []).find(function (f) { return f.name === resume.fileName; });
-        if (hit) { file = hit; return true; }
-        return false;
-      });
-    }
-    if (!file || typeof window.openFile !== 'function') return false;
+// Called from the Courses sidebar click handler. Returns true if we resumed
+// a file; false if the caller should fall through to the normal Courses view.
+export function showStudipResume() {
+  var raw = null;
+  try { raw = sessionStorage.getItem('ss_resume_file'); } catch (e) {}
+  if (!raw) { showStudip(); return false; }
 
-    window.openFile(file, course);
-    return true;
-  } catch (e) {
+  var resume;
+  try { resume = JSON.parse(raw); } catch (e) { resume = null; }
+  if (!resume || !resume.courseId || !resume.fileName) {
+    clearResumeFile();
+    showStudip();
     return false;
   }
+
+  var hit = _findCourseFile(resume);
+  if (!hit || typeof window.openFile !== 'function') {
+    // Course data might not be loaded yet. Don't consume the stash — fall
+    // back to the courses list so the user is never left on a broken page,
+    // and they can click in manually.
+    showStudip();
+    return false;
+  }
+
+  clearResumeFile();
+  window.openFile(hit.file, hit.course);
+  return true;
 }
 
 export function showStudip() {
-  // If the user navigated away from an open file and is now coming back via
-  // the Courses nav button, jump straight back to that file instead of the
-  // course list.
-  if (_tryResumeOpenFile()) return;
-
   hideFilesView();
   var portal = document.getElementById('portal');
   if (portal) {
@@ -204,17 +244,10 @@ export function navTo(navId, section) {
   var studipEl = document.getElementById('studipDash');
   var fromStudip = studipEl && studipEl.style.display !== 'none';
 
-  // Remember the open file so a later click on Courses (showStudip) can jump
-  // straight back to it. Cleared after a successful restore, or naturally on
-  // tab close. sessionStorage so it doesn't outlive the browser session.
-  if (fromFiles && window.activeFileName && window.activeCourseId) {
-    try {
-      sessionStorage.setItem('ss_resume_file', JSON.stringify({
-        courseId: window.activeCourseId,
-        fileName: window.activeFileName
-      }));
-    } catch (e) {}
-  }
+  // Capture the open file the FIRST time we leave the file view by clicking
+  // a sidebar item, so a later Courses click can jump back. Subsequent hops
+  // (Editor → Settings → Chat) keep pointing at the original PDF.
+  if (fromFiles) stashResumeFile();
 
   if (fromFiles || fromStudip) showPortal();
   setNavActive(navId);

@@ -84,7 +84,9 @@ import {
   hideStudip as _hideStudip,
   setNavActive as _setNavActive,
   showPortalSection as _showPortalSection,
-  navTo as _navToImpl
+  navTo as _navToImpl,
+  showStudipResume as _showStudipResume,
+  clearResumeFile as _clearResumeFile
 } from './core/navigation.js';
 import {
   showFilesView as _showFilesView,
@@ -175,6 +177,9 @@ function _fetchPdfBytes(path, cb, onError) {
   _fetchPdfBytes_(path, cb, onError);
 }
 function openFile(f, course) {
+  // The user opened a (possibly different) file directly — any pending
+  // resume-to-previous-file pointer is now stale, drop it.
+  _clearResumeFile();
   _openFile(f, course);
 }
 function downloadFile(fname) {
@@ -1038,8 +1043,12 @@ _bindIf('nightBtn', 'click', function () {
 
 // Dashboard cards
 _bindIf('pcStudip', 'click', function () {
-  showStudip();
-  _ssPushHistory({ view: 'studip' }, '#studip');
+  // showStudipResume() tries to jump straight to the PDF the user was viewing
+  // before they hopped to a portal section. If it resumes a file, openFile
+  // handles its own history push; otherwise it falls through to the courses
+  // list and we push the studip URL ourselves.
+  var resumed = _showStudipResume();
+  if (!resumed) _ssPushHistory({ view: 'studip' }, '#studip');
 });
 _bindIf('pcMail', 'click', function () {
   window.open('https://mail.tu-braunschweig.de', '_blank');
