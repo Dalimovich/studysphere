@@ -1,4 +1,4 @@
-# StudySphere AI/RAG service.
+# Minallo AI/RAG service.
 # Slim Python 3.11 base. No OCR in v1 — tesseract added later if needed.
 
 FROM python:3.11-slim AS base

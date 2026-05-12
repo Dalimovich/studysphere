@@ -244,7 +244,7 @@ export function initAuthModal(options) {
   function handleAuthClick() {
     var currentUser = getCurrentUser();
     if (currentUser) {
-      if (confirm('Sign out of StudySphere?')) {
+      if (confirm('Sign out of Minallo?')) {
         sb.auth.signOut().then(function () {
           var authAvatar = document.getElementById('authAvatar');
           var authName = document.getElementById('authName');

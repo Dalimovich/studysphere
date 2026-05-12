@@ -1,4 +1,4 @@
-"""FastAPI entrypoint for the StudySphere AI/RAG service.
+"""FastAPI entrypoint for the Minallo AI/RAG service.
 
 Phase 1: only /health and a Supabase smoke test endpoint. No business
 logic yet. Routers for /index-document, /ask, etc. are added in later
@@ -19,10 +19,10 @@ from .supabase_client import get_supabase
 
 settings = get_settings()
 logging.basicConfig(level=settings.log_level)
-log = logging.getLogger("studysphere-ai")
+log = logging.getLogger("minallo-ai")
 
 app = FastAPI(
-    title="StudySphere AI Service",
+    title="Minallo AI Service",
     version="0.4.0",
     description="PDF indexing, retrieval, and grounded answer generation.",
 )
@@ -37,7 +37,7 @@ async def health() -> dict[str, Any]:
     """Liveness probe. Unauthenticated on purpose — used by Fly/Netlify."""
     return {
         "status": "ok",
-        "service": "studysphere-ai",
+        "service": "minallo-ai",
         "version": app.version,
         "environment": settings.environment,
     }

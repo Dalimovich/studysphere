@@ -33,7 +33,7 @@ def test_health_unauthenticated(client: TestClient) -> None:
     assert r.status_code == 200
     body = r.json()
     assert body["status"] == "ok"
-    assert body["service"] == "studysphere-ai"
+    assert body["service"] == "minallo-ai"
 
 
 def test_db_smoke_requires_internal_token(client: TestClient) -> None:

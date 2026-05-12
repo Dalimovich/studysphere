@@ -1,6 +1,6 @@
-# StudySphere AI Service
+# Minallo AI Service
 
-FastAPI service that owns PDF indexing, retrieval, and grounded answer generation for StudySphere.
+FastAPI service that owns PDF indexing, retrieval, and grounded answer generation for Minallo.
 
 Currently at **Phase 1**: skeleton + Supabase wiring. No production endpoints yet — see [`docs/python-ai-migration-plan.md`](../docs/python-ai-migration-plan.md) for the full plan and phase status.
 
@@ -21,7 +21,7 @@ Verify:
 
 ```bash
 curl http://localhost:8080/health
-# → {"status":"ok","service":"studysphere-ai",...}
+# → {"status":"ok","service":"minallo-ai",...}
 
 curl -H "X-Internal-Token: $INTERNAL_SECRET" \
      http://localhost:8080/internal/db-smoke
@@ -39,8 +39,8 @@ The default tests stub env vars and don't touch Supabase or OpenAI. Integration 
 ## Docker
 
 ```bash
-docker build -t studysphere-ai .
-docker run --rm -p 8080:8080 --env-file .env studysphere-ai
+docker build -t minallo-ai .
+docker run --rm -p 8080:8080 --env-file .env minallo-ai
 ```
 
 ## Deploy (Fly.io, later phase)
@@ -66,7 +66,7 @@ See [`.env.example`](.env.example) for the full list. Naming matches the existin
 The browser **never** talks to this service. The flow is:
 
 ```
-browser  →  studysphere-website.netlify.app/api/ai/*  (verifies Supabase JWT)
+browser  →  minallo-website.netlify.app/api/ai/*  (verifies Supabase JWT)
          →  Netlify proxy injects trusted user_id + INTERNAL_SECRET
          →  AI_SERVICE_URL  (this service)
 ```

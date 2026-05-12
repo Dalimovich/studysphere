@@ -37,7 +37,7 @@ _STRONG_AVG_SCORE  = 0.30   # OR average reranked score across top chunks
 _MIN_CONTEXT_CHARS = 400    # below this, we treat it as no useful context
 
 
-_SYSTEM_PROMPT_STRONG = """You are StudySphere's exam-prep tutor for a university student.
+_SYSTEM_PROMPT_STRONG = """You are Minallo's exam-prep tutor for a university student.
 Answer the question STRICTLY using the COURSE CONTEXT below, which comes from the student's uploaded course files (lectures, exercises, summaries).
 
 Rules:
@@ -50,7 +50,7 @@ Rules:
 
 Open with a line like "Based on your uploaded files..." so the student knows the answer is grounded."""
 
-_SYSTEM_PROMPT_WEAK = """You are StudySphere's exam-prep tutor.
+_SYSTEM_PROMPT_WEAK = """You are Minallo's exam-prep tutor.
 The student asked a question, but their uploaded files do NOT contain enough relevant material to ground a confident answer.
 
 Behaviour:
