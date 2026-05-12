@@ -357,13 +357,32 @@
           '<div class="qz-card-question">' + _esc(item.question) + '</div>';
       }
 
-      // Options
+      // Options — tolerate both shapes:
+      //   - Array ['mass*a', 'energy', ...]            ← legacy + proxy-normalised
+      //   - Dict  { A: 'mass*a', B: 'energy', ... }    ← raw Python pipeline shape
+      // Also accept item.answer as either a letter ('A') or a numeric index.
       if (els.options) {
         var letters = ['A', 'B', 'C', 'D'];
-        els.options.innerHTML = (item.options || []).map(function (opt, i) {
+        var optsRaw = item.options;
+        var optsArr;
+        if (Array.isArray(optsRaw)) {
+          optsArr = optsRaw;
+        } else if (optsRaw && typeof optsRaw === 'object') {
+          optsArr = letters.map(function (L) {
+            return typeof optsRaw[L] === 'string' ? optsRaw[L] : '';
+          });
+        } else {
+          optsArr = [];
+        }
+        var ansIdx = item.answer;
+        if (typeof ansIdx === 'string') {
+          var m = ansIdx.trim().toUpperCase().match(/^([A-D])/);
+          ansIdx = m ? letters.indexOf(m[1]) : -1;
+        }
+        els.options.innerHTML = optsArr.map(function (opt, i) {
           var cls = 'qz-option';
           if (isSubmitted) {
-            if (i === item.answer) cls += ' correct';
+            if (i === ansIdx) cls += ' correct';
             else if (i === answered) cls += ' incorrect';
           } else if (i === answered) {
             cls += ' selected';

@@ -86,8 +86,30 @@ exports.handler = async function (event) {
         if (tool === 'summary') {
           mapped = { tool, items: [], text: py.text || '', sources: py.groundedSources || [] };
           if (py.warning) mapped.error = py.warning;
+        } else if (tool === 'quiz') {
+          // Frontend expects options as an ARRAY ['A text','B text','C text','D text']
+          // and answer as a NUMERIC INDEX (0..3). Python emits options as a
+          // dict {A:'',B:'',C:'',D:''} and answer as a letter 'A'..'D'.
+          const _letters = ['A', 'B', 'C', 'D'];
+          const items = (py.questions || []).map(function (q) {
+            if ((q.type || 'mcq') !== 'mcq') return q;
+            const opts = q.options || {};
+            const arr = _letters.map(function (L) {
+              return typeof opts[L] === 'string' ? opts[L] : '';
+            });
+            let ansIdx = -1;
+            if (typeof q.answer === 'string') {
+              const m = q.answer.trim().toUpperCase().match(/^([A-D])/);
+              if (m) ansIdx = _letters.indexOf(m[1]);
+            } else if (typeof q.answer === 'number') {
+              ansIdx = q.answer;
+            }
+            return Object.assign({}, q, { options: arr, answer: ansIdx });
+          });
+          mapped = { tool, items, sources: [] };
+          if (py.warning) mapped.error = py.warning;
         } else {
-          const items = tool === 'quiz' ? (py.questions || []) : (py.cards || []);
+          const items = py.cards || [];
           mapped = { tool, items, sources: [] };
           if (py.warning) mapped.error = py.warning;
         }

@@ -14,8 +14,12 @@ var AI_TYPING = {
   fallbackFrameInterval: 38,
 
   // ── Chatbot page typewriter ────────────────────────────────────────────
-  // Time between each character reveal (ms).
+  // Time between each character reveal (ms) — legacy, kept for backcompat.
   chatbotCharInterval: 6,
+  // Word-by-word typewriter on the chatbot page. Tighter values feel
+  // closer to the streaming side panel.
+  chatbotWordsPerFrame: 4,    // was effectively 2
+  chatbotFrameInterval: 6,    // ms — was 22
 
   // ── Progressive math rendering ─────────────────────────────────────────
   // Re-render with markdown+KaTeX whenever one of these tokens arrives.
