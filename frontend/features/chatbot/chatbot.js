@@ -1134,6 +1134,36 @@
         this.style.height = 'auto';
         this.style.height = Math.min(this.scrollHeight, 140) + 'px';
       });
+      // Accept image/file paste — Ctrl+V / Cmd+V from a screenshot, browser
+      // drag, etc. Each clipboard image becomes a File and is routed through
+      // the same handler the file-picker uses, so previews + validation
+      // behave identically.
+      chatInput.addEventListener('paste', function (e) {
+        var cd = e.clipboardData || window.clipboardData;
+        if (!cd || !cd.items) return;
+        var pastedFiles = [];
+        for (var i = 0; i < cd.items.length; i++) {
+          var item = cd.items[i];
+          if (item && item.kind === 'file') {
+            var f = item.getAsFile();
+            if (f) {
+              // Pasted images from a screenshot have no filename. Give them
+              // a stable one so the dedup-by-name check in _handleFileSelect
+              // doesn't collapse multiple pastes into one entry.
+              if (!f.name || f.name === 'image.png') {
+                var ext = (f.type && f.type.split('/')[1]) || 'png';
+                try {
+                  f = new File([f], 'pasted-' + Date.now() + '-' + i + '.' + ext, { type: f.type });
+                } catch (err) { /* old browsers: stick with original */ }
+              }
+              pastedFiles.push(f);
+            }
+          }
+        }
+        if (!pastedFiles.length) return;   // nothing useful — let the text paste through
+        e.preventDefault();
+        _handleFileSelect({ target: { files: pastedFiles, value: '' } });
+      });
     }
     var chatSend = document.getElementById('aipSend');
     if (chatSend)
