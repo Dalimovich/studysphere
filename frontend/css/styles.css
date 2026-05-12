@@ -1072,11 +1072,11 @@ body:not(.night) .pc-icon {
   background: rgba(6, 214, 160, 0.3);
 }
 body.night .sb-acc-row-active {
-  background: #2a2640 !important;
+  background: #334155 !important;
   color: #3b82f6 !important;
 }
 body.night .sb-acc-hdr:hover {
-  background: #23203a;
+  background: #1e293b;
 }
 body.night .sb-acc-item.open .sb-acc-hdr {
   background: linear-gradient(135deg, #221d3a, #231d30);
@@ -1088,7 +1088,7 @@ body.night .sb-acc-row {
   border-bottom-color: rgba(37, 99, 235, 0.12);
 }
 body.night .sb-acc-row:hover {
-  background: #2a2640;
+  background: #334155;
 }
 body.night .sb-acc-chev-btn {
   border-left-color: rgba(37, 99, 235, 0.25);
@@ -3493,7 +3493,7 @@ body.night .ai-input-box {
   display: flex;
 }
 body.night .ai-scroll-btn {
-  background: #1a1826;
+  background: #0f172a;
   border-color: rgba(37, 99, 235, 0.35);
 }
 .ai-bottom-row {
@@ -3879,7 +3879,7 @@ body.night .think-bubble {
   font-family: 'Nunito', sans-serif;
 }
 body.night .pdf-zoom-pct {
-  background: #2a2640;
+  background: #334155;
 }
 
 /* Sub-option drawer */
@@ -3953,8 +3953,8 @@ body.night .pdf-zoom-pct {
   border-color: #f09595;
 }
 body.night .chip-drawer-inner {
-  background: #1a1826;
-  border-color: #2a2640;
+  background: #0f172a;
+  border-color: #334155;
 }
 body.night .chip-sub-s {
   background: #085041;

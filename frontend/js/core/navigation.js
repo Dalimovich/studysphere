@@ -49,17 +49,22 @@ export function showPortalSection(sec) {
     if (_fab) _fab.classList.toggle('visible', sec === 'dashboard');
     _activePortalSection = target;
 
-    // The AI panel is for chatting about an open course file — it has no
-    // purpose on Settings, Dashboard, Profile, etc. Force-close it and hide
-    // the edge-trigger tab whenever we navigate to any non-courses section.
-    var aiPanel = document.getElementById('aiPanel');
-    var aiTab   = document.getElementById('aiTab');
+    // The AI panel and the floating AI bubble are for chatting about an open
+    // course file — they have no purpose on Settings, Dashboard, Profile,
+    // etc. Hide both (and force-close the panel) whenever we navigate to any
+    // non-courses section; restore them when returning to Courses.
+    var aiPanel  = document.getElementById('aiPanel');
+    var aiTab    = document.getElementById('aiTab');
+    var aiBubble = document.getElementById('aiBubble');
     if (sec !== 'studip') {
       if (typeof window.forceCloseAI === 'function') window.forceCloseAI();
       else if (aiPanel) aiPanel.classList.remove('visible');
-      if (aiTab) aiTab.style.display = 'none';
+      if (aiTab)    aiTab.style.display = 'none';
+      if (aiBubble) aiBubble.style.display = 'none';
+      if (typeof window._aiBubbleClose === 'function') window._aiBubbleClose();
     } else {
-      if (aiTab) aiTab.style.display = '';
+      if (aiTab)    aiTab.style.display = '';
+      if (aiBubble) aiBubble.style.display = '';
     }
   }
 

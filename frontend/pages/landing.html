@@ -91,333 +91,91 @@
 </div>
 
 <!-- CTA BOX -->
-<div class="section" style="padding-bottom: 60px">
+<div class="section section-cta">
   <div class="cta-box fade-in">
     <h2>Ready to study smarter?</h2>
     <p>
       Join thousands of students already using StudySphere to save time, understand more and stress
       less.
     </p>
-    <button
-      class="hero-cta"
-      id="landingCtaBtn"
-      style="
-        display: inline-flex;
-        min-width: 0;
-        padding: 16px 36px;
-        border: none;
-        cursor: pointer;
-        font-family: 'Nunito', sans-serif;
-      "
-    >
+    <button class="hero-cta landing-cta-btn" id="landingCtaBtn">
       Create your free account →
     </button>
   </div>
 </div>
 
 <!-- RATINGS SECTION -->
-<section
-  id="ratings"
-  style="position: relative; z-index: 2; padding: 60px 56px 80px; max-width: 1000px; margin: 0 auto"
->
-  <!-- Stats row -->
-  <div
-    id="ratingsStatsRow"
-    style="
-      display: flex;
-      max-width: 700px;
-      margin: 0 auto 52px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 20px;
-      overflow: hidden;
-      background: rgba(255, 255, 255, 0.03);
-      backdrop-filter: blur(20px);
-    "
-  >
-    <div
-      style="
-        flex: 1;
-        text-align: center;
-        padding: 28px 20px;
-        border-right: 1px solid rgba(255, 255, 255, 0.08);
-      "
-    >
-      <span
-        style="
-          font-family: 'Fredoka One', cursive;
-          font-size: 2.2rem;
-          display: block;
-          background: linear-gradient(135deg, #2563eb, #2563eb);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-clip: text;
-          margin-bottom: 4px;
-        "
-        >4.9★</span
-      >
-      <span style="font-size: 0.78rem; color: rgba(255, 255, 255, 0.35); font-weight: 700"
-        >Average rating</span
-      >
+<section id="ratings">
+  <div id="ratingsStatsRow" class="ratings-stats-row">
+    <div class="ratings-stat">
+      <span class="ratings-num">4.9&#9733;</span>
+      <span class="ratings-label">Average rating</span>
     </div>
-    <div
-      style="
-        flex: 1;
-        text-align: center;
-        padding: 28px 20px;
-        border-right: 1px solid rgba(255, 255, 255, 0.08);
-      "
-    >
-      <span
-        style="
-          font-family: 'Fredoka One', cursive;
-          font-size: 2.2rem;
-          display: block;
-          background: linear-gradient(135deg, #2563eb, #2563eb);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-clip: text;
-          margin-bottom: 4px;
-        "
-        >10k+</span
-      >
-      <span style="font-size: 0.78rem; color: rgba(255, 255, 255, 0.35); font-weight: 700"
-        >Students</span
-      >
+    <div class="ratings-stat">
+      <span class="ratings-num">10k+</span>
+      <span class="ratings-label">Students</span>
     </div>
-    <div style="flex: 1; text-align: center; padding: 28px 20px">
-      <span
-        style="
-          font-family: 'Fredoka One', cursive;
-          font-size: 2.2rem;
-          display: block;
-          background: linear-gradient(135deg, #2563eb, #2563eb);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-clip: text;
-          margin-bottom: 4px;
-        "
-        >50k+</span
-      >
-      <span style="font-size: 0.78rem; color: rgba(255, 255, 255, 0.35); font-weight: 700"
-        >PDFs analysed</span
-      >
+    <div class="ratings-stat">
+      <span class="ratings-num">50k+</span>
+      <span class="ratings-label">PDFs analysed</span>
     </div>
   </div>
 
-  <!-- Reviews heading -->
-  <div style="text-align: center; margin-bottom: 40px">
-    <div
-      style="
-        font-family: 'Fredoka One', cursive;
-        font-size: 0.75rem;
-        color: rgba(37, 99, 235, 0.8);
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
-        margin-bottom: 10px;
-      "
-    >
-      What students say
-    </div>
-    <div
-      style="
-        font-family: 'Fredoka One', cursive;
-        font-size: clamp(1.6rem, 3vw, 2.4rem);
-        background: linear-gradient(135deg, #f1f5f9, #93c5fd, #c4b5fd);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-        margin-bottom: 8px;
-      "
-    >
-      Loved by students
-    </div>
-    <div
-      style="
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 6px;
-        font-size: 1.4rem;
-        letter-spacing: 0.05em;
-      "
-    >
-      <span style="color: #f59e0b">★★★★★</span>
-      <span
-        style="
-          font-family: 'Fredoka One', cursive;
-          font-size: 1.3rem;
-          color: #fff;
-          margin-left: 6px;
-        "
-        >4.9</span
-      >
-      <span style="font-size: 0.8rem; color: rgba(255, 255, 255, 0.35); font-weight: 700"
-        >/ 5.0 · 2,400+ reviews</span
-      >
+  <div class="reviews-heading">
+    <div class="reviews-kicker">What students say</div>
+    <div class="reviews-title">Loved by students</div>
+    <div class="reviews-score">
+      <span class="reviews-stars">&#9733;&#9733;&#9733;&#9733;&#9733;</span>
+      <span class="reviews-score-main">4.9</span>
+      <span class="reviews-score-meta">/ 5.0 &middot; 2,400+ reviews</span>
     </div>
   </div>
 
-  <!-- Review cards -->
-  <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px">
-    <div
-      class="review-card"
-      style="
-        background: rgba(255, 255, 255, 0.04);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 20px;
-        padding: 26px 22px;
-        backdrop-filter: blur(20px);
-        transition: all 0.25s;
-      "
-    >
-      <div style="color: #f59e0b; font-size: 0.85rem; margin-bottom: 12px; letter-spacing: 2px">
-        ★★★★★
-      </div>
-      <p
-        style="
-          font-size: 0.85rem;
-          color: rgba(255, 255, 255, 0.6);
-          line-height: 1.7;
-          font-weight: 600;
-          margin-bottom: 16px;
-        "
-      >
+  <div class="reviews-grid">
+    <div class="review-card">
+      <div class="review-stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+      <p>
         "StudySphere completely changed how I study. The AI tutor explains everything better than my
-        professor — and it's available at 3am before an exam!"
+        professor, and it's available at 3am before an exam!"
       </p>
-      <div style="display: flex; align-items: center; gap: 12px">
-        <div
-          style="
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #2563eb, #2563eb);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 800;
-            font-size: 0.82rem;
-            color: #fff;
-            flex-shrink: 0;
-          "
-        >
-          L
-        </div>
+      <div class="review-author">
+        <div class="review-avatar">L</div>
         <div>
-          <div style="font-weight: 800; font-size: 0.83rem; color: #fff">Lena M.</div>
-          <div style="font-size: 0.72rem; color: rgba(255, 255, 255, 0.35); font-weight: 600">
-            Maschinenbau, TU Braunschweig
-          </div>
+          <div class="review-name">Lena M.</div>
+          <div class="review-meta">Maschinenbau, TU Braunschweig</div>
         </div>
       </div>
     </div>
-    <div
-      class="review-card"
-      style="
-        background: rgba(255, 255, 255, 0.04);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 20px;
-        padding: 26px 22px;
-        backdrop-filter: blur(20px);
-        transition: all 0.25s;
-      "
-    >
-      <div style="color: #f59e0b; font-size: 0.85rem; margin-bottom: 12px; letter-spacing: 2px">
-        ★★★★★
-      </div>
-      <p
-        style="
-          font-size: 0.85rem;
-          color: rgba(255, 255, 255, 0.6);
-          line-height: 1.7;
-          font-weight: 600;
-          margin-bottom: 16px;
-        "
-      >
-        "I used to spend hours searching through Stud.IP. Now everything is in one place. The
-        lecture note summaries from YouTube alone saved me 5 hours a week."
+    <div class="review-card">
+      <div class="review-stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+      <p>
+        "I used to spend hours searching through Stud.IP. Now everything is in one place. The lecture
+        note summaries from YouTube alone saved me 5 hours a week."
       </p>
-      <div style="display: flex; align-items: center; gap: 12px">
-        <div
-          style="
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #2563eb, #22c55e);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 800;
-            font-size: 0.82rem;
-            color: #fff;
-            flex-shrink: 0;
-          "
-        >
-          K
-        </div>
+      <div class="review-author">
+        <div class="review-avatar review-avatar-green">K</div>
         <div>
-          <div style="font-weight: 800; font-size: 0.83rem; color: #fff">Kai R.</div>
-          <div style="font-size: 0.72rem; color: rgba(255, 255, 255, 0.35); font-weight: 600">
-            Informatik, TU Berlin
-          </div>
+          <div class="review-name">Kai R.</div>
+          <div class="review-meta">Informatik, TU Berlin</div>
         </div>
       </div>
     </div>
-    <div
-      class="review-card"
-      style="
-        background: rgba(255, 255, 255, 0.04);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 20px;
-        padding: 26px 22px;
-        backdrop-filter: blur(20px);
-        transition: all 0.25s;
-      "
-    >
-      <div style="color: #f59e0b; font-size: 0.85rem; margin-bottom: 12px; letter-spacing: 2px">
-        ★★★★★
-      </div>
-      <p
-        style="
-          font-size: 0.85rem;
-          color: rgba(255, 255, 255, 0.6);
-          line-height: 1.7;
-          font-weight: 600;
-          margin-bottom: 16px;
-        "
-      >
+    <div class="review-card">
+      <div class="review-stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+      <p>
         "The PDF AI is insane. I uploaded my thermodynamics script, asked it to explain entropy, and
         it gave me the clearest answer I've ever seen. 10/10."
       </p>
-      <div style="display: flex; align-items: center; gap: 12px">
-        <div
-          style="
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #f59e0b, #2563eb);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 800;
-            font-size: 0.82rem;
-            color: #fff;
-            flex-shrink: 0;
-          "
-        >
-          S
-        </div>
+      <div class="review-author">
+        <div class="review-avatar review-avatar-gold">S</div>
         <div>
-          <div style="font-weight: 800; font-size: 0.83rem; color: #fff">Sara T.</div>
-          <div style="font-size: 0.72rem; color: rgba(255, 255, 255, 0.35); font-weight: 600">
-            Elektrotechnik, TU Braunschweig
-          </div>
+          <div class="review-name">Sara T.</div>
+          <div class="review-meta">Elektrotechnik, TU Braunschweig</div>
         </div>
       </div>
     </div>
   </div>
 </section>
-
 <!-- BACK TO TOP -->
 <button id="backToTop">↑</button>
 

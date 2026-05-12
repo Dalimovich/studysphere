@@ -1,36 +1,36 @@
 /* ── Light mode auth & modal variables ── */
 :root {
   --auth-bg: rgba(37, 99, 235, 0.22);
-  --auth-box-bg: linear-gradient(160deg, #fff 0%, #f5f0ff 100%);
+  --auth-box-bg: linear-gradient(160deg, #fff 0%, #eff6ff 100%);
   --auth-box-border: rgba(37, 99, 235, 0.25);
-  --auth-label: rgba(80, 60, 120, 0.65);
-  --auth-input-bg: rgba(242, 238, 255, 1);
+  --auth-label: rgba(30, 64, 175, 0.65);
+  --auth-input-bg: rgba(239, 246, 255, 1);
   --auth-input-border: rgba(37, 99, 235, 0.25);
   --auth-input-color: #2d2d2d;
-  --auth-input-placeholder: rgba(100, 80, 140, 0.4);
+  --auth-input-placeholder: rgba(30, 64, 175, 0.4);
   --auth-divider: rgba(37, 99, 235, 0.2);
-  --auth-divider-text: rgba(100, 80, 140, 0.4);
-  --auth-subtitle: rgba(80, 60, 120, 0.6);
-  --auth-footer: rgba(80, 60, 120, 0.45);
+  --auth-divider-text: rgba(30, 64, 175, 0.4);
+  --auth-subtitle: rgba(30, 64, 175, 0.6);
+  --auth-footer: rgba(30, 64, 175, 0.45);
   --auth-google-bg: rgba(37, 99, 235, 0.08);
   --auth-google-border: rgba(37, 99, 235, 0.22);
-  --auth-google-color: #3c2e6e;
+  --auth-google-color: #1e3a8a;
   --auth-google-hover: rgba(37, 99, 235, 0.15);
-  --auth-stay: rgba(80, 60, 120, 0.55);
-  --auth-stay-timeout: rgba(100, 80, 140, 0.35);
+  --auth-stay: rgba(30, 64, 175, 0.55);
+  --auth-stay-timeout: rgba(30, 64, 175, 0.35);
   --auth-pw-bar: rgba(37, 99, 235, 0.15);
-  --auth-pw-label: rgba(80, 60, 120, 0.45);
-  --auth-confirm-hint: rgba(80, 60, 120, 0.45);
-  --auth-toggle-pw: rgba(80, 60, 120, 0.45);
+  --auth-pw-label: rgba(30, 64, 175, 0.45);
+  --auth-confirm-hint: rgba(30, 64, 175, 0.45);
+  --auth-toggle-pw: rgba(30, 64, 175, 0.45);
   --studip-bg: var(--dp-bg);
   --studip-back-bg: rgba(37, 99, 235, 0.1);
   --studip-back-border: rgba(37, 99, 235, 0.2);
   --studip-back-color: #2563eb;
-  --studip-subtitle: rgba(100, 80, 140, 0.5);
+  --studip-subtitle: rgba(30, 64, 175, 0.5);
 }
 body.night {
   --auth-bg: rgba(10, 8, 18, 0.85);
-  --auth-box-bg: linear-gradient(135deg, #110d20, #0d0f1e);
+  --auth-box-bg: linear-gradient(135deg, #0b1220, #0f172a);
   --auth-box-border: rgba(59, 130, 246, 0.25);
   --auth-label: rgba(255, 255, 255, 0.4);
   --auth-input-bg: rgba(255, 255, 255, 0.06);
@@ -51,7 +51,7 @@ body.night {
   --auth-pw-label: rgba(255, 255, 255, 0.35);
   --auth-confirm-hint: rgba(255, 255, 255, 0.3);
   --auth-toggle-pw: rgba(255, 255, 255, 0.5);
-  --studip-bg: linear-gradient(135deg, #0a0812 0%, #110d20 40%, #0d0f1e 100%);
+  --studip-bg: linear-gradient(135deg, #020617 0%, #0f172a 45%, #082f49 100%);
   --studip-back-bg: rgba(255, 255, 255, 0.08);
   --studip-back-border: rgba(255, 255, 255, 0.15);
   --studip-back-color: rgba(255, 255, 255, 0.7);
@@ -61,15 +61,15 @@ body.night {
   --purple: #60a5fa;
   --pink: #38bdf8;
   --orange: #ff8c5a;
-  --bg: #0f0e17;
-  --card: #1a1826;
-  --text: #e8e4f0;
-  --muted: #7a748a;
+  --bg: #020617;
+  --card: #0f172a;
+  --text: #e2e8f0;
+  --muted: #64748b;
   --shadow: 0 2px 14px rgba(0, 0, 0, 0.4);
-  --border: #2a2640;
-  --dp-bg: linear-gradient(135deg, #0a0812 0%, #110d20 40%, #0d0f1e 100%);
-  --dp-solid: #0a0812;
-  --dp-modal: linear-gradient(135deg, #0f0c1a, #130f22);
+  --border: #1e293b;
+  --dp-bg: linear-gradient(135deg, #020617 0%, #0f172a 48%, #082f49 100%);
+  --dp-solid: #020617;
+  --dp-modal: linear-gradient(135deg, #0f172a, #082f49);
   /* adaptive semantic tokens — dark overrides */
   --glass-bg: rgba(255, 255, 255, 0.07);
   --glass-border: rgba(255, 255, 255, 0.14);
@@ -95,31 +95,31 @@ body.night .pdf-page-wrap {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
 }
 body.night .sem-btn {
-  background: #23203a;
-  border-color: #2a2640;
+  background: #1e293b;
+  border-color: #334155;
 }
 body.night .sem-dd {
-  background: #1a1826;
+  background: #0f172a;
   border-color: var(--purple);
 }
 body.night .sem-opt {
-  border-bottom-color: #2a2640;
+  border-bottom-color: #334155;
 }
 body.night .sem-opt:hover {
-  background: #23203a;
+  background: #1e293b;
 }
 body.night .course-row {
-  background: #23203a;
+  background: #1e293b;
 }
 body.night .file-row {
   background: #1f1d2e;
-  border-color: #2a2640;
+  border-color: #334155;
 }
 body.night .tt-slot-sb {
-  background: #23203a;
+  background: #1e293b;
 }
 body.night .mail-sb {
-  background: #23203a;
+  background: #1e293b;
 }
 body.night .mail-sb.unread {
   background: #221d3a;
@@ -140,56 +140,101 @@ body.night .co-nav-btn:hover {
   border-color: rgba(255, 255, 255, 0.14);
 }
 body.night .ai-msg.bot {
-  background: #23203a;
+  background: #1e293b;
 }
 body.night .ai-tip {
-  background: #23203a;
-  border-color: #2a2640;
+  background: #1e293b;
+  border-color: #334155;
 }
 body.night .ai-textarea {
-  background: #23203a;
-  border-color: #2a2640;
+  background: #1e293b;
+  border-color: #334155;
   color: var(--text);
 }
 body.night .ai-textarea:focus {
   border-color: var(--purple);
-  background: #2a2640;
+  background: #334155;
 }
 body.night .ai-sel-banner {
   background: linear-gradient(135deg, #221d3a, #231d30);
 }
 body.night .fv-preview-card {
-  background: #1a1826;
+  background: #0f172a;
 }
 body.night .sb-back:hover {
-  background: #23203a;
+  background: #1e293b;
 }
 body.night .sb-x-btn {
-  background: #23203a;
+  background: #1e293b;
 }
 body.night .sb-x-btn:hover {
-  background: #2a2640;
+  background: #334155;
 }
 body.night .pdf-tb-btn {
-  background: #23203a;
-  border-color: #2a2640;
+  background: #1e293b;
+  border-color: #334155;
   color: var(--purple);
 }
 body.night .pdf-tb-btn:hover {
-  background: #2a2640;
+  background: #334155;
 }
 body.night .tb-toggle {
-  background: #23203a;
+  background: #1e293b;
 }
 body.night .tb-toggle:hover {
-  background: #2a2640;
+  background: #334155;
 }
 body.night .tb-portal-btn {
-  background: #23203a;
+  background: #1e293b;
   color: var(--purple);
 }
 body.night .tb-portal-btn:hover {
-  background: #2a2640;
+  background: #334155;
+}
+
+#authBox {
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.32);
+}
+
+#authSubmit,
+.sub-btn-upgrade,
+.settings-save-btn,
+.profile-save-btn {
+  background: var(--brand-gradient) !important;
+  box-shadow: 0 10px 28px rgba(37, 99, 235, 0.32) !important;
+}
+
+#authSubmit:hover,
+.sub-btn-upgrade:hover,
+.settings-save-btn:hover,
+.profile-save-btn:hover {
+  box-shadow: 0 14px 34px rgba(37, 99, 235, 0.42) !important;
+}
+
+#authBox > div:last-child {
+  background: linear-gradient(160deg, #0f172a, #1d4ed8, #0ea5e9) !important;
+}
+
+#googleSignIn:hover {
+  background: var(--auth-google-hover) !important;
+  border-color: rgba(96, 165, 250, 0.35) !important;
+}
+
+@media (max-width: 760px) {
+  #authModal {
+    padding: 16px;
+  }
+  #authBox {
+    width: min(440px, 100%) !important;
+    max-height: calc(100vh - 32px) !important;
+    flex-direction: column !important;
+  }
+  #authBox > div:first-child {
+    padding: 32px 24px !important;
+  }
+  #authBox > div:last-child {
+    display: none !important;
+  }
 }
 /* ── LIGHT MODE — portal & deep-area overrides ──────────────────────────── */
 body:not(.night) .blob {
@@ -206,11 +251,11 @@ body:not(.night) #courseOverview::after {
 }
 /* studipDash now uses var(--dp-bg) inline */
 body:not(.night) #authBox {
-  background: linear-gradient(135deg, #ffffff, #f8f4ff) !important;
+  background: linear-gradient(135deg, #ffffff, #eff6ff) !important;
   border-color: rgba(37, 99, 235, 0.2) !important;
 }
 body:not(.night) #onboardModal > div {
-  background: linear-gradient(135deg, #ffffff, #f8f4ff) !important;
+  background: linear-gradient(135deg, #ffffff, #eff6ff) !important;
   border-color: rgba(37, 99, 235, 0.2) !important;
 }
 body:not(.night) #authModal {
@@ -219,17 +264,17 @@ body:not(.night) #authModal {
 }
 /* portal header */
 body:not(.night) .p-tag {
-  color: rgba(100, 80, 140, 0.6);
+  color: rgba(30, 64, 175, 0.6);
 }
 body:not(.night) .p-uni-badge {
   background: rgba(255, 255, 255, 0.6);
   border-color: rgba(37, 99, 235, 0.16);
 }
 body:not(.night) .p-uni-name {
-  color: rgba(60, 40, 100, 0.85);
+  color: rgba(30, 58, 138, 0.85);
 }
 body:not(.night) .p-uni-city {
-  color: rgba(100, 80, 140, 0.5);
+  color: rgba(30, 64, 175, 0.5);
 }
 /* portal grid cards */
 body:not(.night) .pc {
@@ -266,7 +311,7 @@ body:not(.night) .pc-name {
   color: #2d2d2d;
 }
 body:not(.night) .pc-desc {
-  color: rgba(100, 80, 140, 0.55);
+  color: rgba(30, 64, 175, 0.55);
 }
 /* portal nav tabs */
 body:not(.night) .p-nav-bar {
@@ -282,7 +327,7 @@ body:not(.night) .p-nav-bar::before {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0.1) 100%);
 }
 body:not(.night) .psb {
-  color: rgba(100, 80, 140, 0.52);
+  color: rgba(30, 64, 175, 0.52);
 }
 body:not(.night) .psb::after {
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.7), transparent);
@@ -339,7 +384,7 @@ body:not(.night) .co-nav::before {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0.1) 100%);
 }
 body:not(.night) .co-nav-btn {
-  color: rgba(100, 80, 140, 0.52);
+  color: rgba(30, 64, 175, 0.52);
 }
 body:not(.night) .co-nav-btn::after {
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.7), transparent);
@@ -379,14 +424,14 @@ body:not(.night) .ws-sub {
 }
 body:not(.night) .ws-hint {
   background: rgba(37, 99, 235, 0.1);
-  color: rgba(60, 40, 100, 0.7);
+  color: rgba(30, 58, 138, 0.7);
 }
 body:not(.night) .co-multi-bar {
   background: linear-gradient(135deg, rgba(248, 244, 255, 0.98), rgba(252, 248, 255, 0.98));
   border-top-color: rgba(37, 99, 235, 0.2);
 }
 body:not(.night) .co-multi-count {
-  color: rgba(100, 80, 140, 0.8);
+  color: rgba(30, 64, 175, 0.8);
 }
 /* lecture notes */
 /* lecture notes modal */
@@ -415,7 +460,7 @@ body:not(.night) #onboardModal {
   backdrop-filter: blur(20px);
 }
 body:not(.night) #onboardModal > div {
-  background: linear-gradient(160deg, #fff 0%, #f5f0ff 100%) !important;
+  background: linear-gradient(160deg, #fff 0%, #eff6ff 100%) !important;
   border: 1px solid rgba(37, 99, 235, 0.2) !important;
   box-shadow: 0 20px 60px rgba(37, 99, 235, 0.15) !important;
 }
@@ -427,12 +472,12 @@ body:not(.night) #onboardModal [style*='color:#fff'] {
 }
 body:not(.night) #onboardModal input,
 body:not(.night) #onboardModal select {
-  background: #f2eeff !important;
+  background: #eff6ff !important;
   border: 1.5px solid rgba(37, 99, 235, 0.25) !important;
   color: #2d2d2d !important;
 }
 body:not(.night) #onboardModal label {
-  color: rgba(80, 60, 120, 0.65) !important;
+  color: rgba(30, 64, 175, 0.65) !important;
 }
 body:not(.night) #onboardModal [style*='background:rgba(255,255,255,.1)'] {
   background: rgba(37, 99, 235, 0.15) !important;
@@ -450,7 +495,7 @@ body:not(.night) #authIndicator {
   backdrop-filter: blur(12px);
 }
 body:not(.night) #authName {
-  color: rgba(60, 40, 100, 0.75) !important;
+  color: rgba(30, 58, 138, 0.75) !important;
 }
 
 /* Portal: pc-name / pc-desc are already covered but ensure inline color override */
@@ -458,7 +503,7 @@ body:not(.night) .pc-name {
   color: #2d2d2d !important;
 }
 body:not(.night) .pc-desc {
-  color: rgba(80, 60, 120, 0.55) !important;
+  color: rgba(30, 64, 175, 0.55) !important;
 }
 
 /* Toast styles — moved to features/toast/toast.css */

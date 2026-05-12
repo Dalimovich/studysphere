@@ -33,12 +33,19 @@
   pointer-events: none;
 }
 :root {
-  --purple: #2563eb;
-  --pink: #38bdf8;
+  --brand-primary: #2563eb;
+  --brand-primary-strong: #1d4ed8;
+  --brand-primary-soft: #60a5fa;
+  --brand-accent: #0ea5e9;
+  --brand-accent-soft: #38bdf8;
+  --brand-gradient: linear-gradient(135deg, var(--brand-primary), var(--brand-accent));
+  /* Legacy aliases kept so older feature CSS inherits the blue system. */
+  --purple: var(--brand-primary);
+  --pink: var(--brand-accent-soft);
   --orange: #ff6b35;
   --green: #06d6a0;
   --blue: #4cc9f0;
-  --bg: #f0edf8;
+  --bg: #eff6ff;
   --card: #fff;
   --text: #2d2d2d;
   --muted: #888;
@@ -47,25 +54,25 @@
   --ai-w: 340px;
   --topbar-h: 54px;
   --shadow: 0 2px 14px rgba(0, 0, 0, 0.08);
-  --border: #ede8f5;
-  --dp-bg: linear-gradient(135deg, #ede8f8 0%, #f3eeff 40%, #eaefff 100%);
-  --dp-solid: #ede8f8;
-  --dp-modal: linear-gradient(135deg, #ffffff, #f5f0ff);
+  --border: #dbeafe;
+  --dp-bg: linear-gradient(135deg, #eff6ff 0%, #f8fafc 48%, #e0f2fe 100%);
+  --dp-solid: #eff6ff;
+  --dp-modal: linear-gradient(135deg, #ffffff, #eff6ff);
   /* adaptive semantic tokens */
   --glass-bg: rgba(255, 255, 255, 0.55);
   --glass-border: rgba(37, 99, 235, 0.2);
   --glass-border-top: rgba(255, 255, 255, 0.9);
-  --on-glass: rgba(60, 40, 100, 0.82);
-  --on-glass-muted: rgba(100, 80, 140, 0.55);
-  --on-glass-faint: rgba(100, 80, 140, 0.38);
+  --on-glass: #0f172a;
+  --on-glass-muted: #64748b;
+  --on-glass-faint: rgba(100, 116, 139, 0.42);
   --card-inner: rgba(255, 255, 255, 0.7);
   --card-inner-border: rgba(37, 99, 235, 0.15);
   --row-bg: rgba(255, 255, 255, 0.5);
   --row-border: rgba(37, 99, 235, 0.12);
-  --section-label: rgba(100, 80, 140, 0.5);
+  --section-label: rgba(37, 99, 235, 0.55);
   --divider: rgba(37, 99, 235, 0.1);
   --badge-bg: rgba(37, 99, 235, 0.1);
   --badge-border: rgba(37, 99, 235, 0.18);
-  --badge-color: rgba(100, 80, 140, 0.7);
+  --badge-color: rgba(30, 64, 175, 0.72);
   --slot-bg: rgba(255, 255, 255, 0.55);
 }

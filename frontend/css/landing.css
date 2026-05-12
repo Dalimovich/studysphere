@@ -333,7 +333,9 @@ nav {
   height: auto;
   margin-right: 0;
   mix-blend-mode: multiply;
-  filter: saturate(1.28) brightness(1.55) contrast(1.02)
+  -webkit-mask-image: radial-gradient(ellipse at 68% 58%, #000 0 42%, rgba(0, 0, 0, 0.72) 54%, transparent 74%);
+  mask-image: radial-gradient(ellipse at 68% 58%, #000 0 42%, rgba(0, 0, 0, 0.72) 54%, transparent 74%);
+  filter: saturate(1.65) brightness(1.95) contrast(1.08)
     drop-shadow(0 0 28px rgba(37, 99, 235, 0.22)) drop-shadow(0 0 72px rgba(37, 99, 235, 0.16))
     drop-shadow(0 42px 90px rgba(15, 23, 42, 0.28));
   animation: floatArt 6s ease-in-out infinite alternate;

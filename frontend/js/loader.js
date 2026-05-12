@@ -155,16 +155,16 @@
     }
 
     // Stats row labels
-    var statSpans = root.querySelectorAll('#ratings span[style*="font-size:.78rem"]');
+    var statSpans = root.querySelectorAll('#ratings .ratings-label');
     var statLabels = [t.stats_rating, t.stats_students, t.stats_pdfs];
     statSpans.forEach(function (el, i) {
       if (statLabels[i]) el.textContent = statLabels[i];
     });
 
     // Reviews heading
-    var reviewsLabel = root.querySelector('#ratings div[style*="Fredoka"][style*=".75rem"]');
+    var reviewsLabel = root.querySelector('#ratings .reviews-kicker');
     if (reviewsLabel) reviewsLabel.textContent = t.reviews_label;
-    var reviewsTitle = root.querySelector('#ratings div[style*="Fredoka"][style*="2.4rem"]');
+    var reviewsTitle = root.querySelector('#ratings .reviews-title');
     if (reviewsTitle) reviewsTitle.textContent = t.reviews_title;
 
     // Footer sign-in link
