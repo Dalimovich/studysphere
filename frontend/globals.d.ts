@@ -274,6 +274,28 @@ declare global {
     updatePageInfo?: () => void;
     _googleAuth?: () => void;
     _toggleLandingLang?: () => void;
+    _ssIsLoggedIn?: boolean;
+
+    // ── Minallo runtime singleton (set by frontend/js/minallo.js) ─────────
+    Minallo?: {
+      version: string;
+      on: (name: string, handler: (detail: unknown) => void) => () => void;
+      off: (name: string, handler: (detail: unknown) => void) => void;
+      emit: (name: string, detail?: unknown) => void;
+      setState: (patch: Record<string, unknown>) => Record<string, unknown>;
+      getState: (key?: string) => unknown;
+      setAuth: (
+        status: string,
+        detail?: { source?: string; user?: unknown }
+      ) => { status: string; source: string | null; user: unknown };
+      registerFeature: (
+        name: string,
+        definition?: Record<string, unknown>
+      ) => Record<string, unknown> | null;
+      getFeature: (name?: string) => Record<string, unknown> | undefined;
+      markReady: (name: string, detail?: unknown) => void;
+      isReady: (name: string) => boolean;
+    };
 
     // ── App shell helpers (assigned by app.ts) ─────────────────────────
     _showFilesView?: () => void;
