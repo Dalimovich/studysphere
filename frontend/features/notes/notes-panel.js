@@ -44,7 +44,7 @@
   }
 
   function _inlineMd(s) {
-    var r = _renderMath(s);
+    var r = _renderMath(_esc(s));
     return r
       .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
