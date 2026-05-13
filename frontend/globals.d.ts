@@ -262,6 +262,12 @@ declare global {
     _googleAuth?: () => void;
     _toggleLandingLang?: () => void;
 
+    // ── App shell helpers (assigned by app.ts) ─────────────────────────
+    _showFilesView?: () => void;
+    showStudip?: () => void;
+    closeAI?: () => void;
+    _applyTheme?: (toNight: boolean, originEl?: Element) => void;
+
     // ── course-files extras ────────────────────────────────────────────
     openAI?: () => void;
     downloadFile?: (fname: string) => unknown;
