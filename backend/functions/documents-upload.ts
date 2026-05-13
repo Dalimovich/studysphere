@@ -7,11 +7,16 @@ import { jsonResponse, fail, handleOptions } from '../lib/responses';
 import { verifySupabaseToken, extractBearerToken } from '../lib/supabase-auth';
 import { supaRequest } from '../lib/supabase-admin';
 import { pythonAiConfigured, forwardToPython } from '../lib/python-ai-proxy';
+import { enforceEventRateLimit } from '../lib/rate-limit';
+import { logSecurityEvent } from '../lib/logger';
 import type { LambdaResponse, NetlifyEvent } from '../lib/types';
 
 const MAX_BODY_BYTES = 20 * 1024 * 1024;
 const ALLOWED_TYPES: Record<string, string> = { 'application/pdf': 'pdf' };
-const STORAGE_BUCKET = optionalEnv('RAG_STORAGE_BUCKET', 'course-documents');
+const STORAGE_BUCKET = optionalEnv('RAG_STORAGE_BUCKET', 'course-uploads');
+const UPLOAD_RATE_LIMIT_MAX = parseInt(optionalEnv('UPLOAD_RATE_LIMIT_MAX', '12'), 10);
+const UPLOAD_RATE_LIMIT_WINDOW = parseInt(optionalEnv('UPLOAD_RATE_LIMIT_WINDOW_MS', String(60 * 60 * 1000)), 10);
+const SAFE_FILE_NAME = /^[^<>:"\\|?*\x00-\x1F]{1,180}\.pdf$/i;
 
 interface DocumentRow {
   id: string;
@@ -64,6 +69,16 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
   if (!user) return fail(401, 'Invalid or expired token');
 
   const serviceKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
+  const limited = await enforceEventRateLimit(
+    serviceKey,
+    user.id,
+    'document_upload',
+    UPLOAD_RATE_LIMIT_MAX,
+    UPLOAD_RATE_LIMIT_WINDOW,
+    'Upload limit reached. Please try again later.'
+  );
+  if (limited) return limited;
+
   if (Buffer.byteLength(event.body || '', 'utf8') > Math.ceil(MAX_BODY_BYTES * 1.45)) {
     return fail(413, 'Request too large (max 20 MB file)');
   }
@@ -78,21 +93,33 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
   };
 
   if (!fileName || typeof fileName !== 'string') return fail(400, 'fileName is required');
+  if (!SAFE_FILE_NAME.test(fileName)) return fail(400, 'fileName must be a valid PDF filename');
   if (!mimeType || !ALLOWED_TYPES[mimeType]) return fail(400, 'Only PDF files are supported');
   if (!fileBase64 || typeof fileBase64 !== 'string') return fail(400, 'fileBase64 is required');
+  if (!/^[A-Za-z0-9+/=\r\n]+$/.test(fileBase64)) return fail(400, 'fileBase64 is invalid');
   if (!courseId || typeof courseId !== 'string') return fail(400, 'courseId is required');
 
   const fileBuffer = Buffer.from(fileBase64, 'base64');
   if (fileBuffer.length > MAX_BODY_BYTES) return fail(413, 'File too large (max 20 MB)');
+  if (fileBuffer.length < 5 || fileBuffer.subarray(0, 5).toString('ascii') !== '%PDF-') {
+    return fail(400, 'Uploaded file is not a valid PDF');
+  }
 
   const fileExt = ALLOWED_TYPES[mimeType]!;
   const documentHash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
   const storagePath = user.id + '/' + courseId + '/' + documentHash + '.' + fileExt;
+  await logSecurityEvent(serviceKey, user.id, 'document_upload', {
+    course_id: courseId,
+    bytes: fileBuffer.length
+  });
 
   try {
     await uploadToStorage(serviceKey, storagePath, fileBuffer, mimeType);
   } catch (e: unknown) {
-    return fail(500, 'File storage failed: ' + (e instanceof Error ? e.message : String(e)));
+    await logSecurityEvent(serviceKey, user.id, 'document_upload_storage_failed', {
+      message: e instanceof Error ? e.message : String(e)
+    });
+    return fail(500, 'File storage failed');
   }
 
   const docRow = {

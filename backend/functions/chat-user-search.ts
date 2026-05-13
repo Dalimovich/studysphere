@@ -3,7 +3,12 @@ import { jsonResponse, fail } from '../lib/responses';
 import { getCorsHeaders } from '../lib/cors';
 import { supaRequest } from '../lib/supabase-admin';
 import { verifySupabaseToken, extractBearerToken } from '../lib/supabase-auth';
+import { countRecentEvents, rateLimitResponse } from '../lib/rate-limit';
+import { logSecurityEvent } from '../lib/logger';
 import type { LambdaResponse, NetlifyEvent } from '../lib/types';
+
+const SEARCH_RATE_LIMIT_MAX = 120;
+const SEARCH_RATE_LIMIT_WINDOW = 60 * 60 * 1000;
 
 interface BlockRow { blocker_id: string; blocked_id: string }
 interface ProfileRow { id: string; full_name?: string; chat_username?: string; programme?: string }
@@ -25,8 +30,16 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
 
   const q = escLike((event.queryStringParameters && event.queryStringParameters.q) || '').trim();
   if (q.length < 2) return fail(400, 'Search query must be at least 2 characters');
+  if (q.length > 50) return fail(400, 'Search query is too long');
 
   try {
+    const searchCount = await countRecentEvents(serviceKey, user.id, 'chat_user_search', SEARCH_RATE_LIMIT_WINDOW);
+    if (searchCount >= SEARCH_RATE_LIMIT_MAX) {
+      await logSecurityEvent(serviceKey, user.id, 'chat_user_search_rate_limited', { count: searchCount });
+      return rateLimitResponse(SEARCH_RATE_LIMIT_WINDOW, 'Search limit reached. Please try again later.');
+    }
+    await logSecurityEvent(serviceKey, user.id, 'chat_user_search', {});
+
     const blockedPath = 'blocked_users?or=(blocker_id.eq.' + encodeURIComponent(user.id) +
       ',blocked_id.eq.' + encodeURIComponent(user.id) + ')&select=blocker_id,blocked_id';
     const blockedRes = await supaRequest<BlockRow[]>('GET', blockedPath, null, serviceKey);
@@ -64,7 +77,7 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
     }
 
     return jsonResponse(200, { users: rows.slice(0, 8) });
-  } catch (e: unknown) {
-    return fail(500, e instanceof Error ? e.message : String(e));
+  } catch {
+    return fail(500, 'Search failed');
   }
 };

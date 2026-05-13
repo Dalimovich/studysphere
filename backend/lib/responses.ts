@@ -42,8 +42,8 @@ export function withHandler(handler: NetlifyHandler): NetlifyHandler {
         path: event.path,
         userId: context.clientContext?.user?.sub
       });
-      const message = err && err.message ? err.message : 'Internal server error';
       const status = err && err.statusCode ? err.statusCode : 500;
+      const message = status >= 500 ? 'Internal server error' : (err && err.message ? err.message : 'Request failed');
       return fail(status, message);
     }
   };

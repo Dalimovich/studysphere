@@ -49,7 +49,7 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
       ok: true,
       room: { id: room.id, name: room.name || 'Room', visibility: room.visibility || null }
     });
-  } catch (e: unknown) {
-    return fail(500, e instanceof Error ? e.message : String(e));
+  } catch {
+    return fail(500, 'Could not join room');
   }
 };

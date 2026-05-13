@@ -80,7 +80,7 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
       serviceKey, { Prefer: 'resolution=merge-duplicates,return=minimal' });
 
     return jsonResponse(200, { ok: true, expires_at: expires });
-  } catch (e: unknown) {
-    return fail(500, e instanceof Error ? e.message : String(e));
+  } catch {
+    return fail(500, 'Could not verify payment');
   }
 };

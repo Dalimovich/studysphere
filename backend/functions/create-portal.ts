@@ -37,7 +37,7 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
     const result = await stripePost<StripeResponse>('/v1/billing_portal/sessions', params);
     if (result.status !== 200) return fail(result.status, result.body.error?.message || 'Stripe error');
     return jsonResponse(200, { url: result.body.url });
-  } catch (e: unknown) {
-    return fail(500, e instanceof Error ? e.message : String(e));
+  } catch {
+    return fail(500, 'Could not create portal session');
   }
 };

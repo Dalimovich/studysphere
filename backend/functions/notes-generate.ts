@@ -1,9 +1,16 @@
 // POST /api/notes/generate — proxy to Python /notes-generate.
 
 import { jsonResponse, fail, handleOptions } from '../lib/responses';
+import { optionalEnv, requireEnv } from '../lib/env';
 import { verifySupabaseToken, extractBearerToken } from '../lib/supabase-auth';
 import { pythonAiConfigured, forwardToPython } from '../lib/python-ai-proxy';
+import { enforceEventRateLimit } from '../lib/rate-limit';
+import { logSecurityEvent } from '../lib/logger';
 import type { LambdaResponse, NetlifyEvent } from '../lib/types';
+
+const NOTES_RATE_LIMIT_MAX = parseInt(optionalEnv('NOTES_RATE_LIMIT_MAX', '30'), 10);
+const NOTES_RATE_LIMIT_WINDOW = parseInt(optionalEnv('NOTES_RATE_LIMIT_WINDOW_MS', String(60 * 60 * 1000)), 10);
+const MAX_PDF_TEXT_LENGTH = 250000;
 
 export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
   if (event.httpMethod === 'OPTIONS') return handleOptions();
@@ -14,6 +21,16 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
   const user = await verifySupabaseToken(token);
   if (!user) return fail(401, 'Invalid or expired token');
   if (!pythonAiConfigured()) return fail(503, 'AI service not configured');
+  const serviceKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
+  const limited = await enforceEventRateLimit(
+    serviceKey,
+    user.id,
+    'notes_generate',
+    NOTES_RATE_LIMIT_MAX,
+    NOTES_RATE_LIMIT_WINDOW,
+    'Notes generation limit reached. Please try again later.'
+  );
+  if (limited) return limited;
 
   let body: Record<string, unknown>;
   try { body = JSON.parse(event.body || '{}') as Record<string, unknown>; }
@@ -23,6 +40,14 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
   if (typeof body.tool !== 'string' || !['notes', 'summary'].includes(body.tool)) {
     return fail(400, 'tool must be notes or summary');
   }
+  if (typeof body.pdfText === 'string' && body.pdfText.length > MAX_PDF_TEXT_LENGTH) {
+    return fail(413, 'pdfText is too large');
+  }
+  await logSecurityEvent(serviceKey, user.id, 'notes_generate', {
+    course_id: body.courseId,
+    tool: body.tool,
+    scope: body.scope ?? 'document'
+  });
 
   const upstream = await forwardToPython('notes-generate', {
     userId:         user.id,

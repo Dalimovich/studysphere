@@ -127,7 +127,7 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
     const insertRes = await supaRequest('POST', 'messages', payload, serviceKey, { Prefer: 'return=minimal' });
     if (insertRes.status < 200 || insertRes.status >= 300) return fail(500, 'Could not send message');
     return jsonResponse(200, { ok: true });
-  } catch (e: unknown) {
-    return fail(500, e instanceof Error ? e.message : String(e));
+  } catch {
+    return fail(500, 'Could not send message');
   }
 };

@@ -82,7 +82,7 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
   });
 
   if (doc.storage_path) {
-    let bucket = optionalEnv('RAG_STORAGE_BUCKET', 'course-documents');
+    let bucket = optionalEnv('RAG_STORAGE_BUCKET', 'course-uploads');
     let storagePath = doc.storage_path;
     const colon = storagePath.indexOf(':');
     if (colon > 0 && storagePath.indexOf('/') > colon) {

@@ -1,11 +1,19 @@
 // POST /api/ai/generate — proxy to Python /generate-{quiz,flashcards,notes}.
 
 import { jsonResponse, fail, handleOptions } from '../lib/responses';
+import { optionalEnv, requireEnv } from '../lib/env';
 import { verifySupabaseToken, extractBearerToken } from '../lib/supabase-auth';
 import { pythonAiConfigured, forwardToPython } from '../lib/python-ai-proxy';
+import { enforceEventRateLimit } from '../lib/rate-limit';
+import { logSecurityEvent } from '../lib/logger';
 import type { LambdaResponse, NetlifyEvent } from '../lib/types';
 
 const _LETTERS = ['A', 'B', 'C', 'D'] as const;
+const AI_GENERATE_RATE_LIMIT_MAX = parseInt(optionalEnv('AI_GENERATE_RATE_LIMIT_MAX', '30'), 10);
+const AI_GENERATE_RATE_LIMIT_WINDOW = parseInt(optionalEnv('AI_GENERATE_RATE_LIMIT_WINDOW_MS', String(60 * 60 * 1000)), 10);
+const MAX_DOCUMENT_IDS = 25;
+const MAX_REQUESTED_COUNT = 50;
+const MAX_TOPIC_LENGTH = 500;
 
 interface PyQuizQuestion {
   type?: string;
@@ -47,6 +55,16 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
   const user = await verifySupabaseToken(token);
   if (!user) return fail(401, 'Invalid or expired token');
   if (!pythonAiConfigured()) return fail(503, 'AI service not configured');
+  const serviceKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
+  const limited = await enforceEventRateLimit(
+    serviceKey,
+    user.id,
+    'ai_generate',
+    AI_GENERATE_RATE_LIMIT_MAX,
+    AI_GENERATE_RATE_LIMIT_WINDOW,
+    'Generation limit reached. Please try again later.'
+  );
+  if (limited) return limited;
 
   let body: Record<string, unknown>;
   try { body = JSON.parse(event.body || '{}') as Record<string, unknown>; }
@@ -63,8 +81,20 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
     return fail(400, 'tool must be flashcards, quiz, or summary');
   }
 
-  const docIds = Array.isArray(rawDocumentIds) && rawDocumentIds.length ? (rawDocumentIds as string[]) : null;
-  const requestedCount = parseInt(String(count), 10) || (tool === 'flashcards' ? 10 : 8);
+  if (typeof topic === 'string' && topic.length > MAX_TOPIC_LENGTH) return fail(400, 'topic is too long');
+  const docIds = Array.isArray(rawDocumentIds) && rawDocumentIds.length
+    ? (rawDocumentIds as string[]).slice(0, MAX_DOCUMENT_IDS)
+    : null;
+  const requestedCount = Math.min(
+    Math.max(parseInt(String(count), 10) || (tool === 'flashcards' ? 10 : 8), 1),
+    MAX_REQUESTED_COUNT
+  );
+  await logSecurityEvent(serviceKey, user.id, 'ai_generate', {
+    course_id: courseId,
+    tool,
+    requested_count: requestedCount,
+    document_count: docIds ? docIds.length : 0
+  });
 
   let endpoint: string;
   let pyPayload: Record<string, unknown>;

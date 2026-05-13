@@ -32,7 +32,7 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
     const row = Array.isArray(res.body) ? res.body[0] : null;
     const available = !row || row.id === user.id;
     return jsonResponse(200, { available });
-  } catch (e: unknown) {
-    return fail(500, e instanceof Error ? e.message : String(e));
+  } catch {
+    return fail(500, 'Could not check username');
   }
 };

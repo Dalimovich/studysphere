@@ -75,8 +75,8 @@ export function forwardToPython<T = unknown>(
     req.setTimeout(_UPSTREAM_TIMEOUT_MS, function () {
       req.destroy(new Error('Python AI service timed out'));
     });
-    req.on('error', function (err: Error) {
-      resolve({ ok: false, status: 502, body: { error: 'Upstream error: ' + err.message } });
+    req.on('error', function () {
+      resolve({ ok: false, status: 502, body: { error: 'Upstream AI service error' } });
     });
     req.write(body);
     req.end();

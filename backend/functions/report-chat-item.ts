@@ -4,9 +4,12 @@ import { supaRequest } from '../lib/supabase-admin';
 import { verifySupabaseToken, extractBearerToken } from '../lib/supabase-auth';
 import { isUuid, cleanText, requireOneOf } from '../lib/validation';
 import { logSecurityEvent } from '../lib/logger';
+import { countRecentEvents, rateLimitResponse } from '../lib/rate-limit';
 import type { LambdaResponse, NetlifyEvent } from '../lib/types';
 
 const ALLOWED_REASONS = ['spam', 'harassment', 'hate', 'impersonation', 'nsfw', 'other'] as const;
+const REPORT_RATE_LIMIT_MAX = 10;
+const REPORT_RATE_LIMIT_WINDOW = 60 * 60 * 1000;
 
 interface MessageRow { id: string; user_id: string; room_id: string }
 
@@ -54,6 +57,12 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
   } catch { return fail(400, 'Invalid body'); }
 
   try {
+    const reportCount = await countRecentEvents(serviceKey, user.id, 'chat_report_submitted', REPORT_RATE_LIMIT_WINDOW);
+    if (reportCount >= REPORT_RATE_LIMIT_MAX) {
+      await logSecurityEvent(serviceKey, user.id, 'chat_report_rate_limited', { count: reportCount });
+      return rateLimitResponse(REPORT_RATE_LIMIT_WINDOW, 'Report limit reached. Please try again later.');
+    }
+
     const reason = requireOneOf(
       String(body.reason || '').trim().toLowerCase(),
       ALLOWED_REASONS, 'Reason'
@@ -106,7 +115,7 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
       reason, message_id: messageId, room_id: roomId || null, reported_user_id: reportedUserId || null
     });
     return jsonResponse(200, { ok: true });
-  } catch (e: unknown) {
-    return fail(400, e instanceof Error ? e.message : String(e));
+  } catch {
+    return fail(400, 'Invalid report');
   }
 };

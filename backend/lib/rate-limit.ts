@@ -1,5 +1,6 @@
 import { supaRequest } from './supabase-admin';
 import { getCorsHeaders } from './cors';
+import { logSecurityEvent } from './logger';
 import type { LambdaResponse } from './types';
 
 // Counts recent security_events for a user within a rolling window.
@@ -44,4 +45,22 @@ export function rateLimitResponse(windowMs: number, message?: string): LambdaRes
     },
     body: JSON.stringify({ error: { message: message || 'Rate limit exceeded. Try again soon.' } })
   };
+}
+
+export async function enforceEventRateLimit(
+  serviceKey: string,
+  userId: string,
+  eventType: string,
+  maxEvents: number,
+  windowMs: number,
+  message?: string,
+  metadata?: Record<string, unknown>
+): Promise<LambdaResponse | null> {
+  const count = await countRecentEvents(serviceKey, userId, eventType, windowMs);
+  if (count < maxEvents) return null;
+  await logSecurityEvent(serviceKey, userId, eventType + '_rate_limited', {
+    count,
+    ...(metadata || {})
+  });
+  return rateLimitResponse(windowMs, message);
 }
