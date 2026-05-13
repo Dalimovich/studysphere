@@ -202,6 +202,40 @@ declare global {
     // ── pdf controls extras ────────────────────────────────────────────
     updateZoomPct?: () => void;
     _pdfScrollToPage?: (n: number) => void;
+
+    // ── ai-chips / panel-bridge state ──────────────────────────────────
+    currentCourseId?: string | null;
+    pdfFullText?: string;
+    addUserMsg?: (text: string) => unknown;
+    pinAI?: () => void;
+    showSelectionBanner?: (txt: string) => void;
+
+    // ── course-folders state ───────────────────────────────────────────
+    _openFolders?: Set<string>;
+    _selectedFiles?: Array<{ name: string; folder: string | null; sname: string | null }>;
+    _ufDeleteRemote?: (
+      uid: string,
+      course: LegacyCourse,
+      fileName: string,
+      folderName?: string | null
+    ) => Promise<unknown>;
+    _ufDeleteFolder?: (uid: string, course: LegacyCourse, folderName: string) => unknown;
+    _ufUpload?: (
+      uid: string,
+      course: LegacyCourse,
+      file: File,
+      onProgress?: ((pct: number) => void) | null,
+      folder?: string | null
+    ) => Promise<unknown>;
+    _ufCreateFolder?: (uid: string, course: LegacyCourse, folderName: string) => boolean;
+
+    // ── study-lounge stats hooks ───────────────────────────────────────
+    _statsTrackFile?: (fileName: string, courseName?: string) => void;
+    _statsTrackGame?: () => void;
+    _loungeRender?: () => void;
+
+    // ── navigation extras ──────────────────────────────────────────────
+    hideStudip?: (stRunning?: boolean) => void;
   }
 }
 
