@@ -14,7 +14,7 @@ function setEnv() {
 }
 
 setEnv();
-const { handler } = require('../../backend/functions/stripe-webhook.js');
+const { handler } = require('../../backend/functions/stripe-webhook.ts');
 
 test('stripe-webhook: rejects non-POST with 405', async () => {
   const res = await handler({ httpMethod: 'GET', headers: {}, body: '' });

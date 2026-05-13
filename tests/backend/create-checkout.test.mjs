@@ -11,7 +11,7 @@ process.env.STRIPE_SECRET_KEY = 'sk_test_fake';
 process.env.STRIPE_PRICE_ID = 'price_fake';
 process.env.ALLOWED_ORIGIN = 'https://example.com';
 
-const { handler } = require('../../backend/functions/create-checkout.js');
+const { handler } = require('../../backend/functions/create-checkout.ts');
 
 test('create-checkout: OPTIONS returns 200', async () => {
   const res = await handler({ httpMethod: 'OPTIONS', headers: {}, body: '' });

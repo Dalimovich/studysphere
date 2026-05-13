@@ -1,8 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createRequire } from 'node:module';
-const require = createRequire(import.meta.url);
-const { isUuid, cleanText, requireOneOf } = require('../../backend/lib/validation.js');
+import { isUuid, cleanText, requireOneOf } from '../../backend/lib/validation.ts';
 
 test('isUuid accepts valid v4 UUID', () => {
   assert.equal(isUuid('550e8400-e29b-41d4-a716-446655440000'), true);

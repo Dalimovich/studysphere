@@ -1,8 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createRequire } from 'node:module';
-const require = createRequire(import.meta.url);
-const { requireEnv, optionalEnv } = require('../../backend/lib/env.js');
+import { requireEnv, optionalEnv } from '../../backend/lib/env.ts';
 
 test('requireEnv returns value when set', () => {
   process.env._TEST_VAR = 'hello';
