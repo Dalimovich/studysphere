@@ -1,5 +1,6 @@
 import { sendAiRequest } from '../../services/ai-service.js';
 import { extractMultiplePdfs } from '../pdf-viewer/pdf-text-extraction.js';
+import { escapeHtml } from '../../utils/escape-html.js';
 
 interface AiContentBlock { text?: string }
 interface AiResponse {
@@ -87,6 +88,6 @@ export async function runMultiSummary(fnames: string[], course: CourseLite): Pro
     if (saveBtn) saveBtn.style.display = '';
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : String(e);
-    body.innerHTML = tagsHtml + '<p style="color:#ff6b35">❌ ' + message + '</p>';
+    body.innerHTML = tagsHtml + '<p style="color:#ff6b35">❌ ' + escapeHtml(message) + '</p>';
   }
 }

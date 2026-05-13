@@ -8,6 +8,7 @@ import {
 } from '../../services/ai-service.js';
 import { extractPdfText } from '../pdf-viewer/pdf-text-extraction.js';
 import { bindMessageActionButtons } from './ai-message-actions.js';
+import { escapeHtml } from '../../utils/escape-html.js';
 
 interface AskAiState {
   generationStopped: boolean;
@@ -176,7 +177,7 @@ function _renderHistoryPairs(pairs: HistoryPair[] | null, aiMsgs: HTMLElement): 
     if (bubble) {
       bubble.setAttribute('data-raw', pair.a);
       const _doRender = (): void => {
-        bubble.innerHTML = window.renderMarkdown ? window.renderMarkdown(pair.a) : pair.a;
+        bubble.innerHTML = window.renderMarkdown ? window.renderMarkdown(pair.a) : escapeHtml(pair.a);
       };
       if (window._ssEnsureKatex) {
         window._ssEnsureKatex().then(_doRender).catch(_doRender);
@@ -463,13 +464,13 @@ export function initAskAI(
 
             function applyKatexToBlock(div: HTMLElement, text: string): void {
               const done = (): void => {
-                div.innerHTML = window.renderMarkdown ? window.renderMarkdown(text) : text;
+                div.innerHTML = window.renderMarkdown ? window.renderMarkdown(text) : escapeHtml(text);
                 div.style.opacity = '1';
                 _autoScroll(aiMsgs);
               };
               if (window._ssEnsureKatex) {
                 window._ssEnsureKatex().then(done).catch(() => {
-                  div.innerHTML = window.renderMarkdown ? window.renderMarkdown(text) : text;
+                  div.innerHTML = window.renderMarkdown ? window.renderMarkdown(text) : escapeHtml(text);
                   div.style.opacity = '1';
                 });
               } else {
@@ -510,7 +511,7 @@ export function initAskAI(
               if (!display) return;
               const _doFullRender = (): void => {
                 if (!bubble) return;
-                bubble.innerHTML = window.renderMarkdown ? window.renderMarkdown(display) : display;
+                bubble.innerHTML = window.renderMarkdown ? window.renderMarkdown(display) : escapeHtml(display);
                 _autoScroll(aiMsgs);
               };
               if (window._ssEnsureKatex) {
@@ -850,7 +851,7 @@ export function initAskAI(
               return;
             }
             if (idx >= tokens.length) {
-              bubble!.innerHTML = window.renderMarkdown ? window.renderMarkdown(rawTextLocal) : rawTextLocal;
+              bubble!.innerHTML = window.renderMarkdown ? window.renderMarkdown(rawTextLocal) : escapeHtml(rawTextLocal);
               if (window._renderMath) window._renderMath(bubble);
               meta!.style.display = 'flex';
               if (!ansWrap.querySelector('.ai-action-bar') && window._aiResponseActions) {
@@ -878,7 +879,7 @@ export function initAskAI(
             const batch = panelHidden ? tokens.length : WORDS_PER_FRAME;
             for (let w = 0; w < batch && idx < tokens.length; w++) displayed += tokens[idx++];
             bubble!.innerHTML =
-              (window.renderMarkdown ? window.renderMarkdown(displayed) : displayed) +
+              (window.renderMarkdown ? window.renderMarkdown(displayed) : escapeHtml(displayed)) +
               (idx < tokens.length ? '<span class="stream-cursor">▋</span>' : '');
             if (!panelHidden && aiMsgs.scrollHeight - aiMsgs.scrollTop - aiMsgs.clientHeight < 80) {
               aiMsgs.scrollTop = aiMsgs.scrollHeight;

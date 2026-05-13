@@ -1,3 +1,4 @@
+import { escapeHtml } from '../../utils/escape-html.js';
 export function copyBubble(btn) {
     const body = btn.closest('.msg-body');
     const bubble = body?.querySelector('.ai-bubble');
@@ -83,7 +84,7 @@ export function addBotMsg(text) {
     const wrap = document.createElement('div');
     wrap.className = 'ai-msg-wrap';
     const t = getTime();
-    const botHtml = typeof window.renderMarkdown === 'function' ? window.renderMarkdown(text) : text;
+    const botHtml = typeof window.renderMarkdown === 'function' ? window.renderMarkdown(text) : escapeHtml(text);
     wrap.innerHTML =
         '<div class="msg-sender bot-sender"><span class="msg-sender-dot"></span>Minallo AI</div>' +
             '<div class="msg-body">' +

@@ -1,4 +1,5 @@
 import { checkAdminStatus, searchUsers, setUserPlan } from '../../services/admin-service.js';
+import { escapeHtml } from '../../utils/escape-html.js';
 
 interface AdminUser {
   id: string;
@@ -111,6 +112,6 @@ async function adminSearch(): Promise<void> {
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
-    results.innerHTML = '<div style="color:#f87171;font-size:.85rem">Error: ' + msg + '</div>';
+    results.innerHTML = '<div style="color:#f87171;font-size:.85rem">Error: ' + escapeHtml(msg) + '</div>';
   }
 }

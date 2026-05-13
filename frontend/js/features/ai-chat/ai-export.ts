@@ -1,4 +1,5 @@
 import type { LegacyCourse } from '../../../globals';
+import { escapeHtml } from '../../utils/escape-html.js';
 
 // ── External library shims (loaded via <script> at runtime) ─────────────
 interface JsPdfOptions {
@@ -92,7 +93,7 @@ export async function aiMakePdfBlob(
 
   const contentEl = document.createElement('div');
   contentEl.style.color = '#1a1a1a';
-  contentEl.innerHTML = window.renderMarkdown ? window.renderMarkdown(text) : text;
+  contentEl.innerHTML = window.renderMarkdown ? window.renderMarkdown(text) : escapeHtml(text);
   container.appendChild(contentEl);
 
   const footer = document.createElement('div');

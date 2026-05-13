@@ -1,6 +1,7 @@
 import { sendAiRequest, sendRagRequest, listCourseDocuments, submitRagFeedback, } from '../../services/ai-service.js';
 import { extractPdfText } from '../pdf-viewer/pdf-text-extraction.js';
 import { bindMessageActionButtons } from './ai-message-actions.js';
+import { escapeHtml } from '../../utils/escape-html.js';
 function _getTime() {
     const d = new Date();
     return (d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0'));
@@ -125,7 +126,7 @@ function _renderHistoryPairs(pairs, aiMsgs) {
         if (bubble) {
             bubble.setAttribute('data-raw', pair.a);
             const _doRender = () => {
-                bubble.innerHTML = window.renderMarkdown ? window.renderMarkdown(pair.a) : pair.a;
+                bubble.innerHTML = window.renderMarkdown ? window.renderMarkdown(pair.a) : escapeHtml(pair.a);
             };
             if (window._ssEnsureKatex) {
                 window._ssEnsureKatex().then(_doRender).catch(_doRender);
@@ -425,13 +426,13 @@ export function initAskAI(state) {
                     }
                     function applyKatexToBlock(div, text) {
                         const done = () => {
-                            div.innerHTML = window.renderMarkdown ? window.renderMarkdown(text) : text;
+                            div.innerHTML = window.renderMarkdown ? window.renderMarkdown(text) : escapeHtml(text);
                             div.style.opacity = '1';
                             _autoScroll(aiMsgs);
                         };
                         if (window._ssEnsureKatex) {
                             window._ssEnsureKatex().then(done).catch(() => {
-                                div.innerHTML = window.renderMarkdown ? window.renderMarkdown(text) : text;
+                                div.innerHTML = window.renderMarkdown ? window.renderMarkdown(text) : escapeHtml(text);
                                 div.style.opacity = '1';
                             });
                         }
@@ -472,7 +473,7 @@ export function initAskAI(state) {
                         const _doFullRender = () => {
                             if (!bubble)
                                 return;
-                            bubble.innerHTML = window.renderMarkdown ? window.renderMarkdown(display) : display;
+                            bubble.innerHTML = window.renderMarkdown ? window.renderMarkdown(display) : escapeHtml(display);
                             _autoScroll(aiMsgs);
                         };
                         if (window._ssEnsureKatex) {
@@ -823,7 +824,7 @@ export function initAskAI(state) {
                         return;
                     }
                     if (idx >= tokens.length) {
-                        bubble.innerHTML = window.renderMarkdown ? window.renderMarkdown(rawTextLocal) : rawTextLocal;
+                        bubble.innerHTML = window.renderMarkdown ? window.renderMarkdown(rawTextLocal) : escapeHtml(rawTextLocal);
                         if (window._renderMath)
                             window._renderMath(bubble);
                         meta.style.display = 'flex';
@@ -857,7 +858,7 @@ export function initAskAI(state) {
                     for (let w = 0; w < batch && idx < tokens.length; w++)
                         displayed += tokens[idx++];
                     bubble.innerHTML =
-                        (window.renderMarkdown ? window.renderMarkdown(displayed) : displayed) +
+                        (window.renderMarkdown ? window.renderMarkdown(displayed) : escapeHtml(displayed)) +
                             (idx < tokens.length ? '<span class="stream-cursor">▋</span>' : '');
                     if (!panelHidden && aiMsgs.scrollHeight - aiMsgs.scrollTop - aiMsgs.clientHeight < 80) {
                         aiMsgs.scrollTop = aiMsgs.scrollHeight;

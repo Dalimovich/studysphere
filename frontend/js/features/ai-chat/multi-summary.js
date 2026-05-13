@@ -1,5 +1,6 @@
 import { sendAiRequest } from '../../services/ai-service.js';
 import { extractMultiplePdfs } from '../pdf-viewer/pdf-text-extraction.js';
+import { escapeHtml } from '../../utils/escape-html.js';
 export async function runMultiSummary(fnames, course) {
     if (window._requirePro && !window._requirePro('Multi-PDF summaries are a Pro feature.'))
         return;
@@ -69,7 +70,7 @@ export async function runMultiSummary(fnames, course) {
     }
     catch (e) {
         const message = e instanceof Error ? e.message : String(e);
-        body.innerHTML = tagsHtml + '<p style="color:#ff6b35">❌ ' + message + '</p>';
+        body.innerHTML = tagsHtml + '<p style="color:#ff6b35">❌ ' + escapeHtml(message) + '</p>';
     }
 }
 //# sourceMappingURL=multi-summary.js.map

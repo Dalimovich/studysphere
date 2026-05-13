@@ -1,5 +1,6 @@
 import { fetchPdfBytes } from '../../services/pdf-service.js';
 import { panelShow, panelHide } from '../../core/panels.js';
+import { escapeHtml } from '../../utils/escape-html.js';
 import type { LegacyCourse } from '../../../globals.js';
 
 interface FileLite {
@@ -318,11 +319,11 @@ export function openFile(f: FileLite, course: LegacyCourse): void {
         })
         .catch((e: unknown) => {
           const msg = e instanceof Error ? e.message : String(e);
-          pdfBody.innerHTML = '<div style="color:#fff;padding:40px">Error: ' + msg + '</div>';
+          pdfBody.innerHTML = '<div style="color:#fff;padding:40px">Error: ' + escapeHtml(msg) + '</div>';
         });
     },
     (e) => {
-      pdfBody.innerHTML = '<div style="color:#fff;padding:40px">Error loading PDF: ' + e.message + '</div>';
+      pdfBody.innerHTML = '<div style="color:#fff;padding:40px">Error loading PDF: ' + escapeHtml(e.message) + '</div>';
     }
   );
 }

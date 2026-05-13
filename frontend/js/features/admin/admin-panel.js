@@ -1,4 +1,5 @@
 import { checkAdminStatus, searchUsers, setUserPlan } from '../../services/admin-service.js';
+import { escapeHtml } from '../../utils/escape-html.js';
 export function adminShowIfEligible(user) {
     const btn = document.getElementById('psbAdmin');
     if (!btn || !user)
@@ -102,7 +103,7 @@ async function adminSearch() {
     }
     catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        results.innerHTML = '<div style="color:#f87171;font-size:.85rem">Error: ' + msg + '</div>';
+        results.innerHTML = '<div style="color:#f87171;font-size:.85rem">Error: ' + escapeHtml(msg) + '</div>';
     }
 }
 //# sourceMappingURL=admin-panel.js.map

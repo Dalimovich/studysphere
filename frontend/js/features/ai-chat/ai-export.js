@@ -1,3 +1,4 @@
+import { escapeHtml } from '../../utils/escape-html.js';
 function errorMessage(e) {
     return e instanceof Error ? e.message : String(e);
 }
@@ -25,7 +26,7 @@ export async function aiMakePdfBlob(title, text) {
     container.appendChild(titleEl);
     const contentEl = document.createElement('div');
     contentEl.style.color = '#1a1a1a';
-    contentEl.innerHTML = window.renderMarkdown ? window.renderMarkdown(text) : text;
+    contentEl.innerHTML = window.renderMarkdown ? window.renderMarkdown(text) : escapeHtml(text);
     container.appendChild(contentEl);
     const footer = document.createElement('div');
     footer.style.cssText =
