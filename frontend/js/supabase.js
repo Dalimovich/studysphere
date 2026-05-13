@@ -11,8 +11,7 @@
       var tok = hp.get('access_token');
       var ref = hp.get('refresh_token') || '';
       if (tok) {
-        localStorage.setItem('sb_token', tok);
-        if (ref) localStorage.setItem('sb_refresh', ref);
+        _sbStoreSession(tok, ref);
       }
     }
   } catch (e) {}
@@ -26,6 +25,40 @@ var _sbToken = null; // access token after login
 var _currentUser = null;
 var _sbAuthCallbacks = [];
 var _SS = window.Minallo;
+
+function _sbStoreSession(accessToken, refreshToken) {
+  try {
+    sessionStorage.setItem('sb_sess_token', accessToken || '');
+    if (refreshToken) sessionStorage.setItem('sb_sess_refresh', refreshToken);
+    localStorage.removeItem('sb_token');
+    localStorage.removeItem('sb_refresh');
+  } catch (e) {}
+}
+
+function _sbStoredToken() {
+  try {
+    return sessionStorage.getItem('sb_sess_token') || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function _sbStoredRefresh() {
+  try {
+    return sessionStorage.getItem('sb_sess_refresh') || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function _sbClearStoredSession() {
+  try {
+    sessionStorage.removeItem('sb_sess_token');
+    sessionStorage.removeItem('sb_sess_refresh');
+    localStorage.removeItem('sb_token');
+    localStorage.removeItem('sb_refresh');
+  } catch (e) {}
+}
 
 function _ssAuth(status, detail) {
   if (!_SS || typeof _SS.setAuth !== 'function') return;
@@ -73,9 +106,7 @@ var _sb = {
         _currentUser = d.user;
         _ssAuth('signed-in', { source: 'password', user: _currentUser });
         // Always persist — user stays logged in across browser restarts until explicit sign-out
-        localStorage.setItem('sb_token', d.access_token);
-        localStorage.setItem('sb_refresh', d.refresh_token || '');
-        sessionStorage.removeItem('sb_sess_token');
+        _sbStoreSession(d.access_token, d.refresh_token || '');
         _sbAuthCallbacks.forEach(function (cb) {
           cb('SIGNED_IN', d);
         });
@@ -93,10 +124,8 @@ var _sb = {
         _sbToken = null;
         _currentUser = null;
         _ssAuth('signed-out', { source: 'signOut' });
-        localStorage.removeItem('sb_token');
-        localStorage.removeItem('sb_refresh');
+        _sbClearStoredSession();
         localStorage.removeItem('ss_state');
-        sessionStorage.removeItem('sb_sess_token');
         sessionStorage.removeItem('ss_last_active');
         // ── Session routing: clear the login flag so next page load shows landing ─
         try {
@@ -129,7 +158,7 @@ var _sb = {
       _sbAuthCallbacks.push(cb);
     },
     refreshSession: function () {
-      var ref = localStorage.getItem('sb_refresh');
+      var ref = _sbStoredRefresh();
       if (!ref) return Promise.resolve(null);
       return fetch(SUPA_URL + '/auth/v1/token?grant_type=refresh_token', {
         method: 'POST',
@@ -143,13 +172,11 @@ var _sb = {
           if (d.access_token) {
             _sbToken = d.access_token;
             _currentUser = d.user || _currentUser;
-            localStorage.setItem('sb_token', d.access_token);
-            if (d.refresh_token) localStorage.setItem('sb_refresh', d.refresh_token);
+            _sbStoreSession(d.access_token, d.refresh_token || ref);
             return _currentUser;
           }
           _sbToken = null;
-          localStorage.removeItem('sb_token');
-          localStorage.removeItem('sb_refresh');
+          _sbClearStoredSession();
           return null;
         })
         .catch(function () {
@@ -158,7 +185,7 @@ var _sb = {
     },
     restoreSession: function () {
       _ssAuth('checking', { source: 'restoreSession' });
-      var token = localStorage.getItem('sb_token');
+      var token = _sbStoredToken();
       if (!token) {
         _ssAuth('signed-out', { source: 'restoreSession' });
         window._sbSessionReady = Promise.resolve(null);
@@ -187,14 +214,14 @@ var _sb = {
               return user;
             }
             _sbToken = null;
-            localStorage.removeItem('sb_token');
+            _sbClearStoredSession();
             _ssAuth('signed-out', { source: 'restoreSession' });
             return null;
           });
         })
         .catch(function () {
           _sbToken = null;
-          localStorage.removeItem('sb_token');
+          _sbClearStoredSession();
           _ssAuth('signed-out', { source: 'restoreSession' });
           return null;
         });
@@ -425,11 +452,9 @@ function _showModal() {
   _currentUser = null;
   _ssAuth('signed-out', { source: 'showModal' });
 
-  localStorage.removeItem('sb_token');
-  localStorage.removeItem('sb_refresh');
+  _sbClearStoredSession();
   localStorage.removeItem('ss_state');
 
-  sessionStorage.removeItem('sb_sess_token');
   sessionStorage.removeItem('ss_last_active');
   sessionStorage.removeItem('ss_logged_in');
   sessionStorage.removeItem('ss_try_saved_login');
@@ -455,7 +480,7 @@ function _showModal() {
 function _sbRefreshAccessToken() {
   var ref = null;
   try {
-    ref = localStorage.getItem('sb_refresh');
+    ref = _sbStoredRefresh();
   } catch (e) {}
   if (!ref) return Promise.resolve(null);
   return fetch(SUPA_URL + '/auth/v1/token?grant_type=refresh_token', {
@@ -469,8 +494,7 @@ function _sbRefreshAccessToken() {
     .then(function (d) {
       if (d && d.access_token) {
         _sbToken = d.access_token;
-        localStorage.setItem('sb_token', d.access_token);
-        if (d.refresh_token) localStorage.setItem('sb_refresh', d.refresh_token);
+        _sbStoreSession(d.access_token, d.refresh_token || ref);
         return d.access_token;
       }
       return null;
@@ -548,7 +572,7 @@ window.addEventListener('ss-ready', function () {
     '[Auth] ss-ready fired. ss_logged_in=',
     sessionStorage.getItem('ss_logged_in'),
     'sb_token=',
-    !!localStorage.getItem('sb_token'),
+    !!_sbStoredToken(),
     'sb_sess_token=',
     !!sessionStorage.getItem('sb_sess_token'),
     'hash=',
@@ -561,11 +585,9 @@ window.addEventListener('ss-ready', function () {
     _ssAuth('signed-out', { source: 'clearSavedAuth' });
 
     try {
-      localStorage.removeItem('sb_token');
-      localStorage.removeItem('sb_refresh');
+      _sbClearStoredSession();
       localStorage.removeItem('ss_state');
 
-      sessionStorage.removeItem('sb_sess_token');
       sessionStorage.removeItem('ss_last_active');
       sessionStorage.removeItem('ss_logged_in');
       sessionStorage.removeItem('ss_try_saved_login');
@@ -612,8 +634,7 @@ window.addEventListener('ss-ready', function () {
     console.log('[Auth] → path: hashToken found');
     history.replaceState(null, '', window.location.pathname);
     var ref = new URLSearchParams(hash.slice(1)).get('refresh_token') || '';
-    localStorage.setItem('sb_token', hashToken);
-    if (ref) localStorage.setItem('sb_refresh', ref);
+    _sbStoreSession(hashToken, ref);
     _verifyAndEnter(hashToken);
     return;
   }
@@ -631,8 +652,7 @@ window.addEventListener('ss-ready', function () {
       })
       .then(function (d) {
         if (d.access_token) {
-          localStorage.setItem('sb_token', d.access_token);
-          if (d.refresh_token) localStorage.setItem('sb_refresh', d.refresh_token);
+          _sbStoreSession(d.access_token, d.refresh_token || '');
           _verifyAndEnter(d.access_token);
         } else {
           _showModalClean();
@@ -659,8 +679,8 @@ window.addEventListener('ss-ready', function () {
     var tok = null;
 
     try {
-      saved = localStorage.getItem('sb_token');
-      sess = sessionStorage.getItem('sb_sess_token');
+      saved = null;
+      sess = _sbStoredToken();
       tok = saved || sess || null;
     } catch (e) {}
 
@@ -686,8 +706,8 @@ window.addEventListener('ss-ready', function () {
     var tok2 = null;
 
     try {
-      saved2 = localStorage.getItem('sb_token');
-      sess2 = sessionStorage.getItem('sb_sess_token');
+      saved2 = null;
+      sess2 = _sbStoredToken();
       tok2 = saved2 || sess2 || null;
     } catch (e) {}
 
@@ -722,11 +742,10 @@ window.addEventListener('ss-ready', function () {
     return;
   }
 
-  // Persistent login: sb_token in localStorage caused the full app to boot.
-  // Verify the token and enter the app, or fall back to the auth modal.
+  // Session login: verify the in-tab token and enter the app, or fall back to the auth modal.
   var savedTok = null;
   try {
-    savedTok = localStorage.getItem('sb_token');
+    savedTok = _sbStoredToken();
   } catch (e) {}
   if (savedTok) {
     _ssAuth('checking', { source: 'persistentToken' });

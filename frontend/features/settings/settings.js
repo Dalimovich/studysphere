@@ -186,6 +186,7 @@ async function saveSettings(patch) {
     logoutBtn.addEventListener('click', function () {
       localStorage.removeItem('sb_token');
       localStorage.removeItem('sb_refresh');
+      sessionStorage.removeItem('sb_sess_refresh');
       localStorage.removeItem('ss_user_type');
       sessionStorage.removeItem('sb_sess_token');
       sessionStorage.removeItem('ss_last_active');
@@ -239,7 +240,7 @@ async function saveSettings(patch) {
         var btn = this;
         btn.textContent = 'Deleting...';
         btn.disabled = true;
-        var token = _sbToken || localStorage.getItem('sb_token');
+        var token = _sbToken || sessionStorage.getItem('sb_sess_token');
         var uid = _currentUser && _currentUser.id;
         var h = {
           apikey: SUPA_KEY,

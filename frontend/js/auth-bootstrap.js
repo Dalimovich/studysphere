@@ -37,7 +37,7 @@
 
   if (!loggedIn) {
     try {
-      if (localStorage.getItem('sb_token')) loggedIn = true;
+      if (sessionStorage.getItem('sb_sess_token')) loggedIn = true;
     } catch (e) {}
   }
 
@@ -130,8 +130,10 @@ function _handleGoogleCredential(response) {
     })
     .then(function (d) {
       if (d && d.access_token) {
-        localStorage.setItem('sb_token', d.access_token);
-        if (d.refresh_token) localStorage.setItem('sb_refresh', d.refresh_token);
+        sessionStorage.setItem('sb_sess_token', d.access_token);
+        if (d.refresh_token) sessionStorage.setItem('sb_sess_refresh', d.refresh_token);
+        localStorage.removeItem('sb_token');
+        localStorage.removeItem('sb_refresh');
         if (window.Minallo)
           window.Minallo.setAuth('token-received', { source: 'google-one-tap' });
         var alreadyIn = false;

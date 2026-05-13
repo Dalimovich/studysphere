@@ -331,7 +331,7 @@
     }
     async function _chatSignAttachmentPath(path) {
       if (!path || _chatAttachmentIsExternal(path)) return path;
-      var token = _sbToken || localStorage.getItem('sb_token') || SUPA_KEY;
+      var token = _sbToken || sessionStorage.getItem('sb_sess_token') || SUPA_KEY;
       var res = await fetch(
         SUPA_URL + '/storage/v1/object/sign/chat-attachments/' + _chatEncodeStoragePath(path),
         {
@@ -2181,7 +2181,7 @@
         Date.now() +
         '_' +
         safeName;
-      var token = _sbToken || localStorage.getItem('sb_token') || SUPA_KEY;
+      var token = _sbToken || sessionStorage.getItem('sb_sess_token') || SUPA_KEY;
       var res = await fetch(
         SUPA_URL + '/storage/v1/object/chat-attachments/' + _chatEncodeStoragePath(path),
         {
