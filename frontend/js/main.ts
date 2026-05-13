@@ -2,6 +2,7 @@
 //
 // Imports app.js (compatibility bridge) which bootstraps all feature modules.
 // As app.js shrinks, the init calls will move here and app.js will be removed.
+
 import { initSidebarIcons } from './core/app-shell.js';
 import { initPdfWorker } from './core/pdf-worker.js';
 import { initPullToRefresh } from './core/pull-to-refresh.js';
@@ -11,12 +12,15 @@ import { initOnboarding } from './features/auth/onboarding.js';
 import { initStudyLounge } from './features/study-lounge/lounge.js';
 import { initMusicServices } from './features/music/music-services.js';
 import { initStudyTimer } from './features/study-timer/study-timer.js';
-window.addEventListener('error', (event) => {
-    console.error('[Minallo] Unhandled error:', event.error || event.message);
+
+window.addEventListener('error', (event: ErrorEvent) => {
+  console.error('[Minallo] Unhandled error:', event.error || event.message);
 });
-window.addEventListener('unhandledrejection', (event) => {
-    console.error('[Minallo] Unhandled promise rejection:', event.reason);
+
+window.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => {
+  console.error('[Minallo] Unhandled promise rejection:', event.reason);
 });
+
 initSidebarIcons();
 initPdfWorker();
 initPullToRefresh();
@@ -25,20 +29,19 @@ initAdminPanel();
 initOnboarding();
 initStudyLounge();
 initMusicServices({
-    sb: window._sb,
-    getCurrentUser: () => window._currentUser ?? null,
-    applyUserTypeUI: () => {
-        if (typeof window._applyUserTypeUI === 'function') {
-            window._applyUserTypeUI();
-        }
-    },
-    showToast: (title, sub) => {
-        if (typeof window.showToast === 'function')
-            window.showToast(title, sub);
-    },
+  sb: window._sb as never,
+  getCurrentUser: () => window._currentUser ?? null,
+  applyUserTypeUI: () => {
+    if (typeof window._applyUserTypeUI === 'function') {
+      window._applyUserTypeUI();
+    }
+  },
+  showToast: (title: string, sub?: string) => {
+    if (typeof window.showToast === 'function') window.showToast(title, sub);
+  },
 });
 initStudyTimer();
+
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore — dynamic import with cache-busting query string
 import('./app.js?v=7');
-//# sourceMappingURL=main.js.map

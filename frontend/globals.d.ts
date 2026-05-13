@@ -104,13 +104,26 @@ declare global {
     spawnConfetti?: () => void;
 
     // ── AI export ──────────────────────────────────────────────────────
-    _aiMakePdfBlob?: (...args: unknown[]) => unknown;
-    _aiDownloadPdf?: (...args: unknown[]) => unknown;
-    _ufDestPicker?: (...args: unknown[]) => unknown;
-    _glMoveDestPicker?: (...args: unknown[]) => unknown;
-    _aiExportToCourse?: (...args: unknown[]) => unknown;
-    _aiShowExportModal?: (...args: unknown[]) => unknown;
-    _aiResponseActions?: (...args: unknown[]) => unknown;
+    _aiMakePdfBlob?: (title: string, text: string) => Promise<Blob | null>;
+    _aiDownloadPdf?: (title: string, text: string) => Promise<void>;
+    _ufDestPicker?: (
+      uid: string,
+      course: LegacyCourse,
+      onPick: (folder: string | null) => void
+    ) => void;
+    _glMoveDestPicker?: (
+      uid: string,
+      fromCourse: LegacyCourse,
+      onPick: (toCourse: LegacyCourse, folder: string | null) => void
+    ) => void;
+    _aiExportToCourse?: (
+      title: string,
+      text: string,
+      course: LegacyCourse | null | undefined,
+      folder?: string | null
+    ) => Promise<void>;
+    _aiShowExportModal?: (title: string, text: string) => void;
+    _aiResponseActions?: (rawText: string, context: 'panel' | string) => HTMLElement;
 
     // ── Auth bridge ────────────────────────────────────────────────────
     _setAuthMode?: (mode: 'signin' | 'signup') => void;
@@ -120,7 +133,7 @@ declare global {
     applyProfile?: (profile: Record<string, unknown> | null | undefined) => unknown;
     _applyUserTypeUI?: () => void;
     _adminShowIfEligible?: (user: { id?: string } | null) => void;
-    _showOnboarding?: (...args: unknown[]) => void;
+    _showOnboarding?: (email?: string) => void;
     landShowAuth?: (mode?: 'signin' | 'signup') => void;
 
     // ── Theme / settings ───────────────────────────────────────────────
