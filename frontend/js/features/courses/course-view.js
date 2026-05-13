@@ -78,12 +78,22 @@ function buildFilesContent(course) {
     .join('');
 
   var hasFolders = course.userFolders && course.userFolders.length > 0;
-  var filesHtml = course.files.length
-    ? course.files.slice().sort(function (a, b) { return a.name.localeCompare(b.name); })
-        .map(function (f) { return fileRowHtml(f, null); }).join('')
-    : course._filesLoading || hasFolders
-      ? ''
-      : '<div class="co-files-loading" style="opacity:.5">No files yet &mdash; click Upload files to add some</div>';
+  var filesHtml;
+  if (course.files.length) {
+    filesHtml = course.files.slice().sort(function (a, b) { return a.name.localeCompare(b.name); })
+      .map(function (f) { return fileRowHtml(f, null); }).join('');
+  } else if (hasFolders) {
+    filesHtml = '';
+  } else if (course._filesLoading) {
+    filesHtml =
+      '<div class="co-files-loading" style="opacity:.6;padding:14px 4px;font-size:.92rem">' +
+      '<span class="co-spinner" style="display:inline-block;width:12px;height:12px;border:2px solid rgba(96,165,250,.25);border-top-color:rgba(96,165,250,.85);border-radius:50%;animation:co-spin 0.8s linear infinite;vertical-align:-2px;margin-right:8px"></span>' +
+      'Loading your files&hellip;' +
+      '</div>' +
+      '<style>@keyframes co-spin{to{transform:rotate(360deg)}}</style>';
+  } else {
+    filesHtml = '<div class="co-files-loading" style="opacity:.5">No files yet &mdash; click Upload files to add some</div>';
+  }
 
   return (
     '<div class="co-course-tabs" role="tablist" aria-label="Course sections">' +
@@ -196,10 +206,15 @@ export function openCourse(course) {
     ._ufMerge(course)
     .then(function () {
       course._filesLoading = false;
-      if (_myCourseSeq !== window._courseOpenSeq) return;
-      window._ssRestoring = true;
-      showCourseSection(course, 'files');
-      window._ssRestoring = false;
+      var stillOnThisCourse = _myCourseSeq === window._courseOpenSeq;
+      if (stillOnThisCourse) {
+        window._ssRestoring = true;
+        showCourseSection(course, 'files');
+        window._ssRestoring = false;
+      }
+      // Persist the cache + count regardless of whether the user navigated
+      // away. The fetched data is correct for THIS course; skipping the
+      // write means the next visit replays the same empty-state race.
       try {
         var toCache = {
           files: course.files
