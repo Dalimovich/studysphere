@@ -191,6 +191,11 @@ function _ufUpload(uid, course, file, onProgress, folder) {
 
 // List files for user+course from Supabase Storage
 async function _ufList(uid, course) {
+  // Wait for session restore so the request uses the real token, not anon.
+  // Without this, prewarm-on-boot lists with SUPA_KEY → empty results → cards
+  // show 0 files until the user reopens the course.
+  if (window._sbSessionReady) await window._sbSessionReady;
+
   var prefix = uid + '/' + _ufKey(course) + '/';
   var r = await fetch(SUPA_URL + '/storage/v1/object/list/' + _UF_BUCKET, {
     method: 'POST',

@@ -18,6 +18,7 @@ declare global {
     // ── Session ─────────────────────────────────────────────────────────
     _currentUser?: { id?: string; sub?: string; email?: string };
     _sbToken?: string;
+    _sbSessionReady?: Promise<unknown>;
     _lang?: string;
     _uid?: string;
 

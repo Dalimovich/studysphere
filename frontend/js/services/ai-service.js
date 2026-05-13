@@ -88,6 +88,11 @@ export function uploadCourseDocument(file, courseId, sourceType) {
     });
 }
 export async function listCourseDocuments(courseId) {
+    // Wait for session restore so the Authorization header isn't empty during
+    // dashboard prewarm. Otherwise the proxy returns 401 and cards show no files
+    // until the user manually reopens the course.
+    if (window._sbSessionReady)
+        await window._sbSessionReady;
     const response = await fetch(_backendUrl() + '/api/documents/list?courseId=' + encodeURIComponent(courseId), { headers: { Authorization: 'Bearer ' + _token() } });
     const data = (await response.json());
     return data.documents || [];
