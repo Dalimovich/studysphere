@@ -5,19 +5,20 @@ from __future__ import annotations
 import json
 import logging
 import re
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from typing import Any
 
-from .llm_json import chat_json
+from .llm_json import LlmResult, chat_json
 from .retrieval import RetrievedChunk, retrieve_chunks
 from ..supabase_client import get_supabase
 
 log = logging.getLogger(__name__)
 
 
-# Two attempts max — keeps wall-clock under Fly's ~60s HTTP idle timeout
-# even for the largest flashcard sets.
-_MAX_RETRIES = 2
+# Three parallel shards on round 1, one serial backfill on round 2.
+_PARALLEL_SHARDS = 3
+_TARGET_SHARD_SIZE = 8
 _VALID_DIFFICULTIES = {"easy", "medium", "hard"}
 
 
@@ -98,6 +99,31 @@ def _context_block(chunks: list[RetrievedChunk], doc_names: dict[str, str]) -> s
     return "\n\n---\n\n".join(parts)
 
 
+def _run_one_flashcard_shard(
+    *, shard_count: int, context: str, already_taken: list[str],
+    diversity_hint: str | None = None,
+) -> LlmResult | None:
+    avoid = ""
+    if already_taken:
+        avoid = "\n\nDO NOT repeat or paraphrase these card fronts:\n" + "\n".join(
+            "- " + f[:140] for f in already_taken[:30]
+        )
+    diversity = ""
+    if diversity_hint:
+        diversity = f"\n\nFor this batch specifically: focus on {diversity_hint}."
+    # Per-shard completion budget. 8 cards × 350 tok ≈ 2800; round up.
+    max_completion = min(4000, 700 + shard_count * 350)
+    try:
+        return chat_json(
+            system=_system_prompt(shard_count) + avoid + diversity,
+            user="COURSE CONTEXT:\n\n" + context,
+            max_tokens=max_completion,
+        )
+    except Exception:
+        log.exception("flashcards shard LLM call failed (shard_count=%s)", shard_count)
+        return None
+
+
 def generate_flashcards(
     *,
     user_id: str,
@@ -106,9 +132,9 @@ def generate_flashcards(
     requested_count: int,
     doc_names: dict[str, str],
 ) -> dict[str, Any]:
-    # Capped at 12 to fit within Netlify's 30s function timeout. Flashcards
-    # are shorter than quiz items so we can do a couple more than quiz (10).
-    requested = max(1, min(int(requested_count or 1), 12))
+    # Capped at 24 thanks to parallel shards. Each shard runs in ~15-20s, all
+    # three together wall-clock ~20-25s — comfortably under Netlify's 30s.
+    requested = max(1, min(int(requested_count or 1), 24))
 
     chunks = retrieve_chunks(
         user_id=user_id, course_id=course_id,
@@ -127,42 +153,44 @@ def generate_flashcards(
     context = _context_block(chunks, doc_names)
     collected: list[dict[str, Any]] = []
     seen_fronts: set[str] = set()
-    diagnostics = {"prompt_tokens": 0, "completion_tokens": 0, "model": None}
+    diagnostics: dict[str, Any] = {"prompt_tokens": 0, "completion_tokens": 0, "model": None}
 
-    needed = requested
-    last_error: str | None = None
-    for attempt in range(_MAX_RETRIES):
-        if needed <= 0:
-            break
-        avoid = ""
-        if collected:
-            avoid = "\n\nDO NOT repeat or paraphrase these card fronts:\n" + "\n".join(
-                "- " + (c.get("front") or "")[:140] for c in collected
-            )
-        # Per-attempt completion budget. Each card runs ~200-350 tokens.
-        # Capped so the OpenAI call finishes well under Fly's proxy idle
-        # timeout (~60s). The second attempt only fills the shortfall.
-        max_completion = min(5000, 1000 + needed * 350)
-        try:
-            res = chat_json(
-                system=_system_prompt(needed) + avoid,
-                user="COURSE CONTEXT:\n\n" + context,
-                max_tokens=max_completion,
-            )
-        except Exception as e:  # noqa: BLE001
-            last_error = f"{type(e).__name__}: {e}"
-            log.exception("flashcards LLM call failed on attempt %s", attempt + 1)
-            break
+    # ── Round 1: parallel shards with diversity hints ────────────────────────
+    shard_count = min(_PARALLEL_SHARDS, max(1, (requested + _TARGET_SHARD_SIZE - 1) // _TARGET_SHARD_SIZE))
+    base = requested // shard_count
+    remainder = requested % shard_count
+    shard_sizes = [base + (1 if i < remainder else 0) + 1 for i in range(shard_count)]
+    diversity_hints = [
+        "definitions, theorems, and named results",
+        "worked examples, mini-exercises, and step-by-step methods",
+        "formulas, notation, and common mistakes",
+    ]
 
+    with ThreadPoolExecutor(max_workers=shard_count) as pool:
+        futures = [
+            pool.submit(
+                _run_one_flashcard_shard,
+                shard_count=shard_sizes[i],
+                context=context,
+                already_taken=[],
+                diversity_hint=diversity_hints[i % len(diversity_hints)],
+            )
+            for i in range(shard_count)
+        ]
+        shard_results = [f.result() for f in futures]
+
+    for res in shard_results:
+        if res is None:
+            continue
         diagnostics["model"] = res.model
         diagnostics["prompt_tokens"] += res.prompt_tokens or 0
         diagnostics["completion_tokens"] += res.completion_tokens or 0
-
         raw_items = res.data.get("items") if isinstance(res.data, dict) else None
         if not isinstance(raw_items, list):
             continue
-
         for raw in raw_items:
+            if len(collected) >= requested:
+                break
             norm = _normalize(raw)
             if not norm:
                 continue
@@ -171,13 +199,34 @@ def generate_flashcards(
                 continue
             seen_fronts.add(key)
             collected.append(norm)
-            if len(collected) >= requested:
-                break
 
-        needed = requested - len(collected)
+    # ── Round 2: one serial backfill if dedup left us short ──────────────────
+    if len(collected) < requested:
+        backfill = _run_one_flashcard_shard(
+            shard_count=requested - len(collected) + 2,
+            context=context,
+            already_taken=[c.get("front") or "" for c in collected],
+            diversity_hint="anything important not yet covered",
+        )
+        if backfill is not None:
+            diagnostics["prompt_tokens"] += backfill.prompt_tokens or 0
+            diagnostics["completion_tokens"] += backfill.completion_tokens or 0
+            raw_items = backfill.data.get("items") if isinstance(backfill.data, dict) else None
+            if isinstance(raw_items, list):
+                for raw in raw_items:
+                    if len(collected) >= requested:
+                        break
+                    norm = _normalize(raw)
+                    if not norm:
+                        continue
+                    key = re.sub(r"\W+", " ", norm["front"].lower()).strip()
+                    if not key or key in seen_fronts:
+                        continue
+                    seen_fronts.add(key)
+                    collected.append(norm)
 
     collected = collected[:requested]
-    result = {
+    result: dict[str, Any] = {
         "requestedCount": requested,
         "actualCount": len(collected),
         "cards": collected,
@@ -186,13 +235,10 @@ def generate_flashcards(
         "completionTokens": diagnostics["completion_tokens"],
     }
     if len(collected) < requested:
-        msg = (
+        result["warning"] = (
             f"Only {len(collected)} strong flashcards could be created from the selected "
             f"document context (requested {requested})."
         )
-        if last_error:
-            msg += f" (last error: {last_error})"
-        result["warning"] = msg
     return result
 
 

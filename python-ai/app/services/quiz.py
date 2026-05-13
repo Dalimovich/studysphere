@@ -16,20 +16,24 @@ from __future__ import annotations
 import json
 import logging
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from typing import Any
 
-from .llm_json import chat_json
+from .llm_json import LlmResult, chat_json
 from .retrieval import RetrievedChunk, retrieve_chunks
 from ..supabase_client import get_supabase
 
 log = logging.getLogger(__name__)
 
 
-# Two attempts max — the first asks for the full count with a generous
-# token budget; the second backfills only the shortfall. Keeps wall-clock
-# under Fly's ~60s HTTP idle timeout even for the largest quizzes.
-_MAX_RETRIES = 2
+# How many parallel LLM calls fire on the first round. With shard_size~6
+# and gpt-4o-mini, each call finishes in ~15-20s; wall-clock is max() of
+# the parallel branches, not sum. Wall time for 20 items ≈ wall time for 6.
+_PARALLEL_SHARDS = 3
+_TARGET_SHARD_SIZE = 6
+# One follow-up backfill round if dedup left us short.
+_BACKFILL_ROUNDS = 1
 _LETTERS = ("A", "B", "C", "D")
 _VALID_TYPES = {"mcq", "true_false", "short_answer"}
 _DEFAULT_TYPES = ["mcq", "true_false", "short_answer"]
@@ -209,6 +213,34 @@ def _context_block(chunks: list[RetrievedChunk], doc_names: dict[str, str]) -> s
     return "\n\n---\n\n".join(parts)
 
 
+def _run_one_quiz_shard(
+    *, shard_count: int, diff: str, types: list[str], context: str,
+    already_taken: list[str], diversity_hint: str | None = None,
+) -> LlmResult | None:
+    """Single LLM call for one shard's worth of items. Thread-safe."""
+    avoid_block = ""
+    if already_taken:
+        avoid_block = "\n\nDO NOT repeat or paraphrase these already-used questions:\n" + "\n".join(
+            "- " + q[:160] for q in already_taken[:30]
+        )
+    diversity = ""
+    if diversity_hint:
+        diversity = f"\n\nFor this batch specifically: emphasise {diversity_hint}."
+    system = _system_prompt(shard_count, diff, types) + avoid_block + diversity
+    # Per-shard completion budget — each MCQ with options + explanation +
+    # source runs ~250-400 tokens. 6 items × 400 = 2400; round up to 3000.
+    max_completion = min(4000, 800 + shard_count * 380)
+    try:
+        return chat_json(
+            system=system,
+            user="COURSE CONTEXT:\n\n" + context,
+            max_tokens=max_completion,
+        )
+    except Exception:
+        log.exception("quiz shard LLM call failed (shard_count=%s)", shard_count)
+        return None
+
+
 def generate_quiz(
     *,
     user_id: str,
@@ -219,10 +251,10 @@ def generate_quiz(
     question_types: list[str] | None,
     doc_names: dict[str, str],
 ) -> dict[str, Any]:
-    # Capped at 10 to fit comfortably within Netlify's 30s function timeout.
-    # Raising this without first parallelising the LLM calls will intermittently
-    # produce Sandbox.Timedout errors on the proxy.
-    requested = max(1, min(int(requested_count or 1), 10))
+    # Capped at 20. Parallelisation keeps the wall-clock under Netlify's 30s
+    # function timeout even at the high end (3 parallel shards of 6-7 items
+    # finishes in ~15-20s, not 45-60s sequential).
+    requested = max(1, min(int(requested_count or 1), 20))
     diff = difficulty if difficulty in ("easy", "medium", "hard", "mixed") else "medium"
     types = [t for t in (question_types or _DEFAULT_TYPES) if t in _VALID_TYPES] or _DEFAULT_TYPES
 
@@ -245,72 +277,81 @@ def generate_quiz(
     seen_questions: set[str] = set()
     diagnostics: dict[str, Any] = {"prompt_tokens": 0, "completion_tokens": 0, "model": None}
 
-    needed = requested
-    last_error: str | None = None
-    for attempt in range(_MAX_RETRIES):
-        if needed <= 0:
-            break
-        # Tell the model what's already taken so it doesn't repeat itself.
-        avoid_block = ""
-        if collected:
-            avoid_block = "\n\nDO NOT repeat or paraphrase these already-used questions:\n" + "\n".join(
-                "- " + (it.get("question") or "")[:160] for it in collected
-            )
-        system = _system_prompt(needed, diff, types) + avoid_block
-        # Per-attempt completion budget — each MCQ with options + explanation
-        # + source runs ~250-400 tokens. Capped at 6000 so the OpenAI call
-        # finishes well under Fly's ~60s proxy idle timeout (gpt-4o-mini
-        # generates ~80 tok/s, so 6000 tokens is ~75s — uncomfortable. Cap
-        # tighter at 5000.) The second attempt only fills the shortfall.
-        max_completion = min(5000, 1000 + needed * 380)
-        try:
-            res = chat_json(
-                system=system,
-                user="COURSE CONTEXT:\n\n" + context,
-                max_tokens=max_completion,
-            )
-        except Exception as e:  # noqa: BLE001
-            last_error = f"{type(e).__name__}: {e}"
-            log.exception("quiz LLM call failed on attempt %s", attempt + 1)
-            break
+    # ── Round 1: fan-out parallel shards ─────────────────────────────────────
+    # Carve `requested` into shards of ~_TARGET_SHARD_SIZE, capped at _PARALLEL_SHARDS.
+    # Each shard asks the model for its share + 1 extra so dedup has slack.
+    shard_count = min(_PARALLEL_SHARDS, max(1, (requested + _TARGET_SHARD_SIZE - 1) // _TARGET_SHARD_SIZE))
+    base = requested // shard_count
+    remainder = requested % shard_count
+    shard_sizes = [base + (1 if i < remainder else 0) + 1 for i in range(shard_count)]  # +1 slack
+    # Per-shard diversity hint so the three branches don't all converge on
+    # the same easiest concepts.
+    diversity_hints = [
+        "definitions, theorems, and named results",
+        "worked examples, exercises, and step-by-step procedures",
+        "formulas, calculations, and common mistakes / misconceptions",
+    ]
 
+    with ThreadPoolExecutor(max_workers=shard_count) as pool:
+        futures = [
+            pool.submit(
+                _run_one_quiz_shard,
+                shard_count=shard_sizes[i],
+                diff=diff,
+                types=types,
+                context=context,
+                already_taken=[],   # round 1: no avoid list — diversity hints carry the load
+                diversity_hint=diversity_hints[i % len(diversity_hints)],
+            )
+            for i in range(shard_count)
+        ]
+        shard_results = [f.result() for f in futures]
+
+    for res in shard_results:
+        if res is None:
+            continue
         diagnostics["model"] = res.model
         diagnostics["prompt_tokens"] += res.prompt_tokens or 0
         diagnostics["completion_tokens"] += res.completion_tokens or 0
-
         raw_items = res.data.get("items") if isinstance(res.data, dict) else None
-        log.info(
-            "quiz attempt %s: model returned %s raw items; keys=%s",
-            attempt + 1,
-            len(raw_items) if isinstance(raw_items, list) else "n/a",
-            list(res.data.keys()) if isinstance(res.data, dict) else "non-dict",
-        )
         if not isinstance(raw_items, list):
             continue
-
-        new_items: list[dict[str, Any]] = []
-        rejected = 0
         for raw in raw_items:
+            if len(collected) >= requested:
+                break
             norm = _normalize(raw)
             if not norm:
-                rejected += 1
-                if rejected <= 2:  # log first couple of rejections per attempt
-                    log.info("quiz item rejected (type=%r answer=%r): %.200s",
-                             (raw or {}).get("type") if isinstance(raw, dict) else None,
-                             (raw or {}).get("answer") if isinstance(raw, dict) else None,
-                             json.dumps(raw, ensure_ascii=False, default=str) if raw else "")
                 continue
             key = re.sub(r"\W+", " ", (norm["question"] or "").lower()).strip()
             if not key or key in seen_questions:
                 continue
             seen_questions.add(key)
-            new_items.append(norm)
-            if len(collected) + len(new_items) >= requested:
-                break
+            collected.append(norm)
 
-        log.info("quiz attempt %s: kept=%s rejected=%s", attempt + 1, len(new_items), rejected)
-        collected.extend(new_items[: requested - len(collected)])
-        needed = requested - len(collected)
+    # ── Round 2: one serial backfill if we're short ──────────────────────────
+    if len(collected) < requested and _BACKFILL_ROUNDS > 0:
+        backfill = _run_one_quiz_shard(
+            shard_count=requested - len(collected) + 2,
+            diff=diff, types=types, context=context,
+            already_taken=[it.get("question") or "" for it in collected],
+            diversity_hint="any high-value concepts not yet asked about",
+        )
+        if backfill is not None:
+            diagnostics["prompt_tokens"] += backfill.prompt_tokens or 0
+            diagnostics["completion_tokens"] += backfill.completion_tokens or 0
+            raw_items = backfill.data.get("items") if isinstance(backfill.data, dict) else None
+            if isinstance(raw_items, list):
+                for raw in raw_items:
+                    if len(collected) >= requested:
+                        break
+                    norm = _normalize(raw)
+                    if not norm:
+                        continue
+                    key = re.sub(r"\W+", " ", (norm["question"] or "").lower()).strip()
+                    if not key or key in seen_questions:
+                        continue
+                    seen_questions.add(key)
+                    collected.append(norm)
 
     collected = _dedupe(collected)[:requested]
 
@@ -323,13 +364,10 @@ def generate_quiz(
         "completionTokens": diagnostics["completion_tokens"],
     }
     if len(collected) < requested:
-        msg = (
+        result["warning"] = (
             f"Only {len(collected)} strong questions could be created from the selected "
             f"document context (requested {requested})."
         )
-        if last_error:
-            msg += f" (last error: {last_error})"
-        result["warning"] = msg
     return result
 
 

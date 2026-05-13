@@ -10,6 +10,24 @@ const { jsonResponse, fail, handleOptions } = require('../lib/responses');
 const { verifySupabaseToken, extractBearerToken } = require('../lib/supabase-auth');
 const { supaRequest } = require('../lib/supabase-admin');
 const { triggerProcessing } = require('../lib/trigger-processing');
+const { shouldUsePythonAI, forwardToPython } = require('../lib/python-ai-proxy');
+
+// Forward an indexing job to the Python service.  Falls back to the JS
+// triggerProcessing if Python is unreachable so the user is never left
+// without indexing.
+async function _kickIndex(documentId, userId, courseId, storagePath) {
+  if (shouldUsePythonAI()) {
+    const r = await forwardToPython('index-document', {
+      userId: userId,
+      courseId: courseId,
+      documentId: documentId,
+      storagePath: storagePath
+    });
+    if (r.ok) return;
+    console.warn('[documents-index-existing] Python upstream failed, falling back to JS:', r.status);
+  }
+  await triggerProcessing(documentId, userId);
+}
 
 const SOURCE_BUCKET = 'course-uploads';
 
@@ -110,7 +128,7 @@ exports.handler = async function (event) {
     await supaRequest('DELETE', 'document_pages?document_id=eq.' + doc.id, null, serviceKey).catch(
       function () {}
     );
-    await triggerProcessing(doc.id, user.id);
+    await _kickIndex(doc.id, user.id, courseId, docStoragePath);
     return jsonResponse(200, {
       alreadyIndexed: false,
       documentId: doc.id,
@@ -142,7 +160,7 @@ exports.handler = async function (event) {
   }
 
   const document = Array.isArray(insertResult.body) ? insertResult.body[0] : insertResult.body;
-  await triggerProcessing(document.id, user.id);
+  await _kickIndex(document.id, user.id, courseId, docStoragePath);
 
   return jsonResponse(201, {
     documentId: document.id,

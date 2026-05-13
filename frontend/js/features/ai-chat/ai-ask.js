@@ -597,60 +597,12 @@ export function initAskAI(state) {
               }
             } catch (e) {}
 
-            fetch(BACKEND_URL + '/api/ai/stream', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-              signal: _streamController.signal,
-              body: JSON.stringify({
-                courseId: _courseId,
-                question: question,
-                mode: _ragMode,
-                documentId: _activeDocId || undefined,
-                activeFileName: activeFileName || undefined,
-                openFileContext: _openFileCtx || undefined,
-                pageImages: pageImages.length ? pageImages : undefined,
-                forceRefresh: (opts && opts.forceRefresh) ? true : undefined,
-                prevQuestion: _prevQuestion || undefined
-              })
-            }).then(function (res) {
-              if (!res.ok) { fallbackToRag(); return; }
-              var reader = res.body.getReader();
-              var decoder = new TextDecoder();
-              var sseBuffer = '';
-
-              function read() {
-                reader.read().then(function (result) {
-                  if (result.done) { finalize(null); return; }
-                  sseBuffer += decoder.decode(result.value, { stream: true });
-                  var lines = sseBuffer.split('\n');
-                  sseBuffer = lines.pop();
-                  lines.forEach(function (line) {
-                    if (!line.startsWith('data: ')) return;
-                    try {
-                      var evt = JSON.parse(line.slice(6));
-                      if (evt.t) {
-                        ensureBubble(); // swap dots → bubble on first token
-                        queueToken(evt.t);
-                      }
-                      if (evt.done) {
-                        _pendingMeta = evt;
-                        if (!_renderTimer && !_tokenQueue.length) finalize(_pendingMeta);
-                      }
-                      if (evt.error) { fallbackToRag(); }
-                    } catch (e) {}
-                  });
-                  read();
-                }).catch(function () { fallbackToRag(); });
-              }
-              read();
-            }).catch(function (err) {
-              if (err && err.name === 'AbortError') {
-                if (thinkWrap && thinkWrap.parentNode) thinkWrap.remove();
-                var _sb = document.getElementById('aiSend'); if (_sb) _sb.disabled = false;
-                var _st = document.getElementById('stopBtn'); if (_st) _st.style.display = 'none';
-                resolve({ content: [{ text: '' }] });
-              } else { fallbackToRag(); }
-            });
+            // The /api/ai/stream endpoint was retired during the Python
+            // migration — there's no SSE handler today, every call 404'd
+            // and silently fell through to the RAG path, costing one
+            // wasted round-trip per question. Go straight to RAG until
+            // we add proper Python-side streaming.
+            fallbackToRag();
 
             function fallbackToRag() {
               // Stream failed — fall back to non-streaming ai-ask endpoint
