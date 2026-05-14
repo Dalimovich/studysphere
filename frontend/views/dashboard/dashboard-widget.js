@@ -3,7 +3,7 @@
   var container = document.getElementById('psec-dashboard');
   if (!container) return;
 
-  fetch('features/dashboard/dashboard.html')
+  fetch('views/dashboard/dashboard.html')
     .then(function (r) {
       return r.text();
     })

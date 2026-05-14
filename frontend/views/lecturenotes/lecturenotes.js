@@ -3,7 +3,7 @@
   var container = document.getElementById('psec-notes');
   if (!container) return;
 
-  fetch('features/lecturenotes/lecturenotes.html')
+  fetch('views/lecturenotes/lecturenotes.html')
     .then(function (r) {
       return r.text();
     })

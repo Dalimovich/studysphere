@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════
-//  ai/ai.js — Minallo AI Engine
+//  js/ai.js — Minallo AI Engine
 //  Loaded after app.js; overrides askAI, chipPrompt, and runMultiSummary.
 //  Edit this file to change model, prompts, token limits, or response style.
 // ═══════════════════════════════════════════════════════════════════════════
@@ -825,7 +825,7 @@ function _captureSnipRegion(x1, y1, x2, y2) {
 })();
 
 console.log(
-  '\u2713 ai/ai.js loaded — model: ' +
+  '\u2713 js/ai.js loaded — model: ' +
     AI_MODEL +
     ', max_tokens: ' +
     AI_MAX_TOK +

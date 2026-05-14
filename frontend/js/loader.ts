@@ -313,7 +313,7 @@ interface LandingTranslation {
   const SECTIONS = [
     'pages/auth.html',
     'pages/signup.html',
-    'features/toast/toast.html',
+    'views/toast/toast.html',
     'pages/portal.html',
     'pages/modals.html',
   ];
@@ -323,29 +323,29 @@ interface LandingTranslation {
     file: string;
   }
   const FEATURE_SECTIONS: FeatureSection[] = [
-    { id: 'psec-profile', file: 'features/profile/profile.html' },
-    { id: 'psec-settings', file: 'features/settings/settings.html' },
-    { id: 'psec-subscription', file: 'features/subscription/subscription.html' },
+    { id: 'psec-profile', file: 'views/profile/profile.html' },
+    { id: 'psec-settings', file: 'views/settings/settings.html' },
+    { id: 'psec-subscription', file: 'views/subscription/subscription.html' },
   ];
 
   // Inject feature CSS
   (function () {
     [
-      'features/toast/toast.css',
-      'features/chatbot/chatbot.css',
-      'features/chatbot/ai-bubble.css',
-      'features/chat/chat.css',
-      'features/dashboard/dashboard.css',
-      'features/practice/practice.css',
-      'features/flashcards/flashcards.css',
-      'features/quiz/quiz.css',
-      'features/lecturenotes/lecturenotes.css',
-      'features/profile/profile.css',
-      'features/settings/settings.css',
-      'features/subscription/subscription.css',
-      'features/editor/editor.css',
-      'features/games/games.css',
-      'features/notes/notes-panel.css',
+      'views/toast/toast.css',
+      'views/chatbot/chatbot.css',
+      'views/chatbot/ai-bubble.css',
+      'views/chat/chat.css',
+      'views/dashboard/dashboard.css',
+      'views/practice/practice.css',
+      'views/flashcards/flashcards.css',
+      'views/quiz/quiz.css',
+      'views/lecturenotes/lecturenotes.css',
+      'views/profile/profile.css',
+      'views/settings/settings.css',
+      'views/subscription/subscription.css',
+      'views/editor/editor.css',
+      'views/games/games.css',
+      'views/notes/notes-panel.css',
     ].forEach((href) => {
       const link = document.createElement('link');
       link.rel = 'stylesheet';
@@ -389,7 +389,7 @@ interface LandingTranslation {
 
     // Load dependency helpers and early feature globals first, then app/router.
     loadScript('js/dependencies.js', 'dependencies-script')
-      .then(() => loadScript('features/subscription/subscription.js', 'subscription-script'))
+      .then(() => loadScript('views/subscription/subscription.js', 'subscription-script'))
       .then(() => {
         // app-data.js must load before app.js — it declares SEMS, COLORS, MAJOR_LIST, SUBJECT_LIST
         return loadScript('js/app-data.js', 'app-data-script');
@@ -412,36 +412,36 @@ interface LandingTranslation {
         // Game sub-modules (tetris/solitaire/bird/chess) must load before games.js (hub)
         // so their window.* functions are defined when games.js _init() wires the buttons.
         const featureSrcs = [
-          'features/toast/toast.js',
-          'features/chatbot/chatbot.js?v=2',
-          'features/chatbot/ai-bubble.js?v=2',
-          'features/chat/chat.js',
-          'features/dashboard/dashboard-widget.js',
-          'features/dashboard/dashboard-calendar.js',
+          'views/toast/toast.js',
+          'views/chatbot/chatbot.js?v=2',
+          'views/chatbot/ai-bubble.js?v=2',
+          'views/chat/chat.js',
+          'views/dashboard/dashboard-widget.js',
+          'views/dashboard/dashboard-calendar.js',
           'js/utils/db-helpers.js',
-          'features/practice/practice.js',
-          'features/flashcards/flashcards.js',
-          'features/quiz/quiz.js',
-          'features/lecturenotes/lecturenotes.js',
-          'features/profile/profile.js',
-          'features/settings/settings.js',
-          'features/editor/editor.js',
-          'features/editor/merger.js',
-          'features/editor/writer.js',
-          'features/notes/notes-panel.js',
-          'features/games/games-tetris.js',
-          'features/games/games-solitaire-shared.js',
-          'features/games/games-solitaire-klondike.js',
-          'features/games/games-solitaire-spider.js',
-          'features/games/games-solitaire-scorpion.js',
-          'features/games/games-solitaire-freecell.js',
-          'features/games/games-solitaire-pyramid.js',
-          'features/games/games-solitaire-tripeaks.js',
-          'features/games/games-solitaire-vegas.js',
-          'features/games/games-solitaire-dispatcher.js',
-          'features/games/games-bird.js',
-          'features/games/games-chess.js',
-          'features/games/games.js',
+          'views/practice/practice.js',
+          'views/flashcards/flashcards.js',
+          'views/quiz/quiz.js',
+          'views/lecturenotes/lecturenotes.js',
+          'views/profile/profile.js',
+          'views/settings/settings.js',
+          'views/editor/editor.js',
+          'views/editor/merger.js',
+          'views/editor/writer.js',
+          'views/notes/notes-panel.js',
+          'views/games/games-tetris.js',
+          'views/games/games-solitaire-shared.js',
+          'views/games/games-solitaire-klondike.js',
+          'views/games/games-solitaire-spider.js',
+          'views/games/games-solitaire-scorpion.js',
+          'views/games/games-solitaire-freecell.js',
+          'views/games/games-solitaire-pyramid.js',
+          'views/games/games-solitaire-tripeaks.js',
+          'views/games/games-solitaire-vegas.js',
+          'views/games/games-solitaire-dispatcher.js',
+          'views/games/games-bird.js',
+          'views/games/games-chess.js',
+          'views/games/games.js',
         ];
         const featurePromises = featureSrcs.map((src) => {
           return new Promise<void>((res) => {
@@ -458,17 +458,17 @@ interface LandingTranslation {
 
         void Promise.all(featurePromises).then(() => {
           const aiScript = document.createElement('script');
-          aiScript.src = 'ai/ai.js?v=' + _v;
+          aiScript.src = 'js/ai.js?v=' + _v;
           aiScript.onload = () => {
-            console.log('ai/ai.js loaded');
+            console.log('js/ai.js loaded');
             if (SS) {
-              SS.markReady('ai', { file: 'ai/ai.js' });
+              SS.markReady('ai', { file: 'js/ai.js' });
               SS.markReady('app', {});
             }
             window.dispatchEvent(new Event('ss-ready'));
           };
           aiScript.onerror = () => {
-            console.error('Failed to load ai/ai.js — falling back');
+            console.error('Failed to load js/ai.js — falling back');
             if (SS) SS.markReady('app', { ai: false });
             window.dispatchEvent(new Event('ss-ready'));
           };

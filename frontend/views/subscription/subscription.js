@@ -1,8 +1,8 @@
 (function () {
   var feature = {
     sectionId: 'psec-subscription',
-    html: 'features/subscription/subscription.html',
-    css: 'features/subscription/subscription.css'
+    html: 'views/subscription/subscription.html',
+    css: 'views/subscription/subscription.css'
   };
   if (window.Minallo) {
     window.Minallo.registerFeature('subscription', feature);

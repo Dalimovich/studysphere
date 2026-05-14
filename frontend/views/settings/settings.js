@@ -1,8 +1,8 @@
 (function () {
   var feature = {
     sectionId: 'psec-settings',
-    html: 'features/settings/settings.html',
-    css: 'features/settings/settings.css'
+    html: 'views/settings/settings.html',
+    css: 'views/settings/settings.css'
   };
   if (window.Minallo) {
     window.Minallo.registerFeature('settings', feature);

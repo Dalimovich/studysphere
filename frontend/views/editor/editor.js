@@ -1,7 +1,7 @@
 (function () {
   var container = document.getElementById('psec-editor');
   if (!container) return;
-  fetch('features/editor/editor.html')
+  fetch('views/editor/editor.html')
     .then(function (r) {
       return r.text();
     })

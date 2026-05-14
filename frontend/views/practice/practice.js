@@ -3,7 +3,7 @@
   var container = document.getElementById('psec-german');
   if (!container) return;
 
-  fetch('features/practice/practice.html')
+  fetch('views/practice/practice.html')
     .then(function (r) {
       return r.text();
     })

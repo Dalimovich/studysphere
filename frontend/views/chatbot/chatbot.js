@@ -24,7 +24,7 @@
     };
   }
 
-  fetch('features/chatbot/chatbot.html')
+  fetch('views/chatbot/chatbot.html')
     .then(function (r) {
       return r.text();
     })

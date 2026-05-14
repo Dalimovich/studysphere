@@ -1,7 +1,7 @@
 (function () {
   var container = document.getElementById('psec-games');
   if (!container) return;
-  fetch('features/games/games.html')
+  fetch('views/games/games.html')
     .then(function (r) {
       return r.text();
     })

@@ -1,7 +1,7 @@
 (function () {
   var container = document.getElementById('psec-chat');
   if (!container) return;
-  fetch('features/chat/chat.html')
+  fetch('views/chat/chat.html')
     .then(function (r) {
       return r.text();
     })
