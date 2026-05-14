@@ -53,21 +53,44 @@ export function initStatePersistence(options: StatePersistenceOptions): {
 
   function saveState(): void {
     try {
-      let curTab: string | null = null;
-      try {
-        curTab = sessionStorage.getItem('ss_portal_tab');
-      } catch {
-        /* sessionStorage disabled */
+      // Read from the actually-visible view, not from ss_portal_tab. The tab
+      // can be stale (e.g. user used the chatbot, then opened a file via a
+      // path that didn't update the tab) and the old behavior here was to
+      // *delete* ss_state when the stale tab said "I'm on a portal-only
+      // section" — which wiped the user's course/file location and made
+      // refresh land on dashboard.
+      //
+      // The portal `data-active-view` attribute is set by selectTopLevelView()
+      // and is the truth. Fall back to DOM inspection for cases where the
+      // attribute hasn't been set yet (early boot).
+      const portalEl = document.getElementById('portal');
+      let activeView: string | null = portalEl ? portalEl.dataset.activeView || null : null;
+      if (!activeView) {
+        const appEl = document.getElementById('app');
+        const studipEl = document.getElementById('studipDash');
+        if (appEl && appEl.style.display !== 'none' && appEl.style.display !== '') activeView = 'file';
+        else if (studipEl && studipEl.style.display !== 'none' && studipEl.style.display !== '') activeView = 'studip';
+        else activeView = 'portal';
       }
-      if (curTab && PORTAL_ONLY_SECTIONS.indexOf(curTab) !== -1) {
-        localStorage.removeItem('ss_state');
+
+      // Only persist when the user is in something restorable (file view with
+      // a course/file open, or studip listing). Pure portal sections aren't
+      // tracked here — ss_portal_tab is the source of truth for those.
+      if (activeView === 'portal') return;
+      if (activeView === 'studip') {
+        // studip view: keep prior fields if present so refresh restores to the
+        // courses list. We don't delete — that was the bug.
+        try {
+          const prior = JSON.parse(localStorage.getItem('ss_state') || '{}') as StoredState;
+          const st: StoredState = { ...prior, view: 'studip', inApp: false };
+          localStorage.setItem('ss_state', JSON.stringify(st));
+        } catch {
+          localStorage.setItem('ss_state', JSON.stringify({ view: 'studip', inApp: false }));
+        }
         return;
       }
-      const appEl = document.getElementById('app');
-      const pdfEl = document.getElementById('pdfView');
-      const appVisible = !!(appEl && appEl.style.display === 'flex');
-      const pdfVisible = !!(pdfEl && (pdfEl.style.display === 'flex' || pdfEl.style.display === 'block'));
-      if (!appVisible && !pdfVisible) return;
+
+      // activeView === 'file' — courseOverview or pdfView under #app.
       const st: StoredState = {
         semId: options.getActiveSemId(),
         courseId: options.getActiveCourseId() || undefined,
