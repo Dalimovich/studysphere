@@ -15,6 +15,7 @@ backend/
 │   └── notes/        Notes CRUD + generation
 ├── edge-functions/   Netlify Edge Functions (ai-stream)
 ├── lib/              Shared modules imported by functions
+├── python-ai/        FastAPI service deployed to Fly.io (python-ai.fly.dev)
 └── tsconfig.json
 ```
 

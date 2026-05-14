@@ -130,14 +130,14 @@ Full request/response shapes are spec'd in the original brief; this doc is the r
 
 ### Phase 1 — Python skeleton + Supabase wiring **← we are here**
 Adds only:
-- `python-ai/pyproject.toml` — fastapi, uvicorn, httpx, supabase-py, openai, pdfminer.six, tiktoken, pytest.
-- `python-ai/app/main.py` — FastAPI app + `/health`.
-- `python-ai/app/config.py` — env loading.
-- `python-ai/app/supabase_client.py` — service-role client.
-- `python-ai/app/auth.py` — `INTERNAL_SECRET (existing Netlify var, reused)` check (shared secret between Netlify and Python).
-- `python-ai/Dockerfile`, `.dockerignore`.
-- `python-ai/README.md`.
-- `python-ai/.env.example`.
+- `backend/python-ai/pyproject.toml` — fastapi, uvicorn, httpx, supabase-py, openai, pdfminer.six, tiktoken, pytest.
+- `backend/python-ai/app/main.py` — FastAPI app + `/health`.
+- `backend/python-ai/app/config.py` — env loading.
+- `backend/python-ai/app/supabase_client.py` — service-role client.
+- `backend/python-ai/app/auth.py` — `INTERNAL_SECRET (existing Netlify var, reused)` check (shared secret between Netlify and Python).
+- `backend/python-ai/Dockerfile`, `.dockerignore`.
+- `backend/python-ai/README.md`.
+- `backend/python-ai/.env.example`.
 
 No frontend changes. No Netlify changes. No DB migrations. Service must run locally and return 200 on `/health`.
 
@@ -211,5 +211,5 @@ Alternatives ranked: Render → Railway → VPS.
 ---
 
 ## What progress means
-- ✅ Phase 1: `python-ai/` boots locally, `/health` returns 200, Supabase service-role client connects (smoke test reads from `documents` table).
+- ✅ Phase 1: `backend/python-ai/` boots locally, `/health` returns 200, Supabase service-role client connects (smoke test reads from `documents` table).
 - ⏳ Phase 2 starts after Phase 1 is approved.

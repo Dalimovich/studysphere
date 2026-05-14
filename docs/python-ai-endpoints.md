@@ -175,7 +175,7 @@ to verify the service can reach Postgres.
 ## Deploy
 
 ```
-flyctl deploy -a python-ai -c python-ai/fly.toml
+flyctl deploy -a python-ai -c backend/python-ai/fly.toml
 flyctl logs -a python-ai
 flyctl status -a python-ai
 ```
