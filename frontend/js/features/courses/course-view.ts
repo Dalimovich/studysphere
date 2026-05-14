@@ -228,8 +228,42 @@ export function openCourse(course: LegacyCourse): void {
   if (typeof window.renderCourses === 'function') window.renderCourses();
 
   const myCourseSeq = ++(window._courseOpenSeq as number);
+
+  // Render the root-level files the moment they arrive — folder listings keep
+  // running in the background. Without this, the spinner persists until the
+  // slowest folder list returns (often seconds longer than necessary).
+  const onRootDone = (ev: Event): void => {
+    const detail = (ev as CustomEvent<{ courseId?: string }>).detail;
+    if (!detail || detail.courseId !== course.id) return;
+    if (myCourseSeq !== window._courseOpenSeq) return;
+    course._filesLoading = false;
+    // Keep _filesRefreshing true — folders are still loading. Toolbar pill stays.
+    window._ssRestoring = true;
+    showCourseSection(course, 'files');
+    window._ssRestoring = false;
+  };
+  window.addEventListener('uf-merge-root-done', onRootDone);
+
+  // 10-second timeout fallback — if _ufMerge hangs entirely (auth race / network
+  // dead), don't leave the user staring at the spinner forever.
+  const fallbackTimer = window.setTimeout(() => {
+    if (myCourseSeq !== window._courseOpenSeq) return;
+    if (!course._filesLoading) return; // already cleared
+    course._filesLoading = false;
+    course._filesRefreshing = false;
+    window._ssRestoring = true;
+    showCourseSection(course, 'files');
+    window._ssRestoring = false;
+  }, 10000);
+
+  const cleanup = (): void => {
+    window.removeEventListener('uf-merge-root-done', onRootDone);
+    window.clearTimeout(fallbackTimer);
+  };
+
   window._ufMerge?.(course)
     .then(() => {
+      cleanup();
       course._filesLoading = false;
       course._filesRefreshing = false;
       const stillOnThisCourse = myCourseSeq === window._courseOpenSeq;
@@ -266,6 +300,7 @@ export function openCourse(course: LegacyCourse): void {
       } catch { /* quota or stringify */ }
     })
     .catch(() => {
+      cleanup();
       course._filesLoading = false;
       course._filesRefreshing = false;
       const stillOnThisCourse = myCourseSeq === window._courseOpenSeq;

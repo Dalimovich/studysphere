@@ -203,8 +203,37 @@ export function openCourse(course) {
     if (typeof window.renderCourses === 'function')
         window.renderCourses();
     const myCourseSeq = ++window._courseOpenSeq;
+    // Render root-level files the moment they arrive — folder listings keep
+    // running in the background. Without this, the spinner persists until the
+    // slowest folder list returns.
+    const onRootDone = (ev) => {
+        const detail = ev.detail;
+        if (!detail || detail.courseId !== course.id) return;
+        if (myCourseSeq !== window._courseOpenSeq) return;
+        course._filesLoading = false;
+        // Keep _filesRefreshing true — folders still loading. Toolbar pill stays.
+        window._ssRestoring = true;
+        showCourseSection(course, 'files');
+        window._ssRestoring = false;
+    };
+    window.addEventListener('uf-merge-root-done', onRootDone);
+    // 10-second timeout fallback — don't leave the user on a spinner forever.
+    const fallbackTimer = window.setTimeout(() => {
+        if (myCourseSeq !== window._courseOpenSeq) return;
+        if (!course._filesLoading) return;
+        course._filesLoading = false;
+        course._filesRefreshing = false;
+        window._ssRestoring = true;
+        showCourseSection(course, 'files');
+        window._ssRestoring = false;
+    }, 10000);
+    const cleanup = () => {
+        window.removeEventListener('uf-merge-root-done', onRootDone);
+        window.clearTimeout(fallbackTimer);
+    };
     window._ufMerge?.(course)
         .then(() => {
+        cleanup();
         course._filesLoading = false;
         course._filesRefreshing = false;
         const stillOnThisCourse = myCourseSeq === window._courseOpenSeq;
@@ -242,6 +271,7 @@ export function openCourse(course) {
         catch { /* quota or stringify */ }
     })
         .catch(() => {
+        cleanup();
         course._filesLoading = false;
         course._filesRefreshing = false;
         const stillOnThisCourse = myCourseSeq === window._courseOpenSeq;

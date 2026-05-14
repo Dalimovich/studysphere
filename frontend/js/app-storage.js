@@ -453,6 +453,15 @@ async function _ufMergeImpl(course) {
       });
   });
 
+  // Root listing is done. Fire an event so the course view can render the
+  // root files immediately — folder listings continue below in parallel.
+  // Without this, the UI waits for the *last* folder list to clear the spinner.
+  try {
+    window.dispatchEvent(new CustomEvent('uf-merge-root-done', {
+      detail: { courseId: course.id, course: course }
+    }));
+  } catch (e) {}
+
   // Merge discovered folders with localStorage list so neither source loses data
   var savedFolders = _ufGetFolders(uid, course);
   var allFolders = savedFolders.slice();
