@@ -93,6 +93,8 @@ function _ssPortalNavId(section) {
 function _ssApplyHistoryState(state) {
   if (!state) {
     showPortal();
+    // Default to dashboard when we have no state at all.
+    setNavActive('psbDashboard');
     return;
   }
 
@@ -101,19 +103,26 @@ function _ssApplyHistoryState(state) {
     if (state.section) {
       setNavActive(_ssPortalNavId(state.section));
       showPortalSection(state.section);
+    } else {
+      setNavActive('psbDashboard');
     }
     return;
   }
 
   if (state.view === 'studip' || state.view === 'courses') {
     showStudip();
+    // showStudip already sets nav, but be explicit so future readers see it.
+    setNavActive('pcStudip');
     return;
   }
 
+  // ── Inside a course or a file: nav must be pcStudip (Courses), not whatever
+  // section the user was on before. This is the bug from the screenshot —
+  // browser back from chatbot to a file left the AI sidebar item highlighted.
   if (state.view === 'course') {
     var course = _ssFindCourseById(state.courseId) || _ssFindCourseByShort(state.courseShort);
     if (course) {
-      _showFilesView();
+      setNavActive('pcStudip');
       if (typeof window.openCourse === 'function') window.openCourse(course);
       if (state.section && typeof window.showCourseSection === 'function')
         window.showCourseSection(course, state.section);
@@ -124,7 +133,7 @@ function _ssApplyHistoryState(state) {
   if (state.view === 'file') {
     var fileCourse = _ssFindCourseById(state.courseId) || _ssFindCourseByShort(state.courseShort);
     if (fileCourse) {
-      _showFilesView();
+      setNavActive('pcStudip');
       var file = _ssFindFileInCourse(fileCourse, state.fileName);
       if (file) {
         if (typeof window.openFile === 'function') window.openFile(file, fileCourse);
