@@ -9,10 +9,25 @@ var _ssHandlingPop = false;
 var _ssRestoring = false; // suppress history pushes during state restore
 
 function _ssPushHistory(state, hash) {
-  if (_ssHandlingPop || _ssRestoring) return;
+  // TEMP diagnostic — remove after URL-stuck-on-notes bug is confirmed fixed.
+  // Logs why a push is suppressed so the next click reveals which flag is held.
+  if (_ssHandlingPop || _ssRestoring || window._ssRestoring) {
+    try {
+      console.log(
+        '[router] _ssPushHistory bailed',
+        'hash=', hash,
+        '_ssHandlingPop=', _ssHandlingPop,
+        '_ssRestoring(local)=', _ssRestoring,
+        'window._ssRestoring=', window._ssRestoring
+      );
+    } catch (e) {}
+    return;
+  }
   try {
     history.pushState(state, '', hash || window.location.pathname);
-  } catch (e) {}
+  } catch (e) {
+    try { console.log('[router] pushState threw', e); } catch (e2) {}
+  }
 }
 
 function _ssReplaceHistory(state, hash) {
