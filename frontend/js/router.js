@@ -251,7 +251,21 @@ window.showPortalSection = function (sec) {
   }
 
   activePortalSection = target;
-  _origShowPortalSection(target);
+  // TEMP diagnostic — catch any throw from the inner showPortalSection so we
+  // can see what's blowing up while still completing the URL/sessionStorage
+  // update. Without this, a throw here silently kills the ss_portal_tab and
+  // history push, leaving Notes (the last successful update) as the perpetual
+  // restore target.
+  try {
+    _origShowPortalSection(target);
+  } catch (e) {
+    try {
+      console.error(
+        '[router] _origShowPortalSection threw for target=', target,
+        'error=', e && (e.stack || e.message || e)
+      );
+    } catch (e2) {}
+  }
   if (target === 'subscription') {
     setTimeout(function () {
       if (typeof _bindSubscriptionControls === 'function') _bindSubscriptionControls();
