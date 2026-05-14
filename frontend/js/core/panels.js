@@ -41,6 +41,71 @@ export function showFilesView(stRunning) {
     if (stMini)
         stMini.style.display = stRunning ? 'flex' : 'none';
 }
+// Single source of truth for which of the three top-level containers is shown.
+// See panels.ts for the contract.
+export function selectTopLevelView(which, opts) {
+    const portal = document.getElementById('portal');
+    const app = document.getElementById('app');
+    const studip = document.getElementById('studipDash');
+    const mainScroll = document.querySelector('#portal .main-scroll');
+    if (portal) {
+        portal.classList.add('show');
+        portal.style.display = 'block';
+        portal.dataset.activeView = which;
+    }
+    if (which === 'file') {
+        if (mainScroll) mainScroll.style.display = 'none';
+        if (studip) studip.style.display = 'none';
+        if (app) app.style.display = 'flex';
+        document.querySelectorAll('.portal-section').forEach((el) => {
+            el.style.display = 'none';
+            el.classList.remove('psec-entering', 'psec-leaving');
+        });
+        _applyFileChrome((opts && opts.stRunning) || false);
+    }
+    else if (which === 'studip') {
+        if (mainScroll) mainScroll.style.display = 'none';
+        if (app) app.style.display = 'none';
+        if (studip) studip.style.display = '';
+        document.querySelectorAll('.portal-section').forEach((el) => {
+            el.style.display = 'none';
+            el.classList.remove('psec-entering', 'psec-leaving');
+        });
+        _applyPortalChrome();
+    }
+    else {
+        if (mainScroll) mainScroll.style.display = '';
+        if (app) app.style.display = 'none';
+        if (studip) studip.style.display = 'none';
+        _applyPortalChrome();
+    }
+}
+function _applyFileChrome(stRunning) {
+    const fab = document.getElementById('addWidgetFab');
+    if (fab) fab.classList.remove('visible');
+    const back = document.getElementById('goPortal');
+    if (back) back.style.display = '';
+    const title = document.getElementById('topTitle');
+    if (title) title.style.display = 'none';
+    const crumb = document.getElementById('breadcrumb');
+    if (crumb) crumb.style.display = '';
+    const stBtn = document.getElementById('studyTechBtn');
+    if (stBtn) stBtn.style.display = 'flex';
+    const stMini = document.getElementById('stMiniTimer');
+    if (stMini) stMini.style.display = stRunning ? 'flex' : 'none';
+}
+function _applyPortalChrome() {
+    const back = document.getElementById('goPortal');
+    if (back) back.style.display = 'none';
+    const title = document.getElementById('topTitle');
+    if (title) title.style.display = '';
+    const crumb = document.getElementById('breadcrumb');
+    if (crumb) crumb.style.display = 'none';
+    const stBtn = document.getElementById('studyTechBtn');
+    if (stBtn) stBtn.style.display = 'none';
+    const stMini = document.getElementById('stMiniTimer');
+    if (stMini) stMini.style.display = 'none';
+}
 export function hideFilesView() {
     const ms = document.querySelector('#portal .main-scroll');
     if (ms)
