@@ -173,18 +173,6 @@
 
     window._glOpenSkill = function (skill) {
       _glActiveSkill = skill;
-
-      // Show skill detail, hide home
-      var home = document.getElementById('glHome');
-      var detail = document.getElementById('glSkillView');
-      if (home) home.style.display = 'none';
-      if (detail) detail.style.display = '';
-
-      // Update title and subtitle
-      var titleEl = document.getElementById('glSkillTitle');
-      var subEl = document.getElementById('glSkillSub');
-      if (titleEl) titleEl.textContent = _glSkillNames[skill] || skill;
-      if (subEl) subEl.textContent = _glSkillSubs[skill] || '';
       // Seed activeCourseId/activeCourseRef if not yet set, then load DB tools.
       var _glCourseForSkill = _glEnsurePracticeCourse();
       console.log('[practice course]', {
@@ -899,6 +887,10 @@
       }
       activeCourseId = course.id;
       activeCourseRef = course;
+      _showFilesView();
+      var crumb = document.getElementById('breadcrumb');
+      if (crumb) crumb.innerHTML = '<b>' + (course.name || course.id) + '</b>';
+      showCourseSection(course, 'files');
     }
 
     function _glOpenFile(uid, fname) {
