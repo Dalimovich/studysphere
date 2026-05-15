@@ -460,53 +460,6 @@ function wireClose() {
         }
     });
 }
-// ── Mobile pill + chooser popover ────────────────────────────────────────
-function setPillMenuOpen(open) {
-    const menu = $('drPillMenu');
-    const pill = $('drPill');
-    if (!menu || !pill)
-        return;
-    menu.hidden = !open;
-    pill.setAttribute('aria-expanded', open ? 'true' : 'false');
-}
-function wirePill() {
-    const pill = $('drPill');
-    const menu = $('drPillMenu');
-    if (!pill || !menu)
-        return;
-    pill.addEventListener('click', (e) => {
-        e.stopPropagation();
-        setPillMenuOpen(menu.hidden);
-    });
-    // Mode buttons inside the popover — open the drawer in the picked mode.
-    menu.querySelectorAll('.dr-pill-menu-btn').forEach((btn) => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const mode = btn.dataset.drMode;
-            if (!mode)
-                return;
-            setPillMenuOpen(false);
-            openDrawer(mode);
-        });
-    });
-    // Outside-click closes the popover.
-    document.addEventListener('click', (e) => {
-        if (menu.hidden)
-            return;
-        const target = e.target;
-        if (!target)
-            return;
-        if (menu.contains(target) || pill.contains(target))
-            return;
-        setPillMenuOpen(false);
-    });
-    // Esc closes the popover (in addition to closing the drawer).
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && !menu.hidden) {
-            setPillMenuOpen(false);
-        }
-    });
-}
 function setRouteVisibility(route) {
     const root = $('drRoot');
     if (!root)
@@ -534,7 +487,6 @@ export function initDocumentRail() {
     wireRailButtons();
     wireClose();
     wireResize();
-    wirePill();
     const w = window;
     w.__minalloDocRail = {
         setRouteVisibility,

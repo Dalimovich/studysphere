@@ -463,53 +463,6 @@ function wireClose(): void {
   });
 }
 
-// ── Mobile pill + chooser popover ────────────────────────────────────────
-function setPillMenuOpen(open: boolean): void {
-  const menu = $('drPillMenu');
-  const pill = $('drPill');
-  if (!menu || !pill) return;
-  menu.hidden = !open;
-  pill.setAttribute('aria-expanded', open ? 'true' : 'false');
-}
-
-function wirePill(): void {
-  const pill = $('drPill');
-  const menu = $('drPillMenu');
-  if (!pill || !menu) return;
-
-  pill.addEventListener('click', (e: MouseEvent) => {
-    e.stopPropagation();
-    setPillMenuOpen(menu.hidden);
-  });
-
-  // Mode buttons inside the popover — open the drawer in the picked mode.
-  menu.querySelectorAll<HTMLButtonElement>('.dr-pill-menu-btn').forEach((btn) => {
-    btn.addEventListener('click', (e: MouseEvent) => {
-      e.stopPropagation();
-      const mode = btn.dataset.drMode as DocRailMode | undefined;
-      if (!mode) return;
-      setPillMenuOpen(false);
-      openDrawer(mode);
-    });
-  });
-
-  // Outside-click closes the popover.
-  document.addEventListener('click', (e: MouseEvent) => {
-    if (menu.hidden) return;
-    const target = e.target as Node | null;
-    if (!target) return;
-    if (menu.contains(target) || pill.contains(target)) return;
-    setPillMenuOpen(false);
-  });
-
-  // Esc closes the popover (in addition to closing the drawer).
-  document.addEventListener('keydown', (e: KeyboardEvent) => {
-    if (e.key === 'Escape' && !menu.hidden) {
-      setPillMenuOpen(false);
-    }
-  });
-}
-
 function setRouteVisibility(route: DocRailRoute): void {
   const root = $('drRoot');
   if (!root) return;
@@ -537,7 +490,6 @@ export function initDocumentRail(): void {
   wireRailButtons();
   wireClose();
   wireResize();
-  wirePill();
 
   const w: DocRailWindow = window as DocRailWindow;
   w.__minalloDocRail = {
