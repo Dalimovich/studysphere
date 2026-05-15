@@ -267,7 +267,7 @@ export function initMusicServices(options: InitMusicServicesOptions): void {
   }
 
   function ytRenderList(): void {
-    const list = document.getElementById('youtubePlaylists');
+    const list = document.getElementById('ytPlaylistList');
     if (!list) return;
     list.innerHTML = '';
     const playlists = ytGetPlaylists();

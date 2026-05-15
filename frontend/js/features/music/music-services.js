@@ -201,7 +201,7 @@ export function initMusicServices(options) {
         }
     }
     function ytRenderList() {
-        const list = document.getElementById('youtubePlaylists');
+        const list = document.getElementById('ytPlaylistList');
         if (!list)
             return;
         list.innerHTML = '';
