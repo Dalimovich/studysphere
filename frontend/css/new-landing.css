@@ -90,10 +90,14 @@ body.nl-body {
   background-color: var(--nl-bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  /* See note on .nl-main below. Same reasoning applies: use `clip` instead
-     of `hidden` so the body never becomes a wheel-event-swallowing scroll
-     container with zero scroll range. */
-  overflow-x: clip;
+  /* Body uses overflow-x: hidden — the stable, well-supported pattern for
+     trapping horizontal overflow at the root. Unlike .nl-main (which has no
+     fixed height and would become a dead scroll container under `hidden`),
+     the body's viewport scroll range IS the document height, so `hidden`
+     here does not break wheel scrolling. `clip` was tried (909c557) and
+     still left wheel events broken on some browsers — reverting to the
+     known-good pattern. .nl-main keeps `overflow-x: clip` below. */
+  overflow-x: hidden;
   position: relative;
 }
 
@@ -202,6 +206,10 @@ img, svg {
   position: fixed;
   inset: 0;
   z-index: -10;
+  /* Other decor layers (.nl-grid-bg, .nl-orb-*) disable pointer-events; this
+     one was missed. A fixed full-viewport element without pointer-events
+     disabled can intercept wheel events in some stacking contexts. */
+  pointer-events: none;
   background:
     radial-gradient(circle at top left, var(--nl-bg-soft) 0, transparent 34%),
     radial-gradient(circle at 80% 10%, var(--nl-sky-600) 0, transparent 28%),
