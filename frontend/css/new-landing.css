@@ -83,21 +83,23 @@ html {
 
 body.nl-body {
   margin: 0;
-  min-height: 100vh;
   font-family: var(--nl-font-body);
   font-weight: 400;
   color: #ffffff;
   background-color: var(--nl-bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  /* Body uses overflow-x: hidden — the stable, well-supported pattern for
-     trapping horizontal overflow at the root. Unlike .nl-main (which has no
-     fixed height and would become a dead scroll container under `hidden`),
-     the body's viewport scroll range IS the document height, so `hidden`
-     here does not break wheel scrolling. `clip` was tried (909c557) and
-     still left wheel events broken on some browsers — reverting to the
-     known-good pattern. .nl-main keeps `overflow-x: clip` below. */
+  /* CRITICAL: theme.css has a global `body { overflow: hidden; height: 100vh }`
+     intended for the in-app dashboard shell. When the landing loads, the body
+     gets both `night` and `nl-body` classes, so that rule applies too and
+     kills wheel scrolling (anchor jumps still work because scrollIntoView
+     forces a scroll). Setting `min-height` alone is NOT enough — the
+     inherited `height: 100vh` still wins. Override both axes explicitly:
+     the page must grow to its content height and scroll vertically. */
+  height: auto;
+  min-height: 100vh;
   overflow-x: hidden;
+  overflow-y: auto;
   position: relative;
 }
 
