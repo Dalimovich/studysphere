@@ -186,6 +186,11 @@
             link.rel = 'stylesheet';
             link.href = 'css/new-landing.css?v=1';
             document.head.appendChild(link);
+            // task-04: auth modal can be triggered from the landing too, ship its CSS up front.
+            const authLink = document.createElement('link');
+            authLink.rel = 'stylesheet';
+            authLink.href = 'css/auth.css?v=1';
+            document.head.appendChild(authLink);
         })();
         fetch('pages/new_landing.html')
             .then((r) => {
@@ -288,6 +293,7 @@
     // Inject feature CSS
     (function () {
         [
+            'css/auth.css?v=1',
             'views/toast/toast.css',
             'views/chatbot/chatbot.css',
             'views/chatbot/ai-bubble.css',
