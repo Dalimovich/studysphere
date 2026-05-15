@@ -5349,7 +5349,7 @@ body:not(.night) #portal {
   background: rgba(59, 130, 246, 0.1);
   border-color: rgba(59, 130, 246, 0.2);
 }
-#portal .typing-bubble span:nth-child(1) { background: #7dd3fc; }
+#portal .typing-bubble span:nth-child(1) { background: #60a5fa; }
 #portal .typing-bubble span:nth-child(2) { background: #93c5fd; }
 #portal .typing-bubble span:nth-child(3) { background: #bfdbfe; }
 

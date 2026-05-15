@@ -77,18 +77,9 @@ body.night {
   --shadow-sky: 0 0 35px rgba(56, 189, 248, 0.35);
   --shadow-sky-soft: 0 0 55px rgba(56, 189, 248, 0.18);
   --border: #1e293b;
-  /* Landing-style background: two sky-radial hotspots over a slate linear
-     gradient. Identical to .nl-bg-gradient on the new landing so every
-     dashboard / courses / settings surface that uses var(--dp-bg) inherits
-     the same atmospheric look. */
-  --dp-bg:
-    radial-gradient(circle at top left, #075985 0, transparent 34%),
-    radial-gradient(circle at 80% 10%, #0284c7 0, transparent 28%),
-    linear-gradient(135deg, #020617 0%, #082f49 55%, #031323 100%);
-  --dp-solid: #031323;
-  --dp-modal:
-    radial-gradient(circle at 50% 0%, rgba(125, 211, 252, 0.20), transparent 45%),
-    linear-gradient(135deg, #0f172a, #082f49);
+  --dp-bg: linear-gradient(135deg, #020617 0%, #0f172a 48%, #082f49 100%);
+  --dp-solid: #020617;
+  --dp-modal: linear-gradient(135deg, #0f172a, #082f49);
   /* adaptive semantic tokens — dark overrides */
   --glass-bg: rgba(255, 255, 255, 0.07);
   --glass-border: rgba(255, 255, 255, 0.14);
@@ -106,20 +97,6 @@ body.night {
   --badge-border: rgba(255, 255, 255, 0.12);
   --badge-color: rgba(255, 255, 255, 0.5);
   --slot-bg: rgba(255, 255, 255, 0.05);
-}
-
-/* Landing-style atmosphere on the body itself. Every glass surface in the
-   app (sidebar with backdrop-blur, cards with rgba bg, modals) sees
-   through to this radial-sky gradient — same two hotspot recipe as the
-   new landing's .nl-bg-gradient. background-attachment: fixed so the
-   gradient stays anchored to the viewport even though body has
-   height:100vh/overflow:hidden (in-app shell scrolls its own children). */
-body.night {
-  background:
-    radial-gradient(circle at top left, #075985 0, transparent 34%),
-    radial-gradient(circle at 80% 10%, #0284c7 0, transparent 28%),
-    linear-gradient(135deg, #020617 0%, #082f49 55%, #031323 100%);
-  background-attachment: fixed;
 }
 body.night .pdf-body {
   background: #1a1a2e;
@@ -250,7 +227,7 @@ body.night .tb-portal-btn:hover {
 
 #googleSignIn:hover {
   background: var(--auth-google-hover) !important;
-  border-color: rgba(125, 211, 252, 0.35) !important;
+  border-color: rgba(96, 165, 250, 0.35) !important;
 }
 
 @media (max-width: 760px) {
