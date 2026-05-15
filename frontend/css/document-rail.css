@@ -790,20 +790,23 @@
 }
 
 /* Editor inputs / preview.
-   Flex inheritance through .np-body → .np-editor-wrap → .np-preview was not
-   reliably propagating the drawer's available height down to the preview
-   (something in the legacy cascade keeps collapsing back to content size).
-   Force the layout with CSS grid: title-row + view-tabs are auto, preview
-   takes 1fr — explicit, unambiguous, no flex chain. */
+   The drawer header already labels the mode, and the AI-generated markdown
+   is rarely hand-edited inside the drawer — so we hide the legacy title
+   input and Preview/Edit sub-tabs to give the preview ~90px more room.
+   With those rows hidden, the grid collapses to a single 1fr row that
+   the preview (or hidden editor-ta in Edit mode) fills. */
 .dr-drawer .dr-host-notes .np-editor-wrap {
   background: transparent;
   flex: 1 1 0 !important;
   min-height: 0 !important;
   height: 100% !important;
   display: grid !important;
-  grid-template-rows: auto auto 1fr !important;
+  grid-template-rows: 1fr !important;
   overflow: hidden !important;
-  gap: 8px;
+}
+.dr-drawer .dr-host-notes .np-title-row,
+.dr-drawer .dr-host-notes .np-view-tabs {
+  display: none !important;
 }
 .dr-drawer .dr-host-notes .np-title-input {
   width: 100%;
