@@ -6,8 +6,8 @@
 ## Task states
 | Task | Status | Notes |
 |---|---|---|
-| task-01 | running | Color token swap in theme.css |
-| task-02 | not-started | Glass surfaces re-skin (sidebar, dashboard cards, modals) |
+| task-01 | done (66e6cf2) | Color token swap in theme.css |
+| task-02 | partial (high-impact pass) | body.night radial gradient + --dp-bg sky radials + bulk swap of hardcoded #60a5fa → #7dd3fc |
 | task-03 | not-started | Visual review fixes |
 
 ## Next action

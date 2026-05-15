@@ -752,7 +752,7 @@ body.night #portal .sidebar:hover .sb-night-track-label {
   border-color: #2563eb;
 }
 #portal #app .co-multi-count b {
-  color: #60a5fa;
+  color: #7dd3fc;
 }
 #portal #app .co-multi-bar {
   background: linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(15, 30, 60, 0.98));
@@ -766,14 +766,14 @@ body.night #portal .sidebar:hover .sb-night-track-label {
 /* Dark mode blue overrides */
 body.night #portal #app .sb-x-btn {
   background: rgba(37, 99, 235, 0.15);
-  color: #60a5fa;
+  color: #7dd3fc;
 }
 body.night #portal #app .sem-btn:hover,
 body.night #portal #app .sem-btn.open {
   border-color: #3b82f6;
 }
 body.night #portal #app .sem-chev {
-  color: #60a5fa;
+  color: #7dd3fc;
 }
 body.night #portal #app .sem-dd {
   border-color: #3b82f6;
@@ -781,11 +781,11 @@ body.night #portal #app .sem-dd {
 }
 body.night #portal #app .sem-opt:hover {
   background: rgba(37, 99, 235, 0.15);
-  color: #60a5fa;
+  color: #7dd3fc;
 }
 body.night #portal #app .sem-opt.sel {
   background: linear-gradient(135deg, rgba(37, 99, 235, 0.2), rgba(14, 165, 233, 0.15));
-  color: #60a5fa;
+  color: #7dd3fc;
 }
 body.night #portal #app .course-row:hover {
   border-color: #3b82f6;
@@ -801,59 +801,59 @@ body.night #portal #app .file-row:hover {
 body.night #portal #app .file-row.active {
   border-color: #3b82f6;
   background: rgba(37, 99, 235, 0.2);
-  color: #60a5fa;
+  color: #7dd3fc;
 }
 body.night #portal #app .sb-back {
-  color: #60a5fa;
+  color: #7dd3fc;
 }
 body.night #portal #app .sb-acc-row-active {
   background: rgba(37, 99, 235, 0.25) !important;
-  color: #60a5fa !important;
+  color: #7dd3fc !important;
 }
 body.night #portal #app .pdf-tb-btn {
   background: rgba(37, 99, 235, 0.12);
   border-color: rgba(37, 99, 235, 0.3);
-  color: #60a5fa;
+  color: #7dd3fc;
 }
 body.night #portal #app #aiTab {
   background: linear-gradient(135deg, #2563eb, #1e40af);
 }
 body.night #portal #app .ai-hdr h3 {
-  color: #60a5fa;
+  color: #7dd3fc;
 }
 body.night #portal #app .ai-icon-btn {
-  border-color: rgba(96, 165, 250, 0.3);
+  border-color: rgba(125, 211, 252, 0.3);
   background: rgba(37, 99, 235, 0.15);
-  color: #60a5fa;
+  color: #7dd3fc;
 }
 body.night #portal #app .msg-sender.bot-sender {
-  color: #60a5fa;
+  color: #7dd3fc;
 }
 body.night #portal #app .msg-sender.bot-sender .msg-sender-dot {
-  background: #60a5fa;
+  background: #7dd3fc;
 }
 body.night #portal #app .ai-bubble b,
 body.night #portal #app .ai-bubble strong {
   color: var(--text);
 }
 body.night #portal #app .ai-bubble code {
-  background: rgba(96, 165, 250, 0.12);
-  color: #60a5fa;
+  background: rgba(125, 211, 252, 0.12);
+  color: #7dd3fc;
 }
 body.night #portal #app .ai-bubble .md-h {
   color: var(--text);
 }
 body.night #portal #app .co-card h2 {
-  color: #60a5fa;
+  color: #7dd3fc;
 }
 body.night #portal #app .co-nav-btn:hover {
-  color: #60a5fa;
+  color: #7dd3fc;
   background: rgba(37, 99, 235, 0.15);
-  border-color: rgba(96, 165, 250, 0.3);
+  border-color: rgba(125, 211, 252, 0.3);
 }
 body.night #portal #app .co-nav-btn.active {
   background: linear-gradient(135deg, rgba(37, 99, 235, 0.25), rgba(14, 165, 233, 0.18));
-  color: #60a5fa;
+  color: #7dd3fc;
 }
 /* Active tab — override dark and light purple */
 #portal #app .co-nav-btn.active {
@@ -895,14 +895,14 @@ body:not(.night) #portal #app .co-nav-btn:hover {
   border-color: rgba(37, 99, 235, 0.6);
 }
 body.night #portal #app .co-select-toggle {
-  border-color: rgba(96, 165, 250, 0.35);
+  border-color: rgba(125, 211, 252, 0.35);
   background: rgba(37, 99, 235, 0.12);
-  color: #60a5fa;
+  color: #7dd3fc;
 }
 /* Open button (inline styled in JS — override via class) */
 #portal #app .co-open-btn {
   background: rgba(37, 99, 235, 0.18) !important;
-  color: rgba(96, 165, 250, 0.9) !important;
+  color: rgba(125, 211, 252, 0.9) !important;
   border-color: rgba(37, 99, 235, 0.3) !important;
 }
 #portal #app .co-open-btn:hover {
@@ -956,7 +956,7 @@ body.night #portal #app .ai-textarea:focus {
 }
 body.night #portal #app .ai-chip {
   border-color: rgba(37, 99, 235, 0.3);
-  color: #60a5fa;
+  color: #7dd3fc;
 }
 body.night #portal #app .ai-chip:hover {
   background: rgba(37, 99, 235, 0.15);
@@ -967,7 +967,7 @@ body.night #portal #app .ai-chip:hover {
   color: #2563eb;
 }
 body.night #portal #app .tb-portal-btn {
-  color: #60a5fa;
+  color: #7dd3fc;
 }
 /* AI tip chips */
 #portal #app .ai-tip {
@@ -978,7 +978,7 @@ body.night #portal #app .tb-portal-btn {
 body.night #portal #app .ai-tip {
   background: rgba(37, 99, 235, 0.12);
   border-color: rgba(37, 99, 235, 0.28);
-  color: #60a5fa;
+  color: #7dd3fc;
 }
 #portal #app .ai-tip:hover {
   background: linear-gradient(135deg, #2563eb, #0ea5e9);
@@ -998,7 +998,7 @@ body.night #portal #app .ai-tip {
 body.night #portal #app .ai-file-chip {
   background: rgba(37, 99, 235, 0.13);
   border-color: rgba(37, 99, 235, 0.28);
-  color: #60a5fa;
+  color: #7dd3fc;
 }
 #portal #app .ai-file-chip-bar {
   border-bottom-color: rgba(37, 99, 235, 0.1);
@@ -1010,7 +1010,7 @@ body.night #portal #app .ai-file-chip {
 }
 body.night #portal #app .ai-scroll-btn {
   border-color: rgba(37, 99, 235, 0.3);
-  color: #60a5fa;
+  color: #7dd3fc;
 }
 /* AI panel scrollbar */
 #portal #app .ai-msgs {
