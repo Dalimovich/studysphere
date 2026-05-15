@@ -248,11 +248,6 @@ window.showPortalSection = function (sec) {
   // 'courses' is the URL-facing alias for the internal 'studip' section
   if (target === 'courses') target = 'studip';
 
-  if (target === 'dashboard' && !_pendingPortalRestore) {
-    target = 'german';
-    setNavActive('psbGerman');
-    setTimeout(_glLoadFiles, 300);
-  }
   if (target === 'dashboard' && _pendingPortalRestore) {
     target = _pendingPortalRestore;
     _pendingPortalRestore = null;
@@ -344,9 +339,9 @@ _bindIf('studipBack', 'click', function () {
 
 _bindIf('psbDashboard', 'click', function () {
   showPortal();
-  setNavActive('psbGerman');
-  showPortalSection('german');
-  _finalizeNav('german');
+  setNavActive('psbDashboard');
+  showPortalSection('dashboard');
+  _finalizeNav('dashboard');
 });
 
 _bindIf('psbGerman', 'click', function () {
