@@ -526,3 +526,607 @@
     display: flex;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   Hosted-panel skin (Task-04 follow-up): restyle legacy controls in
+   Minallo glass while they live inside the drawer.
+   ═══════════════════════════════════════════════════════════════════ */
+
+.dr-drawer {
+  --dr-glass-bg: rgba(2, 6, 23, 0.45);
+  --dr-glass-bg-soft: rgba(255, 255, 255, 0.04);
+  --dr-glass-border: rgba(255, 255, 255, 0.10);
+  --dr-glass-border-strong: rgba(255, 255, 255, 0.14);
+  --dr-text: #e2e8f0;
+  --dr-text-strong: #f1f5f9;
+  --dr-text-dim: #94a3b8;
+  --dr-text-faint: #64748b;
+  --dr-sky-100: #e0f2fe;
+  --dr-sky-200: #bae6fd;
+  --dr-sky-bg: rgba(56, 189, 248, 0.16);
+  --dr-sky-bg-soft: rgba(56, 189, 248, 0.08);
+  --dr-sky-border: rgba(56, 189, 248, 0.35);
+  --dr-sky-border-soft: rgba(56, 189, 248, 0.22);
+  --dr-sky-glow: 0 0 14px rgba(56, 189, 248, 0.18);
+  --dr-sky-glow-soft: 0 0 12px rgba(56, 189, 248, 0.12);
+}
+
+/* ── Notes / Summary hosted panel ──────────────────────────────────── */
+
+/* Hide the legacy header row (drawer provides its own title/X/trash).
+   Task-01 already hides .np-header-actions (Export+Close); the tabs row
+   stays but we want the surrounding chrome neutralised. */
+.dr-drawer .dr-host-notes .np-header {
+  padding: 0 0 6px;
+  border-bottom: none;
+  background: transparent;
+}
+/* Belt-and-braces: hide the legacy close icon inside .np-header. */
+.dr-drawer .dr-host-notes #npClose {
+  display: none !important;
+}
+
+/* Tabs (Notes | Saved | Summary) */
+.dr-drawer .dr-host-notes .np-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 0 8px;
+  margin: 0 0 8px;
+  border-bottom: 1px solid var(--dr-glass-border);
+  background: transparent;
+}
+.dr-drawer .dr-host-notes .np-tab {
+  appearance: none;
+  -webkit-appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--dr-text-dim);
+  padding: 6px 14px;
+  border-radius: 999px;
+  font: 800 12px/1 'Nunito', system-ui, sans-serif;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease, box-shadow 140ms ease;
+}
+.dr-drawer .dr-host-notes .np-tab:hover {
+  background: rgba(255, 255, 255, 0.055);
+  color: var(--dr-text);
+}
+.dr-drawer .dr-host-notes .np-tab.active {
+  background: var(--dr-sky-bg);
+  color: var(--dr-sky-100);
+  box-shadow: var(--dr-sky-glow-soft);
+}
+
+/* Options rows (scope / lang / detail) */
+.dr-drawer .dr-host-notes .np-options-row,
+.dr-drawer .dr-host-notes .np-range-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 0 0 6px;
+  margin: 0 0 6px;
+  background: transparent;
+  border: none;
+}
+.dr-drawer .dr-host-notes .np-option-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.dr-drawer .dr-host-notes .np-option-label {
+  font: 800 10px/1 'Nunito', system-ui, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--dr-text-faint);
+  margin-right: 2px;
+}
+
+/* Option pills */
+.dr-drawer .dr-host-notes .np-opt {
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid var(--dr-glass-border);
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--dr-text-dim);
+  padding: 4px 10px;
+  border-radius: 999px;
+  font: 800 11px/1 'Nunito', system-ui, sans-serif;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease, box-shadow 140ms ease;
+}
+.dr-drawer .dr-host-notes .np-opt:hover {
+  border-color: var(--dr-sky-border-soft);
+  background: var(--dr-sky-bg-soft);
+  color: var(--dr-sky-100);
+}
+.dr-drawer .dr-host-notes .np-opt.active {
+  border-color: var(--dr-sky-border);
+  background: var(--dr-sky-bg);
+  color: var(--dr-sky-100);
+  box-shadow: var(--dr-sky-glow-soft);
+}
+
+/* Range inputs */
+.dr-drawer .dr-host-notes .np-range-input {
+  width: 60px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--dr-glass-border);
+  background: rgba(2, 6, 23, 0.4);
+  color: var(--dr-text);
+  font: 700 12px/1 'Nunito', system-ui, sans-serif;
+  outline: none;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+.dr-drawer .dr-host-notes .np-range-input:focus {
+  border-color: var(--dr-sky-border);
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.12);
+}
+.dr-drawer .dr-host-notes .np-range-sep {
+  color: var(--dr-text-faint);
+  font-weight: 800;
+}
+
+/* Action bar (Generate / Regen / Save / status) */
+.dr-drawer .dr-host-notes .np-action-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 0 8px;
+  margin: 0 0 8px;
+  border-bottom: 1px solid var(--dr-glass-border);
+  background: transparent;
+}
+.dr-drawer .dr-host-notes .np-spacer {
+  flex: 1;
+}
+
+/* Generate button — primary gradient pill */
+.dr-drawer .dr-host-notes .np-btn-generate {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--dr-sky-border);
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.18), rgba(99, 102, 241, 0.18));
+  color: var(--dr-sky-100);
+  font: 800 12px/1 'Nunito', system-ui, sans-serif;
+  cursor: pointer;
+  box-shadow: var(--dr-sky-glow-soft);
+  transition: background 140ms ease, border-color 140ms ease, box-shadow 140ms ease, transform 120ms ease;
+}
+.dr-drawer .dr-host-notes .np-btn-generate:hover {
+  border-color: rgba(186, 230, 253, 0.45);
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.26), rgba(99, 102, 241, 0.24));
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.22);
+}
+.dr-drawer .dr-host-notes .np-btn-generate:active {
+  transform: scale(0.97);
+}
+
+/* Regen / Save — secondary glass pills */
+.dr-drawer .dr-host-notes .np-btn-regen,
+.dr-drawer .dr-host-notes .np-btn-save {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--dr-glass-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--dr-text);
+  font: 800 11px/1 'Nunito', system-ui, sans-serif;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+.dr-drawer .dr-host-notes .np-btn-regen:hover,
+.dr-drawer .dr-host-notes .np-btn-save:hover {
+  border-color: var(--dr-glass-border-strong);
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--dr-text-strong);
+}
+
+/* Status text */
+.dr-drawer .dr-host-notes .np-status {
+  color: var(--dr-text-faint);
+  font: 700 11px/1.2 'Nunito', system-ui, sans-serif;
+}
+
+/* Body / empty state */
+.dr-drawer .dr-host-notes .np-body {
+  background: transparent;
+  padding: 4px 2px;
+}
+.dr-drawer .dr-host-notes .np-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 36px 16px;
+  color: var(--dr-text-faint);
+  gap: 8px;
+}
+.dr-drawer .dr-host-notes .np-empty-icon {
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 22px;
+  border: 1px solid var(--dr-glass-border);
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--dr-text-faint);
+  font-size: 28px;
+  margin-bottom: 6px;
+}
+.dr-drawer .dr-host-notes .np-empty-title {
+  font: 900 1.05rem/1.2 'Nunito', system-ui, sans-serif;
+  color: var(--dr-text);
+}
+.dr-drawer .dr-host-notes .np-empty-sub {
+  font: 600 0.82rem/1.5 'Nunito', system-ui, sans-serif;
+  color: var(--dr-text-faint);
+  max-width: 240px;
+}
+
+/* Editor inputs / preview */
+.dr-drawer .dr-host-notes .np-editor-wrap {
+  background: transparent;
+}
+.dr-drawer .dr-host-notes .np-title-input {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--dr-glass-border);
+  background: rgba(2, 6, 23, 0.4);
+  color: var(--dr-text-strong);
+  font: 800 0.95rem/1.2 'Nunito', system-ui, sans-serif;
+  outline: none;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+.dr-drawer .dr-host-notes .np-title-input::placeholder {
+  color: var(--dr-text-faint);
+}
+.dr-drawer .dr-host-notes .np-title-input:focus {
+  border-color: var(--dr-sky-border);
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.12);
+}
+.dr-drawer .dr-host-notes .np-view-tabs {
+  display: flex;
+  gap: 6px;
+  margin: 8px 0;
+}
+.dr-drawer .dr-host-notes .np-view-tab {
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid var(--dr-glass-border);
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--dr-text-dim);
+  padding: 4px 12px;
+  border-radius: 999px;
+  font: 800 11px/1 'Nunito', system-ui, sans-serif;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+.dr-drawer .dr-host-notes .np-view-tab.active {
+  border-color: var(--dr-sky-border);
+  background: var(--dr-sky-bg);
+  color: var(--dr-sky-100);
+}
+.dr-drawer .dr-host-notes .np-preview {
+  border-radius: 14px;
+  border: 1px solid var(--dr-glass-border);
+  background: rgba(2, 6, 23, 0.35);
+  padding: 12px 14px;
+  color: var(--dr-text);
+  line-height: 1.6;
+  font-size: 0.85rem;
+}
+.dr-drawer .dr-host-notes .np-editor-ta {
+  width: 100%;
+  min-height: 240px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--dr-glass-border);
+  background: rgba(2, 6, 23, 0.4);
+  color: var(--dr-text);
+  font: 500 0.85rem/1.6 'Nunito', system-ui, sans-serif;
+  outline: none;
+  resize: vertical;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+.dr-drawer .dr-host-notes .np-editor-ta::placeholder {
+  color: var(--dr-text-faint);
+}
+.dr-drawer .dr-host-notes .np-editor-ta:focus {
+  border-color: var(--dr-sky-border);
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.12);
+}
+
+/* Saved list */
+.dr-drawer .dr-host-notes .np-saved-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 2px;
+}
+.dr-drawer .dr-host-notes .np-saved-item {
+  border-radius: 14px;
+  border: 1px solid var(--dr-glass-border);
+  background: rgba(2, 6, 23, 0.4);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease;
+  position: relative;
+}
+.dr-drawer .dr-host-notes .np-saved-item:hover {
+  border-color: var(--dr-sky-border-soft);
+  background: rgba(56, 189, 248, 0.06);
+}
+.dr-drawer .dr-host-notes .np-saved-item-title {
+  font: 800 0.85rem/1.3 'Nunito', system-ui, sans-serif;
+  color: var(--dr-text-strong);
+}
+.dr-drawer .dr-host-notes .np-saved-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.dr-drawer .dr-host-notes .np-saved-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font: 800 10px/1 'Nunito', system-ui, sans-serif;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.dr-drawer .dr-host-notes .np-saved-badge-notes {
+  background: var(--dr-sky-bg);
+  color: var(--dr-sky-100);
+  border: 1px solid var(--dr-sky-border-soft);
+}
+.dr-drawer .dr-host-notes .np-saved-badge-summary {
+  background: rgba(99, 102, 241, 0.18);
+  color: #c7d2fe;
+  border: 1px solid rgba(99, 102, 241, 0.35);
+}
+.dr-drawer .dr-host-notes .np-saved-pages,
+.dr-drawer .dr-host-notes .np-saved-date {
+  color: var(--dr-text-faint);
+  font: 700 10px/1.2 'Nunito', system-ui, sans-serif;
+}
+.dr-drawer .dr-host-notes .np-saved-delete {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  appearance: none;
+  -webkit-appearance: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: 1px solid var(--dr-glass-border);
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--dr-text-faint);
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+.dr-drawer .dr-host-notes .np-saved-delete:hover {
+  background: rgba(248, 113, 113, 0.12);
+  border-color: rgba(248, 113, 113, 0.35);
+  color: #fca5a5;
+}
+
+/* Generation overlay */
+.dr-drawer .dr-host-notes .np-gen-overlay {
+  background: rgba(2, 6, 23, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.dr-drawer .dr-host-notes .np-gen-box {
+  border-radius: 16px;
+  border: 1px solid var(--dr-glass-border);
+  background: var(--dr-glass-bg);
+  color: var(--dr-text);
+  padding: 18px 22px;
+}
+.dr-drawer .dr-host-notes .np-gen-spinner {
+  border-color: rgba(56, 189, 248, 0.2);
+  border-top-color: var(--dr-sky-200);
+}
+
+/* ── AI hosted panel ───────────────────────────────────────────────── */
+
+/* Chat history container */
+.dr-drawer .dr-host-ai .ai-msgs {
+  background: transparent;
+  padding: 14px 12px;
+  gap: 16px;
+}
+
+/* Assistant + user bubbles */
+.dr-drawer .dr-host-ai .ai-bubble {
+  border-radius: 18px;
+  padding: 12px 14px;
+  font-size: 0.83rem;
+  line-height: 1.6;
+}
+.dr-drawer .dr-host-ai .ai-bubble.bot {
+  border: 1px solid var(--dr-glass-border);
+  background: rgba(2, 6, 23, 0.4);
+  color: var(--dr-text);
+  box-shadow: 0 4px 18px rgba(2, 6, 23, 0.25);
+}
+.dr-drawer .dr-host-ai .ai-bubble.user {
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  background: linear-gradient(135deg, #38bdf8, #3b82f6);
+  color: #f8fafc;
+  border-top-right-radius: 8px;
+  box-shadow: 0 6px 22px rgba(14, 165, 233, 0.22);
+}
+.dr-drawer .dr-host-ai .msg-sender.user-sender {
+  color: var(--dr-sky-200);
+}
+.dr-drawer .dr-host-ai .msg-sender.bot-sender {
+  color: #c7d2fe;
+}
+.dr-drawer .dr-host-ai .msg-time {
+  color: var(--dr-text-faint);
+}
+
+/* Chip drawers (options) — restyle as glass row */
+.dr-drawer .dr-host-ai .chip-drawer {
+  border-radius: 14px;
+  border: 1px solid var(--dr-glass-border);
+  background: rgba(2, 6, 23, 0.35);
+  padding: 8px 10px;
+  margin: 6px 10px;
+}
+.dr-drawer .dr-host-ai .chip-drawer-label {
+  font: 800 10px/1 'Nunito', system-ui, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--dr-text-faint);
+  margin-right: 6px;
+}
+.dr-drawer .dr-host-ai .chip-sub {
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid var(--dr-glass-border);
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--dr-text-dim);
+  padding: 4px 10px;
+  border-radius: 999px;
+  font: 800 11px/1 'Nunito', system-ui, sans-serif;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+.dr-drawer .dr-host-ai .chip-sub:hover,
+.dr-drawer .dr-host-ai .chip-sub.is-active,
+.dr-drawer .dr-host-ai .chip-sub.active {
+  border-color: var(--dr-sky-border);
+  background: var(--dr-sky-bg);
+  color: var(--dr-sky-100);
+}
+
+/* Composer (input area) */
+.dr-drawer .dr-host-ai .ai-input-box {
+  border-radius: 18px;
+  border: 1px solid var(--dr-glass-border-strong);
+  background: rgba(2, 6, 23, 0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 10px 12px;
+  margin: 8px 10px 12px;
+  box-shadow: 0 8px 28px rgba(2, 6, 23, 0.4);
+}
+.dr-drawer .dr-host-ai .ai-textarea {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--dr-text-strong);
+  font: 500 0.88rem/1.5 'Nunito', system-ui, sans-serif;
+  width: 100%;
+  resize: none;
+  padding: 4px 4px 0;
+}
+.dr-drawer .dr-host-ai .ai-textarea::placeholder {
+  color: var(--dr-text-faint);
+}
+.dr-drawer .dr-host-ai .ai-bottom-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+/* Mode pill */
+.dr-drawer .dr-host-ai .ai-mode-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--dr-sky-border-soft);
+  background: var(--dr-sky-bg-soft);
+  color: var(--dr-sky-100);
+  font: 800 11px/1 'Nunito', system-ui, sans-serif;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+.dr-drawer .dr-host-ai .ai-mode-pill:hover {
+  border-color: var(--dr-sky-border);
+  background: var(--dr-sky-bg);
+}
+
+/* Char count */
+.dr-drawer .dr-host-ai .ai-char-count {
+  color: var(--dr-text-faint);
+  font: 700 10px/1 'Nunito', system-ui, sans-serif;
+  margin-left: 4px;
+}
+
+/* Attach / snip buttons */
+.dr-drawer .dr-host-ai .ai-attach-btn,
+.dr-drawer .dr-host-ai .ai-snip-btn {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px solid var(--dr-glass-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--dr-sky-200);
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+.dr-drawer .dr-host-ai .ai-attach-btn:hover,
+.dr-drawer .dr-host-ai .ai-snip-btn:hover {
+  border-color: var(--dr-glass-border-strong);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Send button — solid sky, big glow */
+.dr-drawer .dr-host-ai .ai-send {
+  appearance: none;
+  -webkit-appearance: none;
+  margin-left: auto;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 12px;
+  background: #38bdf8;
+  color: #020617;
+  cursor: pointer;
+  box-shadow: 0 0 24px rgba(56, 189, 248, 0.32);
+  transition: background 140ms ease, transform 120ms ease, box-shadow 140ms ease;
+}
+.dr-drawer .dr-host-ai .ai-send:hover {
+  background: #7dd3fc;
+  box-shadow: 0 0 30px rgba(56, 189, 248, 0.45);
+}
+.dr-drawer .dr-host-ai .ai-send:active {
+  transform: scale(0.96);
+}
+.dr-drawer .dr-host-ai .ai-send svg {
+  color: #020617;
+  stroke: #020617;
+}
