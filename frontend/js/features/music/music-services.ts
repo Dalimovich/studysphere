@@ -266,6 +266,8 @@ export function initMusicServices(options: InitMusicServicesOptions): void {
     }
   }
 
+  let _ytEditingIdx: number | null = null;
+
   function ytRenderList(): void {
     const list = document.getElementById('ytPlaylistList');
     if (!list) return;
@@ -274,16 +276,30 @@ export function initMusicServices(options: InitMusicServicesOptions): void {
     playlists.forEach((pl, i) => {
       const row = document.createElement('div');
       row.className = 'yt-playlist-row';
-      row.innerHTML =
-        '<div><div class="yt-pl-name">' +
-        escapeHtml(pl.name) +
-        '</div>' +
-        '<div class="yt-pl-id">' +
-        escapeHtml(pl.id.slice(0, 20)) +
-        '...</div></div>' +
-        '<button class="yt-pl-remove" data-idx="' +
-        i +
-        '" title="Remove">x</button>';
+      row.dataset['idx'] = String(i);
+      if (_ytEditingIdx === i) {
+        const url = 'https://www.youtube.com/playlist?list=' + pl.id;
+        row.classList.add('yt-pl-editing');
+        row.innerHTML =
+          '<div class="yt-pl-edit-form">' +
+            '<input class="yt-pl-edit-name" type="text" value="' + escapeHtml(pl.name) + '" placeholder="Name" />' +
+            '<input class="yt-pl-edit-url" type="text" value="' + escapeHtml(url) + '" placeholder="YouTube playlist URL" />' +
+          '</div>' +
+          '<div class="yt-pl-actions">' +
+            '<button class="yt-pl-btn yt-pl-save" data-idx="' + i + '" title="Save">&#x2713;</button>' +
+            '<button class="yt-pl-btn yt-pl-cancel" data-idx="' + i + '" title="Cancel">&#x2715;</button>' +
+          '</div>';
+      } else {
+        row.innerHTML =
+          '<div class="yt-pl-info">' +
+            '<div class="yt-pl-name">' + escapeHtml(pl.name) + '</div>' +
+            '<div class="yt-pl-id">' + escapeHtml(pl.id) + '</div>' +
+          '</div>' +
+          '<div class="yt-pl-actions">' +
+            '<button class="yt-pl-btn yt-pl-edit" data-idx="' + i + '" title="Edit">&#x270E;</button>' +
+            '<button class="yt-pl-btn yt-pl-remove" data-idx="' + i + '" title="Remove">&#x2715;</button>' +
+          '</div>';
+      }
       list.appendChild(row);
     });
     const st = document.getElementById('youtubeStatus');
@@ -350,8 +366,50 @@ export function initMusicServices(options: InitMusicServicesOptions): void {
   function ytRemove(idx: number): void {
     const playlists = ytGetPlaylists();
     playlists.splice(idx, 1);
+    if (_ytEditingIdx === idx) _ytEditingIdx = null;
     void ytSavePlaylists(playlists);
     ytRenderList();
+  }
+
+  function ytStartEdit(idx: number): void {
+    _ytEditingIdx = idx;
+    ytRenderList();
+    const row = document.querySelector('.yt-playlist-row.yt-pl-editing');
+    const nameInput = row?.querySelector('.yt-pl-edit-name') as HTMLInputElement | null;
+    if (nameInput) {
+      nameInput.focus();
+      nameInput.select();
+    }
+  }
+
+  function ytCancelEdit(): void {
+    _ytEditingIdx = null;
+    ytRenderList();
+  }
+
+  function ytSaveEdit(idx: number): void {
+    const row = document.querySelector('.yt-playlist-row[data-idx="' + idx + '"]');
+    if (!row) return;
+    const nameInput = row.querySelector('.yt-pl-edit-name') as HTMLInputElement | null;
+    const urlInput = row.querySelector('.yt-pl-edit-url') as HTMLInputElement | null;
+    if (!nameInput || !urlInput) return;
+    const newName = nameInput.value.trim() || 'Playlist';
+    const newId = ytExtractId(urlInput.value.trim());
+    if (!newId) {
+      showToast('Invalid URL', 'Paste a YouTube playlist URL with ?list=...');
+      return;
+    }
+    const playlists = ytGetPlaylists();
+    const dup = playlists.findIndex((p, j) => p.id === newId && j !== idx);
+    if (dup !== -1) {
+      showToast('Already saved', 'Another entry already uses this playlist');
+      return;
+    }
+    playlists[idx] = { name: newName, id: newId };
+    _ytEditingIdx = null;
+    void ytSavePlaylists(playlists);
+    ytRenderList();
+    showToast('Playlist updated', newName);
   }
 
   window._ytApplyFromDB = function (playlists: unknown): void {
@@ -426,10 +484,42 @@ export function initMusicServices(options: InitMusicServicesOptions): void {
     if (ytList) {
       ytList.addEventListener('click', (e) => {
         const target = e.target as HTMLElement | null;
-        const btn = target ? target.closest('.yt-pl-remove') : null;
-        if (btn) {
-          const idxAttr = (btn as HTMLElement).dataset['idx'];
+        if (!target) return;
+        const editBtn = target.closest('.yt-pl-edit') as HTMLElement | null;
+        if (editBtn) {
+          const idxAttr = editBtn.dataset['idx'];
+          if (idxAttr !== undefined) ytStartEdit(parseInt(idxAttr, 10));
+          return;
+        }
+        const saveBtn = target.closest('.yt-pl-save') as HTMLElement | null;
+        if (saveBtn) {
+          const idxAttr = saveBtn.dataset['idx'];
+          if (idxAttr !== undefined) ytSaveEdit(parseInt(idxAttr, 10));
+          return;
+        }
+        const cancelBtn = target.closest('.yt-pl-cancel') as HTMLElement | null;
+        if (cancelBtn) {
+          ytCancelEdit();
+          return;
+        }
+        const removeBtn = target.closest('.yt-pl-remove') as HTMLElement | null;
+        if (removeBtn) {
+          const idxAttr = removeBtn.dataset['idx'];
           if (idxAttr !== undefined) ytRemove(parseInt(idxAttr, 10));
+        }
+      });
+      // Enter to save, Escape to cancel while editing
+      ytList.addEventListener('keydown', (e) => {
+        if (_ytEditingIdx === null) return;
+        const target = e.target as HTMLElement | null;
+        if (!target) return;
+        if (!target.matches('.yt-pl-edit-name, .yt-pl-edit-url')) return;
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          ytSaveEdit(_ytEditingIdx);
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          ytCancelEdit();
         }
       });
     }
