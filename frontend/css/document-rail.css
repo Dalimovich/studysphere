@@ -741,17 +741,20 @@
   font: 700 11px/1.2 'Nunito', system-ui, sans-serif;
 }
 
-/* Body / empty state */
+/* Body / empty state.
+   The legacy chain (.np-body → .np-editor-wrap → .np-preview, all flex:1)
+   relies on every link having min-height:0 to actually shrink/grow.
+   Force it with !important so nothing in the cascade can collapse the
+   chain back to content-height. */
 .dr-drawer .dr-host-notes .np-body {
   background: transparent;
   padding: 4px 2px;
-  /* Fill the remaining vertical space inside the hosted panel and let the
-     preview / saved-list child scroll its own content. */
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+  flex: 1 1 0 !important;
+  min-height: 0 !important;
+  height: auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
 }
 .dr-drawer .dr-host-notes .np-empty {
   display: flex;
@@ -789,10 +792,12 @@
 /* Editor inputs / preview */
 .dr-drawer .dr-host-notes .np-editor-wrap {
   background: transparent;
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
+  flex: 1 1 0 !important;
+  min-height: 0 !important;
+  height: auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
   gap: 8px;
 }
 .dr-drawer .dr-host-notes .np-title-input {
@@ -843,10 +848,11 @@
   color: var(--dr-text);
   line-height: 1.6;
   font-size: 0.85rem;
-  /* Grow to fill the editor-wrap and scroll the markdown content inside. */
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
+  /* Grow to fill editor-wrap and scroll markdown inside. */
+  flex: 1 1 0 !important;
+  min-height: 0 !important;
+  height: auto !important;
+  overflow-y: auto !important;
 }
 .dr-drawer .dr-host-notes .np-editor-ta {
   width: 100%;
@@ -876,9 +882,10 @@
   flex-direction: column;
   gap: 8px;
   padding: 4px 2px;
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
+  flex: 1 1 0 !important;
+  min-height: 0 !important;
+  height: auto !important;
+  overflow-y: auto !important;
 }
 .dr-drawer .dr-host-notes .np-saved-item {
   border-radius: 14px;
