@@ -7,6 +7,16 @@
 (function () {
   'use strict';
 
+  // ── Task-01 (document rail) guard ────────────────────────────────────────
+  // The legacy floating bubble is being replaced by the right-side document
+  // rail + drawer. We keep the openPanel/closePanel/auto-focus logic intact
+  // (Task-02 will reuse it from the new AI drawer), but the bubble element
+  // itself must never appear. Other code paths reference `#aiBubble` as a
+  // DOM query target; injectBubble() still creates a hidden stub so those
+  // queries don't crash. CSS (`#aiBubble { display:none !important }` in
+  // document-rail.css) provides the visual hide.
+  var HIDE_BUBBLE = true;
+
   var DRAG_THRESHOLD  = 6;
   var SNAP_MARGIN     = 16;
   var BUBBLE_KEY      = 'ss_ai_bubble_pos';
@@ -28,6 +38,12 @@
     el.id    = 'aiBubble';
     el.title = 'Minallo AI';
     el.style.zIndex = '10001'; // always above panel (10000) and #portal (200)
+    // Task-01: never render the floating bubble — keep a hidden stub so any
+    // existing code that queries `#aiBubble` doesn't crash.
+    if (HIDE_BUBBLE) {
+      el.style.display = 'none';
+      el.setAttribute('aria-hidden', 'true');
+    }
     el.innerHTML =
       '<svg class="ai-bubble-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
         '<rect x="3" y="8" width="18" height="11" rx="3" fill="currentColor" opacity="0.9"/>' +

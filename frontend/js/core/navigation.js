@@ -32,7 +32,7 @@ export function showPortalSection(sec) {
     if (sec === 'games' && gamesItem && gamesItem.classList.contains('st-locked'))
         return;
     // Make sure portal is the visible top-level view — kills file/studip ghosts
-    // that would otherwise sit on top of (or under) the section we're showing.
+    // that would otherwise sit on top of (or under) the section we're about to show.
     selectTopLevelView('portal');
     const ms = document.querySelector('#portal .main .main-scroll');
     const target = document.getElementById('psec-' + sec);
@@ -72,6 +72,15 @@ export function showPortalSection(sec) {
         else {
             if (aiBubble)
                 aiBubble.style.display = '';
+        }
+        // Document rail: visible on the courses dashboard (psec-studip) only here;
+        // PDF visibility is handled by panels.ts → showFilesView / hideFilesView.
+        // Use a global to avoid creating a hard import dependency from navigation
+        // into the new feature module.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const dr = window.__minalloDocRail;
+        if (dr && typeof dr.setRouteVisibility === 'function') {
+            dr.setRouteVisibility(sec === 'studip' ? 'courses' : 'other');
         }
     }
     const leaving = _activePortalSection;

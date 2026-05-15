@@ -1,3 +1,13 @@
+// Notify the document rail of a route change (PDF / courses / other).
+// The rail module exposes itself via window.__minalloDocRail to avoid a
+// hard module dependency from core/panels into a feature module.
+function _notifyDocRail(route) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const dr = window.__minalloDocRail;
+    if (dr && typeof dr.setRouteVisibility === 'function') {
+        dr.setRouteVisibility(route);
+    }
+}
 export function panelShow(el, isFlexEl) {
     if (!el)
         return;
@@ -40,9 +50,8 @@ export function showFilesView(stRunning) {
     const stMini = document.getElementById('stMiniTimer');
     if (stMini)
         stMini.style.display = stRunning ? 'flex' : 'none';
+    _notifyDocRail('pdf');
 }
-// Single source of truth for which of the two top-level containers is shown.
-// See panels.ts for the contract.
 export function selectTopLevelView(which, opts) {
     const portal = document.getElementById('portal');
     const app = document.getElementById('app');
@@ -53,43 +62,61 @@ export function selectTopLevelView(which, opts) {
         portal.dataset.activeView = which;
     }
     if (which === 'file') {
-        if (mainScroll) mainScroll.style.display = 'none';
-        if (app) app.style.display = 'flex';
-        _applyFileChrome((opts && opts.stRunning) || false);
+        if (mainScroll)
+            mainScroll.style.display = 'none';
+        if (app)
+            app.style.display = 'flex';
+        _applyFileChrome(opts?.stRunning ?? false);
     }
     else {
-        if (mainScroll) mainScroll.style.display = '';
-        if (app) app.style.display = 'none';
+        // 'portal' — show main-scroll, hide #app. Caller (showPortalSection) is
+        // responsible for revealing the specific .portal-section they want.
+        if (mainScroll)
+            mainScroll.style.display = '';
+        if (app)
+            app.style.display = 'none';
         _applyPortalChrome();
     }
 }
 function _applyFileChrome(stRunning) {
     const fab = document.getElementById('addWidgetFab');
-    if (fab) fab.classList.remove('visible');
+    if (fab)
+        fab.classList.remove('visible');
     const back = document.getElementById('goPortal');
-    if (back) back.style.display = '';
+    if (back)
+        back.style.display = '';
     const title = document.getElementById('topTitle');
-    if (title) title.style.display = 'none';
+    if (title)
+        title.style.display = 'none';
     const crumb = document.getElementById('breadcrumb');
-    if (crumb) crumb.style.display = '';
+    if (crumb)
+        crumb.style.display = '';
     const stBtn = document.getElementById('studyTechBtn');
-    if (stBtn) stBtn.style.display = 'flex';
+    if (stBtn)
+        stBtn.style.display = 'flex';
     const stMini = document.getElementById('stMiniTimer');
-    if (stMini) stMini.style.display = stRunning ? 'flex' : 'none';
+    if (stMini)
+        stMini.style.display = stRunning ? 'flex' : 'none';
 }
 function _applyPortalChrome() {
     const back = document.getElementById('goPortal');
-    if (back) back.style.display = 'none';
+    if (back)
+        back.style.display = 'none';
     const title = document.getElementById('topTitle');
-    if (title) title.style.display = '';
+    if (title)
+        title.style.display = '';
     const crumb = document.getElementById('breadcrumb');
-    if (crumb) crumb.style.display = 'none';
+    if (crumb)
+        crumb.style.display = 'none';
     const stBtn = document.getElementById('studyTechBtn');
-    if (stBtn) stBtn.style.display = 'none';
+    if (stBtn)
+        stBtn.style.display = 'none';
     const stMini = document.getElementById('stMiniTimer');
-    if (stMini) stMini.style.display = 'none';
+    if (stMini)
+        stMini.style.display = 'none';
 }
 export function hideFilesView() {
+    _notifyDocRail('other');
     const ms = document.querySelector('#portal .main-scroll');
     if (ms)
         ms.style.display = '';

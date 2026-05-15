@@ -71,6 +71,18 @@ export function showPortalSection(sec: string): void {
     } else {
       if (aiBubble) aiBubble.style.display = '';
     }
+
+    // Document rail: visible on the courses dashboard (psec-studip) only here;
+    // PDF visibility is handled by panels.ts → showFilesView / hideFilesView.
+    // Use a global to avoid creating a hard import dependency from navigation
+    // into the new feature module.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const dr = (window as any).__minalloDocRail as
+      | { setRouteVisibility: (route: 'pdf' | 'courses' | 'other') => void }
+      | undefined;
+    if (dr && typeof dr.setRouteVisibility === 'function') {
+      dr.setRouteVisibility(sec === 'studip' ? 'courses' : 'other');
+    }
   }
 
   const leaving = _activePortalSection;

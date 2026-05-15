@@ -1,3 +1,16 @@
+// Notify the document rail of a route change (PDF / courses / other).
+// The rail module exposes itself via window.__minalloDocRail to avoid a
+// hard module dependency from core/panels into a feature module.
+function _notifyDocRail(route: 'pdf' | 'courses' | 'other'): void {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const dr = (window as any).__minalloDocRail as
+    | { setRouteVisibility: (route: 'pdf' | 'courses' | 'other') => void }
+    | undefined;
+  if (dr && typeof dr.setRouteVisibility === 'function') {
+    dr.setRouteVisibility(route);
+  }
+}
+
 export function panelShow(el: HTMLElement | null, isFlexEl?: boolean): void {
   if (!el) return;
   el.style.display = isFlexEl ? 'flex' : 'block';
@@ -32,6 +45,7 @@ export function showFilesView(stRunning?: boolean): void {
   if (stBtn) stBtn.style.display = 'flex';
   const stMini = document.getElementById('stMiniTimer');
   if (stMini) stMini.style.display = stRunning ? 'flex' : 'none';
+  _notifyDocRail('pdf');
 }
 
 // Single source of truth for which of the two top-level containers is shown.
@@ -94,6 +108,7 @@ function _applyPortalChrome(): void {
 }
 
 export function hideFilesView(): void {
+  _notifyDocRail('other');
   const ms = document.querySelector<HTMLElement>('#portal .main-scroll');
   if (ms) ms.style.display = '';
   const app = document.getElementById('app');
