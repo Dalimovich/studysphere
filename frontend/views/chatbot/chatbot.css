@@ -1975,3 +1975,82 @@ body:not(.night) .aip-course-cancel {
   line-height: 1.5;
   color: #cbd5e1;
 }
+
+/* ============ PR-02: Sidebar collapsed state ============ */
+
+.ncb-sidebar {
+  transition: width 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Collapsed sidebar: 88px wide, icons only. Text/labels/search/safe-card hidden.
+   The collapse button is centered; chat rows become square icon-only buttons. */
+
+.ncb-sidebar[data-collapsed="true"] {
+  width: 88px;
+  padding: 16px 12px;
+  align-items: center;
+}
+
+.ncb-sidebar[data-collapsed="true"] .ncb-sidebar-head {
+  justify-content: center;
+  width: 100%;
+}
+
+.ncb-sidebar[data-collapsed="true"] .ncb-sidebar-head-text,
+.ncb-sidebar[data-collapsed="true"] .ncb-search,
+.ncb-sidebar[data-collapsed="true"] .ncb-safe-card,
+.ncb-sidebar[data-collapsed="true"] .ncb-chat-section-label,
+.ncb-sidebar[data-collapsed="true"] .ncb-chat-text,
+.ncb-sidebar[data-collapsed="true"] .ncb-chat-more,
+.ncb-sidebar[data-collapsed="true"] .ncb-new-chat-btn span {
+  display: none;
+}
+
+.ncb-sidebar[data-collapsed="true"] .ncb-new-chat-btn {
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  align-self: center;
+  border-radius: 0.875rem;
+}
+
+.ncb-sidebar[data-collapsed="true"] .ncb-chat-list {
+  align-items: center;
+  gap: 8px;
+}
+
+.ncb-sidebar[data-collapsed="true"] .ncb-chat-item {
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  justify-content: center;
+  border-radius: 0.875rem;
+  position: relative;
+}
+
+.ncb-sidebar[data-collapsed="true"] .ncb-chat-item .ncb-chat-icon {
+  width: 100%;
+  height: 100%;
+  border-radius: 0.875rem;
+}
+
+.ncb-sidebar[data-collapsed="true"] .ncb-chat-item--active::after {
+  content: "";
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #93c5fd;
+  box-shadow: 0 0 12px rgba(147, 197, 253, 0.9);
+}
+
+.ncb-sidebar[data-collapsed="true"] .ncb-collapse-btn svg {
+  transform: rotate(180deg);
+  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.ncb-collapse-btn svg {
+  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
