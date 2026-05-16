@@ -698,10 +698,10 @@ body.ncb-fullbleed .ncb-main {
   gap: 6px;
   min-height: 82px;
   max-height: 210px;
-  /* Symmetric, slightly tighter padding so the frame is shorter and
-     the button row reads as vertically centered inside the card
-     rather than pinned to the bottom edge. */
-  padding: 12px 16px;
+  /* Slightly more padding-top than bottom so the text/caret feels a
+     pinch lower without changing the textarea's own padding (which
+     would trip the auto-resize on first keystroke). */
+  padding: 16px 16px 12px 16px;
   background: rgba(8, 15, 34, 0.82);
   border-color: rgba(148, 163, 184, 0.28);
   box-shadow: 0 18px 45px rgba(0, 0, 0, 0.28);
@@ -720,10 +720,9 @@ body.ncb-fullbleed .ncb-main {
   font-size: 1rem;
   line-height: 1.4;
   font-family: inherit;
-  /* Slightly more vertical padding so the placeholder/caret sits a
-     pinch lower — visually centers the text inside the composer
-     between the top edge and the divider above the action row. */
-  padding: 8px 8px 6px;
+  /* Keep textarea's own padding tight so scrollHeight ≈ min-height —
+     auto-resize never bumps the composer on the first keystroke. */
+  padding: 4px 8px;
   box-sizing: border-box;
 }
 .ncb-input-textarea::placeholder {
