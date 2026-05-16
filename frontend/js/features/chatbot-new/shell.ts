@@ -32,6 +32,7 @@ export function initNewChatbotShell(): void {
   initConversation(newRoot);
   initImportModal(newRoot);
   initContextTabs(newRoot);
+  initContextCollapse(newRoot);
   initUploads(newRoot);
 
   renderSidebar(newRoot);
@@ -1359,6 +1360,41 @@ function regenerateLastReal(aiRow: HTMLElement, root: HTMLElement): void {
   aiRow.remove();
 
   void streamAiReply(state, sendBtn, msgs);
+}
+
+// ============ Context panel collapse ============
+
+const NCB_CTX_KEY = 'ss_ncb_context_open';
+
+function initContextCollapse(root: HTMLElement): void {
+  const card = root.querySelector<HTMLElement>('.ncb-card');
+  const closeBtn = root.querySelector<HTMLButtonElement>('.ncb-context-close-btn');
+  const openBtn = root.querySelector<HTMLButtonElement>('.ncb-panel-open-btn');
+  if (!card || !closeBtn || !openBtn) return;
+  if (card.dataset.ncbCtxBound === '1') return;
+  card.dataset.ncbCtxBound = '1';
+
+  let open = true;
+  try {
+    const raw = localStorage.getItem(NCB_CTX_KEY);
+    if (raw === '0') open = false;
+  } catch {
+    // ignore — default to open
+  }
+  apply(open);
+
+  closeBtn.addEventListener('click', () => apply(false));
+  openBtn.addEventListener('click', () => apply(true));
+
+  function apply(isOpen: boolean): void {
+    card!.dataset.contextOpen = isOpen ? 'true' : 'false';
+    openBtn!.hidden = isOpen;
+    try {
+      localStorage.setItem(NCB_CTX_KEY, isOpen ? '1' : '0');
+    } catch {
+      // ignore
+    }
+  }
 }
 
 (window as unknown as { initNewChatbotShell?: () => void }).initNewChatbotShell = initNewChatbotShell;

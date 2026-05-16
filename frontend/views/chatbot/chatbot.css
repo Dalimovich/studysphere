@@ -1201,7 +1201,7 @@ body:not(.night) .aip-course-cancel {
 }
 
 .ncb-panel-open-btn {
-  display: none; /* hidden by default; revealed in PR 4 when context panel is closed */
+  display: grid;
   place-items: center;
   width: 40px;
   height: 40px;
@@ -1212,6 +1212,9 @@ body:not(.night) .aip-course-cancel {
   cursor: pointer;
   transition: background 0.15s ease;
 }
+
+/* Hidden until the context panel is collapsed. The global .ncb-root [hidden]
+   rule already enforces display:none when the attribute is set. */
 
 .ncb-panel-open-btn:hover {
   background: rgba(255, 255, 255, 0.10);
@@ -1426,6 +1429,16 @@ body:not(.night) .aip-course-cancel {
   height: 100%;
   border-left: 1px solid rgba(255, 255, 255, 0.10);
   background: rgba(255, 255, 255, 0.045);
+  transition: width 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+              opacity 0.18s ease;
+  overflow: hidden;
+}
+
+.ncb-card[data-context-open="false"] .ncb-context {
+  width: 0;
+  opacity: 0;
+  border-left-width: 0;
+  pointer-events: none;
 }
 
 /* Keyframes */
