@@ -457,15 +457,15 @@ function typeIntoBubble(bubble, raw, isAborted) {
 function setSendBtnMode(btn, mode) {
     if (mode === 'pause') {
         btn.classList.add('ncb-send-btn--pause');
-        btn.setAttribute('aria-label', 'Pause AI response');
+        btn.setAttribute('aria-label', 'Stop AI response');
         btn.innerHTML =
-            '<svg class="ncb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>';
+            '<svg class="ncb-icon" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
     }
     else {
         btn.classList.remove('ncb-send-btn--pause');
         btn.setAttribute('aria-label', 'Send message');
         btn.innerHTML =
-            '<svg class="ncb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/></svg>';
+            '<svg class="ncb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>';
     }
 }
 function scrollMsgsToBottom(msgs) {
@@ -1891,7 +1891,7 @@ function initTextareaAutoSize(root) {
     if (!ta || ta.dataset.ncbAutoSize === '1')
         return;
     ta.dataset.ncbAutoSize = '1';
-    const MAX = 220;
+    const MAX = 160;
     const resize = () => {
         ta.style.height = 'auto';
         ta.style.height = Math.min(MAX, ta.scrollHeight) + 'px';
