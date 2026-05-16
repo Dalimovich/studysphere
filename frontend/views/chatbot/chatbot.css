@@ -1071,9 +1071,17 @@ body.ncb-fullbleed .ncb-main {
   position: sticky;
   bottom: 8px;
   z-index: 5;
-  background: rgba(15, 23, 42, 0.92);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: #0b1220;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: 0 -12px 24px -8px rgba(0, 0, 0, 0.6);
+}
+
+/* Fade-out mask above the sticky composer so messages don't appear to
+   "touch" the input — they fade into the page background as they scroll
+   underneath. */
+.ncb-empty[data-state="active"] .ncb-msgs {
+  padding-bottom: 24px;
 }
 
 /* Chat header (above messages once active) */
