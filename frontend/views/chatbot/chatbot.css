@@ -2056,3 +2056,119 @@ body.ncb-fullbleed .ncb-main {
   line-height: 1.55;
   color: #94a3b8;
 }
+
+/* ============ PR-09: Mobile responsiveness ============ */
+
+/* ≤ 1024px: context panel becomes an overlay sheet that slides in from the
+   right. Open-btn in the header is always visible. */
+@media (max-width: 1024px) {
+  .ncb-context {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 50;
+    width: min(360px, 90vw);
+    border-left: 1px solid rgba(255, 255, 255, 0.10);
+    background: rgba(2, 6, 23, 0.85);
+    backdrop-filter: blur(28px);
+    -webkit-backdrop-filter: blur(28px);
+    box-shadow: -16px 0 48px rgba(0, 0, 0, 0.45);
+    transform: translateX(100%);
+    transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+    opacity: 1;
+  }
+  .ncb-card[data-context-open="true"] .ncb-context {
+    transform: translateX(0);
+    width: min(360px, 90vw);
+    opacity: 1;
+    border-left-width: 1px;
+    pointer-events: auto;
+  }
+  .ncb-card[data-context-open="false"] .ncb-context {
+    transform: translateX(100%);
+    width: min(360px, 90vw);
+    opacity: 1;
+    border-left-width: 1px;
+  }
+  /* Always show the reopen button in the header at this size, regardless of
+     the [hidden] state JS sets — it doubles as the open button when closed
+     AND lets the user close again from the panel itself. */
+  .ncb-panel-open-btn { display: grid !important; }
+}
+
+/* ≤ 768px: sidebar forced to its collapsed 88px icon strip. The collapse
+   button still works as a toggle; the body class on the sidebar is just
+   overridden visually by this rule. */
+@media (max-width: 768px) {
+  .ncb-sidebar,
+  .ncb-sidebar[data-collapsed="false"],
+  .ncb-sidebar[data-collapsed="true"] {
+    width: 88px;
+    padding: 16px 12px;
+    align-items: center;
+  }
+  .ncb-sidebar .ncb-sidebar-head { justify-content: center; width: 100%; }
+  .ncb-sidebar .ncb-sidebar-head-text,
+  .ncb-sidebar .ncb-search,
+  .ncb-sidebar .ncb-safe-card,
+  .ncb-sidebar .ncb-chat-section-label,
+  .ncb-sidebar .ncb-chat-text,
+  .ncb-sidebar .ncb-chat-more,
+  .ncb-sidebar .ncb-new-chat-btn span { display: none; }
+  .ncb-sidebar .ncb-new-chat-btn {
+    width: 48px; height: 48px; padding: 0;
+    align-self: center; border-radius: 0.875rem;
+  }
+  .ncb-sidebar .ncb-chat-list { align-items: center; gap: 8px; }
+  .ncb-sidebar .ncb-chat-item {
+    width: 48px; height: 48px; padding: 0;
+    justify-content: center; border-radius: 0.875rem;
+    position: relative;
+  }
+  .ncb-sidebar .ncb-chat-item .ncb-chat-icon {
+    width: 100%; height: 100%; border-radius: 0.875rem;
+  }
+}
+
+/* ≤ 640px: header text trims, action grid drops to 1 column, bubbles widen
+   to use the available width, input toolbar wraps. */
+@media (max-width: 640px) {
+  .ncb-header { padding: 12px 16px; }
+  .ncb-header-icon-tile { width: 36px; height: 36px; }
+  .ncb-header-title { font-size: 1rem; }
+  .ncb-header-subtitle { font-size: 0.7rem; }
+  .ncb-main { padding: 0; }
+  .ncb-center, .ncb-center-inner { padding-left: 12px !important; padding-right: 12px !important; }
+
+  .ncb-empty-title { font-size: 2rem; }
+  .ncb-empty-subtitle { font-size: 0.875rem; }
+  .ncb-actions { grid-template-columns: 1fr; gap: 10px; }
+
+  .ncb-bubble--user, .ncb-bubble--ai { max-width: 100%; }
+  .ncb-msg-row--ai { gap: 8px; }
+  .ncb-avatar { width: 32px; height: 32px; }
+
+  .ncb-input-bottom { flex-wrap: wrap; }
+  .ncb-input-action-btn { height: 38px; padding: 0 12px; font-size: 0.8125rem; }
+  .ncb-input-action-btn span:last-child { display: none; } /* icon-only on tight viewports */
+  .ncb-input-action-icon { width: 22px; height: 22px; }
+  .ncb-send-btn { width: 42px; height: 42px; }
+}
+
+/* ≤ 480px: tighten everything one more notch. */
+@media (max-width: 480px) {
+  .ncb-header { padding: 10px 12px; gap: 8px; }
+  .ncb-header-text { min-width: 0; }
+  .ncb-header-title { font-size: 0.95rem; }
+  .ncb-header-subtitle { display: none; }
+  .ncb-pill { padding: 4px 10px; font-size: 0.75rem; }
+  .ncb-input { padding: 12px; }
+  .ncb-input-textarea { font-size: 0.95rem; min-height: 64px; }
+  .ncb-empty-title { font-size: 1.75rem; }
+  .ncb-msgs { gap: 14px; margin-bottom: 16px; }
+  .ncb-bubble { padding: 12px 14px; font-size: 0.875rem; }
+  .ncb-modal { max-width: 100%; border-radius: 1rem; }
+  .ncb-modal-body { padding: 14px; }
+  .ncb-modal-foot { padding: 12px 14px; }
+}
