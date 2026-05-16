@@ -1069,7 +1069,7 @@ body.ncb-fullbleed .ncb-main {
    scrolling underneath. */
 .ncb-empty[data-state="active"] .ncb-input {
   position: sticky;
-  bottom: 8px;
+  bottom: 0;
   z-index: 5;
   background: #0b1220;
   backdrop-filter: none;
@@ -1077,9 +1077,23 @@ body.ncb-fullbleed .ncb-main {
   box-shadow: 0 -12px 24px -8px rgba(0, 0, 0, 0.6);
 }
 
-/* Fade-out mask above the sticky composer so messages don't appear to
-   "touch" the input — they fade into the page background as they scroll
-   underneath. */
+/* The center column scrolls; its bottom edge meets the rounded card edge.
+   Use a ::after on .ncb-empty (positioned via the sticky composer's stacking
+   context) to extend a solid strip BELOW the composer down to the card's
+   rounded bottom — otherwise the 8px gap between bottom:0 and the rounded
+   corner lets scrolling messages peek through. */
+.ncb-empty[data-state="active"] .ncb-input::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 16px;
+  background: #0b1220;
+  pointer-events: none;
+}
+
+/* Tiny breathing room so the last AI reply doesn't kiss the composer. */
 .ncb-empty[data-state="active"] .ncb-msgs {
   padding-bottom: 24px;
 }
