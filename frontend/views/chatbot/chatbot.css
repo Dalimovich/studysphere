@@ -698,10 +698,9 @@ body.ncb-fullbleed .ncb-main {
   gap: 6px;
   min-height: 82px;
   max-height: 210px;
-  /* Tight symmetric vertical padding so the composer total height
-     matches the "clean" version even though textarea min-height is
-     now 36 (bumped to stop the first-keystroke growth jump). */
-  padding: 8px 16px;
+  /* Padding-bottom is intentionally larger than top so the button
+     row + its drop-shadows stay clearly inside the rounded frame. */
+  padding: 8px 16px 14px 16px;
   background: rgba(8, 15, 34, 0.82);
   border-color: rgba(148, 163, 184, 0.28);
   box-shadow: 0 18px 45px rgba(0, 0, 0, 0.28);
@@ -795,9 +794,9 @@ body.ncb-fullbleed .ncb-main {
   background: linear-gradient(135deg, rgba(59, 130, 246, 0.98), rgba(37, 99, 235, 0.86));
   color: #ffffff;
   cursor: pointer;
-  /* Tighter shadow so the soft glow doesn't bleed past the composer's
-     bottom rounded edge — the button stays clearly inside the card. */
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.30);
+  /* Tight shadow that fully fits inside the composer's padding-bottom
+     so nothing bleeds past the rounded frame edge. */
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.28);
   transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
 .ncb-send-btn:hover {
@@ -2290,11 +2289,13 @@ body.ncb-fullbleed .ncb-main {
   .ncb-msg-row--ai { gap: 8px; }
   .ncb-avatar { width: 32px; height: 32px; }
 
-  .ncb-input-bottom { flex-wrap: wrap; }
-  .ncb-input-action-btn { height: 38px; padding: 0 12px; font-size: 0.8125rem; }
+  /* Keep the composer row uniform with the desktop styles — same
+     36px heights, no-wrap. Only the action button label collapses to
+     icon-only when the row gets tight. */
+  .ncb-input-action-btn { height: 36px; padding: 0 12px; font-size: 0.8125rem; }
   .ncb-input-action-btn span:last-child { display: none; } /* icon-only on tight viewports */
-  .ncb-input-action-icon { width: 22px; height: 22px; }
-  .ncb-send-btn { width: 42px; height: 42px; }
+  .ncb-input-action-icon { width: 20px; height: 20px; }
+  .ncb-send-btn { width: 36px; height: 36px; min-width: 36px; }
 }
 
 /* ≤ 480px: tighten everything one more notch. */
@@ -2304,8 +2305,11 @@ body.ncb-fullbleed .ncb-main {
   .ncb-header-title { font-size: 0.95rem; }
   .ncb-header-subtitle { display: none; }
   .ncb-pill { padding: 4px 10px; font-size: 0.75rem; }
-  .ncb-input { padding: 12px; }
-  .ncb-input-textarea { font-size: 0.95rem; min-height: 64px; }
+  .ncb-input { padding: 8px 12px 14px 12px; }
+  /* Don't override the desktop min-height: 36 — the textarea must
+     stay the same compact size on mobile so the composer doesn't
+     balloon. */
+  .ncb-input-textarea { font-size: 0.95rem; }
   .ncb-empty-title { font-size: 1.75rem; }
   .ncb-msgs { gap: 14px; margin-bottom: 16px; }
   .ncb-bubble { padding: 12px 14px; font-size: 0.875rem; }
