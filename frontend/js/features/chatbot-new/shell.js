@@ -7,21 +7,9 @@
 // PR-06: real markdown (KaTeX), file upload (img/.txt/.pdf), real Regenerate.
 import { renderMarkdown } from '../ai-chat/ai-markdown.js';
 export function initNewChatbotShell() {
-    let flag = null;
-    try {
-        flag = localStorage.getItem('ss_new_chatbot');
-    }
-    catch {
-        // private browsing / storage disabled — leave flag null
-    }
-    if (flag !== '1')
-        return;
     const newRoot = document.getElementById('ncbRoot');
     if (!newRoot)
         return;
-    const oldRoot = document.getElementById('aipOuter');
-    if (oldRoot)
-        oldRoot.style.display = 'none';
     newRoot.hidden = false;
     newRoot.style.display = '';
     loadChatStore(); // PR-05 — must run before rendering sidebar or conversation.
