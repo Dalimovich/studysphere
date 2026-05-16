@@ -1067,8 +1067,8 @@ body.ncb-fullbleed .ncb-main {
    scrolling center column so the user can keep typing while they scroll
    through the conversation. The blurred background covers messages
    scrolling underneath. */
-/* Kill the scroller's bottom padding in active state so the composer's
-   skirt can reach the actual card bottom. */
+/* Kill the scroller's bottom padding in active state so the composer can
+   sit flush against the bottom edge of the card. */
 .ncb-empty[data-state="active"] {
   padding-bottom: 0;
 }
@@ -1076,48 +1076,31 @@ body.ncb-fullbleed .ncb-main {
   padding-bottom: 0;
 }
 
-/* Active-chat composer: rounded floating pill near the bottom edge.
-   The ::after pseudo-element is the trick — it extends an opaque strip
-   from the composer's bottom edge all the way down past the viewport,
-   wider than the composer itself. That strip sits ABOVE scrolling
-   messages (via the sticky stacking context) so nothing can ever bleed
-   through under or around the rounded card. */
+/* Active-chat composer: pinned to the bottom of the chat column, edge to
+   edge across the card so there is no transparent strip on any side for
+   scrolling messages to peek through. Only the TOP corners are rounded
+   (the bottom meets the card's bottom edge cleanly). */
 .ncb-empty[data-state="active"] .ncb-input {
   position: sticky;
-  bottom: 14px;
+  bottom: 0;
   z-index: 5;
-  margin-left: 12px;
-  margin-right: 12px;
-  border-radius: 1.25rem;
+  margin-left: -20px;
+  margin-right: -20px;
+  border-radius: 1.25rem 1.25rem 0 0;
   background: #0b1220;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  box-shadow: 0 8px 28px -6px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 -12px 24px -8px rgba(0, 0, 0, 0.6);
+  padding-left: 24px;
+  padding-right: 24px;
 }
 
-.ncb-empty[data-state="active"] .ncb-input::after {
-  content: "";
-  position: absolute;
-  left: -16px;
-  right: -16px;
-  top: 100%;
-  /* Tall enough to cover the gap below the composer on any viewport
-     plus the visible card edge. Negative bottom-margin via height keeps
-     us simple — overflow is hidden by the .ncb-card's overflow:hidden. */
-  height: 100vh;
-  background: #0b1220;
-  pointer-events: none;
-  z-index: -1;
-}
-
-@media (min-width: 640px) {
+@media (min-width: 768px) {
   .ncb-empty[data-state="active"] .ncb-input {
-    margin-left: 24px;
-    margin-right: 24px;
-  }
-  .ncb-empty[data-state="active"] .ncb-input::after {
-    left: -28px;
-    right: -28px;
+    margin-left: -40px;
+    margin-right: -40px;
+    padding-left: 44px;
+    padding-right: 44px;
   }
 }
 
