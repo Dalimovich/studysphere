@@ -1,6 +1,12 @@
 // New chatbot shell. Flag-gated behind localStorage.ss_new_chatbot === '1'.
 // PR-01: hide #aipOuter, reveal #ncbRoot.
 // PR-02: sidebar interactivity (collapse, chat-row selection, new chat, search).
+// PR-03: conversation (input, send/pause, paste, render, abort).
+// PR-04: AI bubble actions, import modal, context tabs, title gen.
+// PR-05: chat store + persistence + multi-chat sidebar.
+// PR-06: real markdown (KaTeX), file upload (img/.txt/.pdf), real Regenerate.
+
+import { renderMarkdown } from '../ai-chat/ai-markdown.js';
 
 export function initNewChatbotShell(): void {
   let flag: string | null = null;
@@ -26,6 +32,7 @@ export function initNewChatbotShell(): void {
   initConversation(newRoot);
   initImportModal(newRoot);
   initContextTabs(newRoot);
+  initUploads(newRoot);
 
   renderSidebar(newRoot);
   loadActiveChatIntoCenter(newRoot);
@@ -156,15 +163,27 @@ interface PastedImage {
   dataUrl: string; // full "data:image/...;base64,..." — used for preview and to derive raw base64
 }
 
+interface PendingFile {
+  id: string;
+  name: string;
+  kind: 'image' | 'text' | 'binary';
+  mediaType?: string; // for image
+  base64?: string; // for image
+  textContent?: string; // for text/extracted-pdf
+  size?: number;
+}
+
 interface ChatMessage {
   role: 'user' | 'assistant';
   text: string;
   images?: PastedImage[];
+  files?: PendingFile[];
 }
 
 interface ConversationState {
   messages: ChatMessage[];
   pasted: PastedImage[];
+  files: PendingFile[];
   controller: AbortController | null;
   isSending: boolean;
 }
@@ -321,34 +340,41 @@ async function doSend(
 ): Promise<void> {
   const text = textarea.value.trim();
   const images = state.pasted.slice();
-  if (!text && images.length === 0) return;
+  const files = state.files.slice();
+  if (!text && images.length === 0 && files.length === 0) return;
 
   // Switch to active-chat state on first send
   if (stage.dataset.state !== 'active') stage.dataset.state = 'active';
 
   // Append user bubble
-  state.messages.push({ role: 'user', text, images });
-  appendUserBubble(msgs, text, images);
+  state.messages.push({ role: 'user', text, images, files });
+  appendUserBubble(msgs, text, images, files);
   touchActiveChat();
   saveChatStore();
 
   // Reset input
   textarea.value = '';
   state.pasted = [];
+  state.files = [];
   renderPasteRow(state, pasteRow);
+  renderFilesRow(stage.closest<HTMLElement>('.ncb-root')!, state);
 
-  // Set sending state
+  await streamAiReply(state, sendBtn, msgs);
+}
+
+async function streamAiReply(
+  state: ConversationState,
+  sendBtn: HTMLButtonElement,
+  msgs: HTMLElement
+): Promise<void> {
   state.isSending = true;
   setSendBtnMode(sendBtn, 'pause');
 
-  // Insert AI bubble with typing indicator placeholder
   const aiRow = appendAiBubble(msgs);
   const bubble = aiRow.querySelector<HTMLElement>('.ncb-bubble-body');
   showTyping(bubble);
 
-  // Build API payload (mirrors chatbot.js's apiMessages format)
   const apiMessages = buildApiMessages(state.messages);
-
   const controller = new AbortController();
   state.controller = controller;
 
@@ -410,7 +436,12 @@ function abortSend(state: ConversationState): void {
   if (state.controller) state.controller.abort();
 }
 
-function appendUserBubble(msgs: HTMLElement, text: string, images: PastedImage[]): void {
+function appendUserBubble(
+  msgs: HTMLElement,
+  text: string,
+  images: PastedImage[],
+  files: PendingFile[] = []
+): void {
   const row = document.createElement('div');
   row.className = 'ncb-msg-row ncb-msg-row--user';
   const attachments = images
@@ -419,9 +450,16 @@ function appendUserBubble(msgs: HTMLElement, text: string, images: PastedImage[]
         `<img class="ncb-bubble-image" src="${escapeAttr(img.dataUrl)}" alt="${escapeAttr(img.name)}" />`
     )
     .join('');
+  const fileChips = files
+    .map(
+      (f) =>
+        `<span class="ncb-bubble-file-chip"><svg class="ncb-icon ncb-icon--xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>${escapeHtml(f.name)}</span>`
+    )
+    .join('');
   row.innerHTML = `
     <div class="ncb-bubble ncb-bubble--user">
       ${attachments ? `<div class="ncb-bubble-images">${attachments}</div>` : ''}
+      ${fileChips ? `<div class="ncb-bubble-files">${fileChips}</div>` : ''}
       ${text ? `<p class="ncb-bubble-text">${escapeHtml(text)}</p>` : ''}
     </div>
   `;
@@ -534,6 +572,24 @@ function buildApiMessages(
         },
       });
     });
+    (m.files || []).forEach((f) => {
+      if (f.kind === 'image' && f.base64 && f.mediaType) {
+        blocks.push({
+          type: 'image',
+          source: { type: 'base64', media_type: f.mediaType, data: f.base64 },
+        });
+      } else if (f.kind === 'text' && f.textContent) {
+        blocks.push({
+          type: 'text',
+          text: '<document filename="' + f.name + '">\n' + f.textContent + '\n</document>',
+        });
+      } else {
+        blocks.push({
+          type: 'text',
+          text: '(The file "' + f.name + '" is a binary format that could not be read as text.)',
+        });
+      }
+    });
     if (m.text) blocks.push({ type: 'text', text: m.text });
     return {
       role: 'user',
@@ -574,20 +630,10 @@ function escapeAttr(s: string): string {
   return escapeHtml(s);
 }
 
-// Very small markdown renderer: paragraphs, **bold**, *italic*, `code`, line breaks.
-// Heavyweight markdown (lists, headings, math) is intentionally deferred — chatbot.js
-// has a richer pipeline (_rm + _renderMath) we can wire in a later PR if needed.
+// PR-06: delegates to the shared ai-markdown renderer, which handles headings,
+// code blocks, lists, blockquotes, inline emphasis, and KaTeX math.
 function renderInlineMarkdown(raw: string): string {
-  const escaped = escapeHtml(raw);
-  const withInline = escaped
-    .replace(/`([^`]+)`/g, '<code class="ncb-code">$1</code>')
-    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*([^*]+)\*/g, '<em>$1</em>');
-  const paragraphs = withInline
-    .split(/\n{2,}/)
-    .map((p) => '<p>' + p.replace(/\n/g, '<br/>') + '</p>')
-    .join('');
-  return paragraphs;
+  return renderMarkdown(raw);
 }
 
 // ============ PR-04: AI bubble actions, import modal, context tabs, title gen ============
@@ -643,10 +689,9 @@ function copyToClipboard(text: string, btn: HTMLElement): void {
 }
 
 function regenerateLast(aiRow: HTMLElement): void {
-  // PR-04 stub: surface a hint. Full re-send (drop last assistant, re-call /api/ai)
-  // is deferred until chat-history persistence lands.
-  const btn = aiRow.querySelector<HTMLElement>('[data-action="regen"]');
-  if (btn) flashAck(btn, 'Coming soon');
+  const root = aiRow.closest<HTMLElement>('.ncb-root');
+  if (!root) return;
+  regenerateLastReal(aiRow, root);
 }
 
 function flashAck(btn: HTMLElement, msg: string): void {
@@ -931,8 +976,15 @@ const chatStore: ChatStore = {
 
 function getOrInitLiveState(): ConversationState {
   if (liveState) return liveState;
-  liveState = { messages: [], pasted: [], controller: null, isSending: false };
-  return liveState;
+  const fresh: ConversationState = {
+    messages: [],
+    pasted: [],
+    files: [],
+    controller: null,
+    isSending: false,
+  };
+  liveState = fresh;
+  return fresh;
 }
 
 function loadChatStore(): void {
@@ -1073,11 +1125,13 @@ function loadActiveChatIntoCenter(root: HTMLElement): void {
   const state = getOrInitLiveState();
   state.messages = chat.messages;
   state.pasted = [];
+  state.files = [];
   state.controller = null;
   state.isSending = false;
   if (sendBtn) setSendBtnMode(sendBtn, 'send');
   if (textarea) textarea.value = '';
   if (pasteRow) renderPasteRow(state, pasteRow);
+  renderFilesRow(root, state);
 
   // Header title.
   if (headerTitle) headerTitle.textContent = chat.title;
@@ -1089,7 +1143,7 @@ function loadActiveChatIntoCenter(root: HTMLElement): void {
   msgs.innerHTML = '';
   chat.messages.forEach((m) => {
     if (m.role === 'user') {
-      appendUserBubble(msgs, m.text, m.images || []);
+      appendUserBubble(msgs, m.text, m.images || [], m.files || []);
     } else {
       const row = appendAiBubble(msgs);
       const bubble = row.querySelector<HTMLElement>('.ncb-bubble-body');
@@ -1100,6 +1154,211 @@ function loadActiveChatIntoCenter(root: HTMLElement): void {
 
   // Re-render attached folders for this chat.
   renderAttachChips(root);
+}
+
+// ============ PR-06: file upload + pdf extraction + files row + regenerate ============
+
+const NCB_FILE_LIMIT = 10;
+const NCB_TEXT_CHAR_LIMIT = 60000;
+const NCB_PDF_PAGE_LIMIT = 80;
+
+function initUploads(root: HTMLElement): void {
+  const trigger = root.querySelector<HTMLButtonElement>('.ncb-upload-btn');
+  const input = root.querySelector<HTMLInputElement>('.ncb-file-input');
+  if (!trigger || !input || trigger.dataset.ncbBound === '1') return;
+  trigger.dataset.ncbBound = '1';
+
+  trigger.addEventListener('click', () => input.click());
+  input.addEventListener('change', () => {
+    const files = Array.from(input.files || []);
+    input.value = '';
+    if (!files.length) return;
+    void absorbUploadedFiles(files, root);
+  });
+}
+
+async function absorbUploadedFiles(files: File[], root: HTMLElement): Promise<void> {
+  const state = getOrInitLiveState();
+  const remaining = NCB_FILE_LIMIT - state.files.length;
+  if (remaining <= 0) return;
+  const accepted = files.slice(0, remaining);
+
+  for (const f of accepted) {
+    const pending = await readUploadedFile(f);
+    if (pending) state.files.push(pending);
+    renderFilesRow(root, state);
+  }
+}
+
+function readUploadedFile(f: File): Promise<PendingFile | null> {
+  const id = (f.name || 'file') + '-' + (f.lastModified || Date.now()) + '-' + Math.random().toString(36).slice(2, 8);
+  const baseMeta = { id, name: f.name || 'file', size: f.size };
+
+  // Image — encode as base64 (strip the data: prefix).
+  if (f.type && f.type.startsWith('image/')) {
+    return readAsDataUrl(f).then((dataUrl) => {
+      if (!dataUrl) return null;
+      return {
+        ...baseMeta,
+        kind: 'image' as const,
+        mediaType: f.type,
+        base64: dataUrl.replace(/^data:[^;]+;base64,/, ''),
+      };
+    });
+  }
+
+  // .txt / .md / text/plain — read as text directly.
+  if (f.type === 'text/plain' || /\.(txt|md)$/i.test(f.name)) {
+    return new Promise((resolve) => {
+      try {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const raw = typeof reader.result === 'string' ? reader.result : '';
+          resolve({
+            ...baseMeta,
+            kind: 'text' as const,
+            textContent: raw.length > NCB_TEXT_CHAR_LIMIT ? raw.slice(0, NCB_TEXT_CHAR_LIMIT) + '\n\n[Content truncated]' : raw,
+          });
+        };
+        reader.onerror = () => resolve(null);
+        reader.readAsText(f);
+      } catch {
+        resolve(null);
+      }
+    });
+  }
+
+  // PDF — pdfjsLib + the same page/char limits the existing chatbot uses.
+  if (f.type === 'application/pdf' || /\.pdf$/i.test(f.name)) {
+    return extractPdfText(f).then((text) => ({
+      ...baseMeta,
+      kind: 'text' as const,
+      textContent: text,
+    }));
+  }
+
+  // Anything else — store as binary stub so the user sees the chip but the AI
+  // gets an honest "couldn't read" hint.
+  return Promise.resolve({ ...baseMeta, kind: 'binary' as const });
+}
+
+function extractPdfText(f: File): Promise<string> {
+  const ensurePdf = (window as unknown as { _ssEnsurePdfJs?: () => Promise<void> })._ssEnsurePdfJs;
+  const ensure = typeof ensurePdf === 'function' ? ensurePdf() : Promise.resolve();
+  return ensure
+    .then(
+      () =>
+        new Promise<ArrayBuffer | null>((resolve) => {
+          try {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as ArrayBuffer);
+            reader.onerror = () => resolve(null);
+            reader.readAsArrayBuffer(f);
+          } catch {
+            resolve(null);
+          }
+        })
+    )
+    .then(async (buf) => {
+      const pdfjs = (window as unknown as {
+        pdfjsLib?: {
+          getDocument: (o: unknown) => { promise: Promise<{
+            numPages: number;
+            getPage: (n: number) => Promise<{
+              getTextContent: () => Promise<{ items: Array<{ str: string }> }>;
+            }>;
+          }> };
+        };
+      }).pdfjsLib;
+      if (!buf || !pdfjs) return '(could not extract text from this PDF)';
+      try {
+        const pdf = await pdfjs.getDocument({
+          data: new Uint8Array(buf),
+          cMapUrl: 'https://unpkg.com/pdfjs-dist@3.11.174/cmaps/',
+          cMapPacked: true,
+        }).promise;
+        const pages = Math.min(pdf.numPages, NCB_PDF_PAGE_LIMIT);
+        const out: string[] = [];
+        for (let p = 1; p <= pages; p++) {
+          const page = await pdf.getPage(p);
+          const tc = await page.getTextContent();
+          const str = tc.items.map((it) => it.str).join(' ').replace(/\s+/g, ' ').trim();
+          if (str) out.push('--- Page ' + p + ' ---\n' + str);
+        }
+        let full = out.join('\n\n');
+        const truncated = full.length > NCB_TEXT_CHAR_LIMIT;
+        if (truncated) full = full.slice(0, NCB_TEXT_CHAR_LIMIT);
+        return full + (truncated ? '\n\n[Content truncated — document is very large]' : '');
+      } catch {
+        return '(could not extract text from this PDF)';
+      }
+    });
+}
+
+function renderFilesRow(root: HTMLElement, state: ConversationState): void {
+  const row = root.querySelector<HTMLElement>('.ncb-files-row');
+  if (!row) return;
+  if (!state.files.length) {
+    row.hidden = true;
+    row.innerHTML = '';
+    return;
+  }
+  row.hidden = false;
+  row.innerHTML = state.files
+    .map((f) => {
+      const icon =
+        f.kind === 'image'
+          ? '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><circle cx="10" cy="13" r="2"/><path d="m20 17-1.296-1.296a2.41 2.41 0 0 0-3.408 0L9 22"/>'
+          : '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>';
+      const kindLabel = f.kind === 'image' ? 'Image' : f.kind === 'text' ? 'Document' : 'File';
+      return `
+        <span class="ncb-file-chip" data-id="${escapeAttr(f.id)}" title="${escapeAttr(f.name)}">
+          <span class="ncb-file-chip-icon">
+            <svg class="ncb-icon ncb-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${icon}</svg>
+          </span>
+          <span class="ncb-file-chip-text">
+            <span class="ncb-file-chip-name">${escapeHtml(f.name)}</span>
+            <span class="ncb-file-chip-kind">${kindLabel}</span>
+          </span>
+          <button type="button" class="ncb-file-chip-x" aria-label="Remove ${escapeAttr(f.name)}">
+            <svg class="ncb-icon ncb-icon--xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </span>
+      `;
+    })
+    .join('');
+
+  row.querySelectorAll<HTMLButtonElement>('.ncb-file-chip-x').forEach((btn) => {
+    btn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const id = btn.closest<HTMLElement>('.ncb-file-chip')?.dataset.id;
+      if (!id) return;
+      state.files = state.files.filter((x) => x.id !== id);
+      renderFilesRow(root, state);
+    });
+  });
+}
+
+// Override the PR-04 stub with a real implementation.
+function regenerateLastReal(aiRow: HTMLElement, root: HTMLElement): void {
+  const msgs = root.querySelector<HTMLElement>('.ncb-msgs');
+  const sendBtn = root.querySelector<HTMLButtonElement>('.ncb-send-btn');
+  if (!msgs || !sendBtn) return;
+
+  const state = liveState;
+  if (!state || state.isSending) return;
+
+  // Drop the trailing assistant message from the active chat.
+  const last = state.messages[state.messages.length - 1];
+  if (!last || last.role !== 'assistant') return;
+  state.messages.pop();
+  touchActiveChat();
+  saveChatStore();
+
+  // Remove the corresponding DOM row (the bubble the user clicked Regenerate on).
+  aiRow.remove();
+
+  void streamAiReply(state, sendBtn, msgs);
 }
 
 (window as unknown as { initNewChatbotShell?: () => void }).initNewChatbotShell = initNewChatbotShell;

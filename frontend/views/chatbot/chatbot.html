@@ -367,7 +367,11 @@
 
               <div class="ncb-input">
                 <div class="ncb-attach-row" hidden></div>
+                <div class="ncb-files-row" hidden></div>
                 <div class="ncb-paste-row" hidden></div>
+                <input type="file" class="ncb-file-input" multiple hidden
+                       accept="image/*,application/pdf,text/plain,.txt,.md" />
+
                 <textarea
                   class="ncb-input-textarea"
                   placeholder="Ask anything about your lectures, exercises, or course files... Paste screenshots with Ctrl+V."
@@ -375,7 +379,7 @@
                 ></textarea>
                 <div class="ncb-input-bottom">
                   <div class="ncb-input-actions">
-                    <button type="button" class="ncb-input-action-btn">
+                    <button type="button" class="ncb-input-action-btn ncb-upload-btn">
                       <span class="ncb-input-action-icon">
                         <svg class="ncb-icon ncb-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                           <path d="M13.234 20.252 21 12.3"/>

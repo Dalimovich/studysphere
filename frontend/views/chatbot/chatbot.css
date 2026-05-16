@@ -2746,3 +2746,157 @@ body:not(.night) .aip-course-cancel {
   opacity: 0.45;
   box-shadow: none;
 }
+
+/* ============ PR-06: file chips (uploaded files above the textarea) ============ */
+
+.ncb-files-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 12px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+.ncb-file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 8px 0 10px;
+  border-radius: 0.875rem;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(2, 6, 23, 0.45);
+  color: #e2e8f0;
+  font-size: 0.8125rem;
+  max-width: 220px;
+}
+
+.ncb-file-chip-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 0.625rem;
+  background: rgba(59, 130, 246, 0.15);
+  color: #bfdbfe;
+  flex-shrink: 0;
+}
+
+.ncb-file-chip-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.ncb-file-chip-name {
+  color: #ffffff;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+.ncb-file-chip-kind {
+  color: #94a3b8;
+  font-size: 0.6875rem;
+}
+
+.ncb-file-chip-x {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: #cbd5e1;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  flex-shrink: 0;
+}
+.ncb-file-chip-x:hover {
+  background: rgba(220, 38, 38, 0.70);
+  color: #ffffff;
+}
+
+/* File chips shown inside the user message bubble (after send) */
+
+.ncb-bubble-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.ncb-bubble-file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(147, 197, 253, 0.25);
+  background: rgba(2, 6, 23, 0.35);
+  color: #dbeafe;
+  font-size: 0.75rem;
+  font-weight: 600;
+  max-width: 220px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ===== Math + markdown polish so renderMarkdown output lands cleanly ===== */
+
+.ncb-bubble-body h1,
+.ncb-bubble-body h2,
+.ncb-bubble-body h3,
+.ncb-bubble-body h4 {
+  color: #ffffff;
+  margin: 16px 0 8px;
+  font-weight: 700;
+}
+.ncb-bubble-body h1 { font-size: 1.25rem; }
+.ncb-bubble-body h2 { font-size: 1.15rem; }
+.ncb-bubble-body h3 { font-size: 1.05rem; }
+.ncb-bubble-body h4 { font-size: 1rem; }
+
+.ncb-bubble-body ul,
+.ncb-bubble-body ol {
+  margin: 8px 0 12px;
+  padding-left: 22px;
+}
+.ncb-bubble-body li {
+  margin-bottom: 4px;
+}
+
+.ncb-bubble-body pre {
+  margin: 12px 0;
+  padding: 12px 14px;
+  border-radius: 0.75rem;
+  background: rgba(2, 6, 23, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+.ncb-bubble-body pre code {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+}
+
+.ncb-bubble-body blockquote {
+  margin: 12px 0;
+  padding: 4px 12px;
+  border-left: 3px solid rgba(147, 197, 253, 0.50);
+  color: #cbd5e1;
+  background: rgba(59, 130, 246, 0.06);
+  border-radius: 0 0.5rem 0.5rem 0;
+}
+
+.ncb-bubble-body .katex-display {
+  margin: 12px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
