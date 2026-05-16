@@ -297,11 +297,11 @@ async function doSend(state, stage, textarea, sendBtn, pasteRow, msgs) {
     appendUserBubble(msgs, text, images, files);
     touchActiveChat();
     saveChatStore();
-    // Reset input. Clear the value AND clear the inline height that
-    // auto-resize set while the user was typing — otherwise the textarea
-    // keeps its multi-line height even after the value is empty.
+    // Reset input. Belt-and-braces: clear value, force textarea back to
+    // its min height explicitly, clear overflow.
     textarea.value = '';
-    textarea.style.height = '';
+    textarea.style.height = '36px';
+    textarea.style.overflowY = 'hidden';
     textarea.dispatchEvent(new Event('input', { bubbles: true }));
     state.pasted = [];
     state.files = [];
@@ -1353,7 +1353,8 @@ function loadActiveChatIntoCenter(root) {
         setSendBtnMode(sendBtn, 'send');
     if (textarea) {
         textarea.value = '';
-        textarea.style.height = '';
+        textarea.style.height = '36px';
+        textarea.style.overflowY = 'hidden';
         textarea.dispatchEvent(new Event('input', { bubbles: true }));
     }
     if (pasteRow)

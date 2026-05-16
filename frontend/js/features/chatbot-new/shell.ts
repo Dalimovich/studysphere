@@ -360,12 +360,12 @@ async function doSend(
   touchActiveChat();
   saveChatStore();
 
-  // Reset input. Clear the value AND clear the inline height that
-  // auto-resize set while the user was typing — otherwise the textarea
-  // keeps its multi-line height even after the value is empty.
-  // Dispatch 'input' so any other listeners can react.
+  // Reset input. Belt-and-braces: clear value, force the textarea
+  // back to its min height explicitly, clear overflow, then fire
+  // input so any other listeners see an empty textarea.
   textarea.value = '';
-  textarea.style.height = '';
+  textarea.style.height = '36px';
+  textarea.style.overflowY = 'hidden';
   textarea.dispatchEvent(new Event('input', { bubbles: true }));
   state.pasted = [];
   state.files = [];
@@ -1537,7 +1537,8 @@ function loadActiveChatIntoCenter(root: HTMLElement): void {
   if (sendBtn) setSendBtnMode(sendBtn, 'send');
   if (textarea) {
     textarea.value = '';
-    textarea.style.height = '';
+    textarea.style.height = '36px';
+    textarea.style.overflowY = 'hidden';
     textarea.dispatchEvent(new Event('input', { bubbles: true }));
   }
   if (pasteRow) renderPasteRow(state, pasteRow);
