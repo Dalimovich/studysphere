@@ -244,6 +244,10 @@ body.ncb-fullbleed .ncb-main {
   min-width: 0;
   overflow-y: auto;
   padding: 32px 20px;
+  /* Flex column so .ncb-center-inner can fill the scroller's height
+     and the sticky composer at the bottom has something to stick to. */
+  display: flex;
+  flex-direction: column;
 }
 
 @media (min-width: 768px) {
@@ -255,6 +259,11 @@ body.ncb-fullbleed .ncb-main {
 .ncb-center-inner {
   margin: 0 auto;
   max-width: 64rem;
+  width: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 /* Empty state */
@@ -262,11 +271,11 @@ body.ncb-fullbleed .ncb-main {
 .ncb-empty {
   display: flex;
   flex-direction: column;
-  /* Fill the scroll column so the active-state sticky composer has
-     something to stick against. Without this, when content is short
-     the composer sits at the bottom of .ncb-empty's natural height,
-     leaving dead space below. */
-  min-height: 100%;
+  /* Fill the scroll column via the flex chain (.ncb-center →
+     .ncb-center-inner → .ncb-empty) so the active-state sticky
+     composer is forced to the actual bottom of the visible area. */
+  flex: 1;
+  min-height: 0;
 }
 
 /* In active chats, let messages take all spare vertical room so the
