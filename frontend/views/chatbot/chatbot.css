@@ -698,10 +698,10 @@ body.ncb-fullbleed .ncb-main {
   gap: 6px;
   min-height: 82px;
   max-height: 210px;
-  /* Slightly more padding-top than bottom so the text/caret feels a
-     pinch lower without changing the textarea's own padding (which
-     would trip the auto-resize on first keystroke). */
-  padding: 16px 16px 12px 16px;
+  /* Tight symmetric vertical padding so the composer total height
+     matches the "clean" version even though textarea min-height is
+     now 36 (bumped to stop the first-keystroke growth jump). */
+  padding: 8px 16px;
   background: rgba(8, 15, 34, 0.82);
   border-color: rgba(148, 163, 184, 0.28);
   box-shadow: 0 18px 45px rgba(0, 0, 0, 0.28);
