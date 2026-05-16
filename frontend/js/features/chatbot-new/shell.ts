@@ -20,10 +20,15 @@ export function initNewChatbotShell(): void {
   newRoot.hidden = false;
   newRoot.style.display = '';
 
+  loadChatStore(); // PR-05 — must run before rendering sidebar or conversation.
+
   initSidebar(newRoot);
   initConversation(newRoot);
   initImportModal(newRoot);
   initContextTabs(newRoot);
+
+  renderSidebar(newRoot);
+  loadActiveChatIntoCenter(newRoot);
 }
 
 // PR-02 — sidebar behavior. Idempotent: each binding tags the node with
@@ -58,17 +63,22 @@ function bindChatItems(sidebar: HTMLElement): void {
   if (!list || list.dataset.ncbBound === '1') return;
   list.dataset.ncbBound = '1';
 
-  // Event delegation so newly-prepended "New chat" rows work without rebinding.
+  // Event delegation: re-renders of the list (PR-05) keep the binding alive.
   list.addEventListener('click', (ev) => {
     const target = ev.target as HTMLElement | null;
     const item = target ? target.closest<HTMLElement>('.ncb-chat-item') : null;
     if (!item) return;
 
-    // If the sidebar is collapsed, expand it before selecting — matches the
-    // brief's rule that collapsed icon clicks reopen + select.
     if (sidebar.dataset.collapsed === 'true') setCollapsed(sidebar, false);
 
-    selectChatItem(list, item);
+    const chatId = item.dataset.chatId;
+    const root = sidebar.closest<HTMLElement>('.ncb-root');
+    if (chatId && root) {
+      switchActiveChat(root, chatId);
+    } else {
+      // Fallback: still mark visually active.
+      selectChatItem(list, item);
+    }
   });
 }
 
@@ -87,64 +97,25 @@ function bindNewChat(sidebar: HTMLElement): void {
   btn.addEventListener('click', () => {
     if (sidebar.dataset.collapsed === 'true') setCollapsed(sidebar, false);
 
-    const list = sidebar.querySelector<HTMLElement>('.ncb-chat-list');
-    if (!list) return;
+    const root = sidebar.closest<HTMLElement>('.ncb-root');
+    if (!root) return;
 
-    // Skip if a draft "New chat" row already exists, matching the React preview's
-    // handleNewChat which de-dupes drafts.
-    const existingDraft = list.querySelector<HTMLElement>('.ncb-chat-item[data-ncb-draft="1"]');
+    // PR-05: de-dupe — if there's already an empty draft chat, just switch to it
+    // instead of creating a second one (matches the React preview's handleNewChat).
+    const existingDraft = chatStore.chats.find(
+      (c) => c.messages.length === 0 && c.title === 'New chat'
+    );
     if (existingDraft) {
-      selectChatItem(list, existingDraft);
+      switchActiveChat(root, existingDraft.id);
       return;
     }
 
-    const row = buildChatItem('New chat', 'Title generated from full context');
-    row.dataset.ncbDraft = '1';
-
-    // Insert directly after the "Recent" label (or at the top if no Recent label).
-    const recentLabel = Array.from(
-      list.querySelectorAll<HTMLElement>('.ncb-chat-section-label')
-    ).find((el) => /recent/i.test(el.textContent || ''));
-
-    if (recentLabel && recentLabel.parentElement === list) {
-      recentLabel.insertAdjacentElement('afterend', row);
-    } else {
-      list.prepend(row);
-    }
-
-    selectChatItem(list, row);
+    const created = chatStore.newChat();
+    chatStore.activeId = created.id;
+    saveChatStore();
+    renderSidebar(root);
+    loadActiveChatIntoCenter(root);
   });
-}
-
-function buildChatItem(title: string, meta: string): HTMLButtonElement {
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'ncb-chat-item';
-
-  // Same MessageSquareText lucide path used in the static sample rows.
-  btn.innerHTML = `
-    <span class="ncb-chat-icon">
-      <svg class="ncb-icon ncb-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-      </svg>
-    </span>
-    <span class="ncb-chat-text">
-      <span class="ncb-chat-title"></span>
-      <span class="ncb-chat-meta"></span>
-    </span>
-    <span class="ncb-chat-more" aria-hidden="true">
-      <svg class="ncb-icon ncb-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>
-      </svg>
-    </span>
-  `;
-
-  const titleEl = btn.querySelector<HTMLElement>('.ncb-chat-title');
-  const metaEl = btn.querySelector<HTMLElement>('.ncb-chat-meta');
-  if (titleEl) titleEl.textContent = title;
-  if (metaEl) metaEl.textContent = meta;
-
-  return btn;
 }
 
 function bindSearch(sidebar: HTMLElement): void {
@@ -208,12 +179,12 @@ function initConversation(root: HTMLElement): void {
   if (stage.dataset.ncbConvBound === '1') return;
   stage.dataset.ncbConvBound = '1';
 
-  const state: ConversationState = {
-    messages: [],
-    pasted: [],
-    controller: null,
-    isSending: false,
-  };
+  // PR-05: state.messages is initialised to the active chat's messages array
+  // by reference, and re-pointed on chat switch by loadActiveChatIntoCenter.
+  // Pasted images / controller / isSending are transient and reset per chat.
+  const state = getOrInitLiveState();
+  state.messages = chatStore.getActive().messages;
+  liveState = state;
 
   // Send / pause toggle
   sendBtn.addEventListener('click', () => {
@@ -358,6 +329,8 @@ async function doSend(
   // Append user bubble
   state.messages.push({ role: 'user', text, images });
   appendUserBubble(msgs, text, images);
+  touchActiveChat();
+  saveChatStore();
 
   // Reset input
   textarea.value = '';
@@ -407,6 +380,8 @@ async function doSend(
         : 'No response.';
 
     state.messages.push({ role: 'assistant', text: raw });
+    touchActiveChat();
+    saveChatStore();
     await typeIntoBubble(bubble, raw, () => controller.signal.aborted);
     appendBubbleActions(aiRow, raw);
 
@@ -772,30 +747,52 @@ function initImportModal(root: HTMLElement): void {
 function attachImportedFolders(root: HTMLElement, folders: ImportedFolder[]): void {
   const row = root.querySelector<HTMLElement>('.ncb-attach-row');
   if (!row) return;
-  const existing = new Set<string>(
-    Array.from(row.querySelectorAll<HTMLElement>('.ncb-attach-chip')).map((el) => el.dataset.id || '')
-  );
+
+  // PR-05: persist into active chat's attachedFolders, then render from there.
+  const active = chatStore.getActive();
+  const existingIds = new Set(active.attachedFolders.map((f) => f.id));
   folders.forEach((f) => {
-    if (existing.has(f.id)) return;
-    const chip = document.createElement('span');
-    chip.className = 'ncb-attach-chip';
-    chip.dataset.id = f.id;
-    chip.innerHTML = `
-      <svg class="ncb-icon ncb-icon--xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"/></svg>
-      <span class="ncb-attach-chip-name">${escapeHtml(f.name)}</span>
-      <span class="ncb-attach-chip-meta">${escapeHtml(f.count)}</span>
-      <button type="button" class="ncb-attach-chip-x" aria-label="Remove ${escapeAttr(f.name)}">
-        <svg class="ncb-icon ncb-icon--xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-      </button>
-    `;
-    chip.querySelector<HTMLButtonElement>('.ncb-attach-chip-x')?.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-      chip.remove();
-      if (!row.querySelector('.ncb-attach-chip')) row.hidden = true;
-    });
-    row.appendChild(chip);
+    if (!existingIds.has(f.id)) active.attachedFolders.push(f);
   });
-  if (row.querySelector('.ncb-attach-chip')) row.hidden = false;
+  saveChatStore();
+  renderAttachChips(root);
+}
+
+function renderAttachChips(root: HTMLElement): void {
+  const row = root.querySelector<HTMLElement>('.ncb-attach-row');
+  if (!row) return;
+  const active = chatStore.getActive();
+  if (!active.attachedFolders.length) {
+    row.hidden = true;
+    row.innerHTML = '';
+    return;
+  }
+  row.innerHTML = active.attachedFolders
+    .map(
+      (f) => `
+      <span class="ncb-attach-chip" data-id="${escapeAttr(f.id)}">
+        <svg class="ncb-icon ncb-icon--xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"/></svg>
+        <span class="ncb-attach-chip-name">${escapeHtml(f.name)}</span>
+        <span class="ncb-attach-chip-meta">${escapeHtml(f.count)}</span>
+        <button type="button" class="ncb-attach-chip-x" aria-label="Remove ${escapeAttr(f.name)}">
+          <svg class="ncb-icon ncb-icon--xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </span>
+    `
+    )
+    .join('');
+  row.hidden = false;
+  row.querySelectorAll<HTMLButtonElement>('.ncb-attach-chip-x').forEach((x) => {
+    x.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const id = x.closest<HTMLElement>('.ncb-attach-chip')?.dataset.id;
+      if (!id) return;
+      const active2 = chatStore.getActive();
+      active2.attachedFolders = active2.attachedFolders.filter((f) => f.id !== id);
+      saveChatStore();
+      renderAttachChips(root);
+    });
+  });
 }
 
 // ---- Context-panel tabs ----
@@ -862,19 +859,247 @@ async function generateChatTitle(state: ConversationState): Promise<string | nul
 }
 
 function updateChatTitle(title: string): void {
-  const headerTitle = document.querySelector<HTMLElement>('.ncb-chat-header-title');
-  if (headerTitle) headerTitle.textContent = title;
+  // PR-05: persist into store + re-render header and sidebar row from data.
+  const active = chatStore.getActive();
+  active.title = title;
+  active.updatedAt = Date.now();
+  saveChatStore();
 
-  // Sync the active sidebar row (likely the draft "New chat" added in PR-02,
-  // or whichever row is currently marked active).
-  const activeRow = document.querySelector<HTMLElement>(
-    '.ncb-chat-item--active .ncb-chat-title'
-  );
-  if (activeRow) activeRow.textContent = title;
-  const activeRowMeta = document.querySelector<HTMLElement>(
-    '.ncb-chat-item--active .ncb-chat-meta'
-  );
-  if (activeRowMeta) activeRowMeta.textContent = 'Generated from chat context · Just now';
+  const root = document.getElementById('ncbRoot');
+  if (root) {
+    const headerTitle = root.querySelector<HTMLElement>('.ncb-chat-header-title');
+    if (headerTitle) headerTitle.textContent = title;
+    renderSidebar(root);
+  }
+}
+
+// ============ PR-05: Chat store + persistence + sidebar render + chat load ============
+
+interface SavedChat {
+  id: string;
+  title: string;
+  messages: ChatMessage[];
+  attachedFolders: ImportedFolder[];
+  pinned: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+interface ChatStore {
+  chats: SavedChat[];
+  activeId: string;
+  getActive(): SavedChat;
+  newChat(): SavedChat;
+}
+
+const NCB_STORE_KEY = 'ss_ncb_chats_v1';
+const NCB_ACTIVE_KEY = 'ss_ncb_active_v1';
+
+let liveState: ConversationState | null = null;
+
+const chatStore: ChatStore = {
+  chats: [],
+  activeId: '',
+  getActive(): SavedChat {
+    let c = chatStore.chats.find((ch) => ch.id === chatStore.activeId);
+    if (c) return c;
+    // Self-heal: pick the most recent, or create a fresh one.
+    c = chatStore.chats[0];
+    if (c) {
+      chatStore.activeId = c.id;
+      return c;
+    }
+    const fresh = chatStore.newChat();
+    chatStore.activeId = fresh.id;
+    return fresh;
+  },
+  newChat(): SavedChat {
+    const now = Date.now();
+    const chat: SavedChat = {
+      id: 'ncb_' + now.toString(36) + '_' + Math.random().toString(36).slice(2, 8),
+      title: 'New chat',
+      messages: [],
+      attachedFolders: [],
+      pinned: false,
+      createdAt: now,
+      updatedAt: now,
+    };
+    chatStore.chats.unshift(chat);
+    return chat;
+  },
+};
+
+function getOrInitLiveState(): ConversationState {
+  if (liveState) return liveState;
+  liveState = { messages: [], pasted: [], controller: null, isSending: false };
+  return liveState;
+}
+
+function loadChatStore(): void {
+  try {
+    const raw = localStorage.getItem(NCB_STORE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as unknown;
+      if (Array.isArray(parsed)) chatStore.chats = parsed as SavedChat[];
+    }
+    const activeRaw = localStorage.getItem(NCB_ACTIVE_KEY);
+    if (typeof activeRaw === 'string' && activeRaw) chatStore.activeId = activeRaw;
+  } catch {
+    // private mode / corrupt storage — start fresh
+  }
+
+  // Migrate any missing fields on legacy entries.
+  chatStore.chats.forEach((c) => {
+    if (!Array.isArray(c.messages)) c.messages = [];
+    if (!Array.isArray(c.attachedFolders)) c.attachedFolders = [];
+    if (typeof c.pinned !== 'boolean') c.pinned = false;
+    if (typeof c.createdAt !== 'number') c.createdAt = Date.now();
+    if (typeof c.updatedAt !== 'number') c.updatedAt = c.createdAt;
+    if (typeof c.title !== 'string' || !c.title) c.title = 'New chat';
+  });
+
+  // Ensure there is always at least one chat and an activeId pointing somewhere.
+  if (chatStore.chats.length === 0) {
+    const fresh = chatStore.newChat();
+    chatStore.activeId = fresh.id;
+  } else if (!chatStore.chats.find((c) => c.id === chatStore.activeId)) {
+    chatStore.activeId = chatStore.chats[0]!.id;
+  }
+}
+
+let _saveTimer: number | null = null;
+function saveChatStore(): void {
+  if (_saveTimer != null) window.clearTimeout(_saveTimer);
+  _saveTimer = window.setTimeout(() => {
+    try {
+      localStorage.setItem(NCB_STORE_KEY, JSON.stringify(chatStore.chats));
+      localStorage.setItem(NCB_ACTIVE_KEY, chatStore.activeId);
+    } catch {
+      // quota / private mode — silently drop
+    }
+  }, 200);
+}
+
+function touchActiveChat(): void {
+  const c = chatStore.getActive();
+  c.updatedAt = Date.now();
+}
+
+function relativeTime(ts: number): string {
+  const diff = Date.now() - ts;
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return 'Just now';
+  if (min < 60) return min + ' min ago';
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return hr + ' hr ago';
+  const d = Math.floor(hr / 24);
+  if (d < 7) return d + ' day' + (d === 1 ? '' : 's') + ' ago';
+  return new Date(ts).toLocaleDateString();
+}
+
+function chatMeta(c: SavedChat): string {
+  const attached = c.attachedFolders.length;
+  const fragment =
+    attached > 0
+      ? attached + ' folder' + (attached === 1 ? '' : 's')
+      : c.messages.length === 0
+        ? 'Empty draft'
+        : c.messages.length + ' msg' + (c.messages.length === 1 ? '' : 's');
+  return fragment + ' · ' + relativeTime(c.updatedAt);
+}
+
+function renderSidebar(root: HTMLElement): void {
+  const list = root.querySelector<HTMLElement>('.ncb-chat-list');
+  if (!list) return;
+
+  const pinned = chatStore.chats.filter((c) => c.pinned);
+  const recent = chatStore.chats.filter((c) => !c.pinned);
+
+  const sections: string[] = [];
+  if (pinned.length) {
+    sections.push('<p class="ncb-chat-section-label">Pinned</p>');
+    pinned.forEach((c) => sections.push(buildSidebarRow(c)));
+  }
+  if (recent.length) {
+    sections.push('<p class="ncb-chat-section-label">Recent</p>');
+    recent.forEach((c) => sections.push(buildSidebarRow(c)));
+  }
+  list.innerHTML = sections.join('');
+}
+
+function buildSidebarRow(c: SavedChat): string {
+  const isActive = c.id === chatStore.activeId;
+  const iconPath = c.pinned
+    ? '<path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/>'
+    : '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>';
+  return `
+    <button type="button" class="ncb-chat-item${isActive ? ' ncb-chat-item--active' : ''}" data-chat-id="${escapeAttr(c.id)}">
+      <span class="ncb-chat-icon">
+        <svg class="ncb-icon ncb-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${iconPath}</svg>
+      </span>
+      <span class="ncb-chat-text">
+        <span class="ncb-chat-title">${escapeHtml(c.title)}</span>
+        <span class="ncb-chat-meta">${escapeHtml(chatMeta(c))}</span>
+      </span>
+      <span class="ncb-chat-more" aria-hidden="true">
+        <svg class="ncb-icon ncb-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+      </span>
+    </button>
+  `;
+}
+
+function switchActiveChat(root: HTMLElement, chatId: string): void {
+  if (chatId === chatStore.activeId) return;
+  // Abort in-flight response on the old chat.
+  if (liveState?.controller) liveState.controller.abort();
+  chatStore.activeId = chatId;
+  saveChatStore();
+  renderSidebar(root);
+  loadActiveChatIntoCenter(root);
+}
+
+function loadActiveChatIntoCenter(root: HTMLElement): void {
+  const stage = root.querySelector<HTMLElement>('.ncb-empty');
+  const msgs = root.querySelector<HTMLElement>('.ncb-msgs');
+  const headerTitle = root.querySelector<HTMLElement>('.ncb-chat-header-title');
+  const textarea = root.querySelector<HTMLTextAreaElement>('.ncb-input-textarea');
+  const sendBtn = root.querySelector<HTMLButtonElement>('.ncb-send-btn');
+  const pasteRow = root.querySelector<HTMLElement>('.ncb-paste-row');
+  if (!stage || !msgs) return;
+
+  const chat = chatStore.getActive();
+
+  // Reset transient live state.
+  const state = getOrInitLiveState();
+  state.messages = chat.messages;
+  state.pasted = [];
+  state.controller = null;
+  state.isSending = false;
+  if (sendBtn) setSendBtnMode(sendBtn, 'send');
+  if (textarea) textarea.value = '';
+  if (pasteRow) renderPasteRow(state, pasteRow);
+
+  // Header title.
+  if (headerTitle) headerTitle.textContent = chat.title;
+
+  // Stage mode: active iff there are any messages.
+  stage.dataset.state = chat.messages.length > 0 ? 'active' : 'empty';
+
+  // Re-render messages from persisted state.
+  msgs.innerHTML = '';
+  chat.messages.forEach((m) => {
+    if (m.role === 'user') {
+      appendUserBubble(msgs, m.text, m.images || []);
+    } else {
+      const row = appendAiBubble(msgs);
+      const bubble = row.querySelector<HTMLElement>('.ncb-bubble-body');
+      if (bubble) bubble.innerHTML = renderInlineMarkdown(m.text);
+      appendBubbleActions(row, m.text);
+    }
+  });
+
+  // Re-render attached folders for this chat.
+  renderAttachChips(root);
 }
 
 (window as unknown as { initNewChatbotShell?: () => void }).initNewChatbotShell = initNewChatbotShell;
