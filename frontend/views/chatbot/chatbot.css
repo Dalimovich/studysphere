@@ -2939,3 +2939,90 @@ body.ncb-fullbleed .ncb-main {
   overflow-x: auto;
   overflow-y: hidden;
 }
+
+/* ============ PR-07: Saved replies (Notes tab) ============ */
+
+.ncb-notes-card {
+  padding: 16px;
+  border-radius: 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.ncb-notes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ncb-notes-empty {
+  margin: 8px 4px;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: #94a3b8;
+}
+
+.ncb-saved-card {
+  padding: 12px;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(2, 6, 23, 0.30);
+}
+
+.ncb-saved-body {
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: #e2e8f0;
+  max-height: 200px;
+  overflow: hidden;
+  position: relative;
+  mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
+}
+.ncb-saved-body p {
+  margin: 0 0 6px;
+}
+.ncb-saved-body p:last-child { margin-bottom: 0; }
+
+.ncb-saved-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ncb-saved-time {
+  font-size: 0.6875rem;
+  color: #64748b;
+}
+
+.ncb-saved-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.ncb-saved-copy,
+.ncb-saved-remove {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 0.625rem;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.05);
+  color: #cbd5e1;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.ncb-saved-copy:hover {
+  background: rgba(59, 130, 246, 0.20);
+  color: #ffffff;
+  border-color: rgba(147, 197, 253, 0.45);
+}
+.ncb-saved-remove:hover {
+  background: rgba(220, 38, 38, 0.65);
+  color: #ffffff;
+  border-color: rgba(248, 113, 113, 0.50);
+}

@@ -582,7 +582,7 @@ function appendBubbleActions(aiRow, raw) {
         else if (action === 'regen')
             regenerateLast(aiRow);
         else if (action === 'save')
-            flashAck(target, 'Saved');
+            saveReplyToNotes(aiRow, raw, target);
         else if (action === 'thumb-up' || action === 'thumb-down') {
             target.classList.add('ncb-bubble-action--picked');
         }
@@ -743,19 +743,108 @@ function initContextTabs(root) {
     const tabs = Array.from(root.querySelectorAll('.ncb-mini-tab'));
     if (!tabs.length || tabs[0]?.dataset.ncbBound === '1')
         return;
+    const sourcesCard = root.querySelector('.ncb-sources-card');
+    const notesCard = root.querySelector('.ncb-notes-card');
     tabs.forEach((tab, idx) => {
         tab.dataset.ncbBound = '1';
         tab.dataset.tabIdx = String(idx);
         tab.addEventListener('click', () => {
             tabs.forEach((t) => t.classList.remove('ncb-mini-tab--active'));
             tab.classList.add('ncb-mini-tab--active');
-            // PR-04: visual only. Real Files/Notes content arrives in a later PR;
-            // for now we re-purpose the existing "Sources used" card as the always-on
-            // body and only switch the active-tab highlight + a subtle label.
-            const label = tab.querySelector('span')?.textContent || '';
-            const card = root.querySelector('.ncb-context-card .ncb-context-card-title');
-            if (card && label)
-                card.textContent = label === 'Sources' ? 'Sources used' : label;
+            const label = (tab.querySelector('span')?.textContent || '').trim();
+            const showNotes = label === 'Notes';
+            // PR-07: Notes tab shows saved replies; Files/Sources still share the
+            // "Sources used" card (real per-tab Files/Sources content is future work).
+            if (sourcesCard)
+                sourcesCard.hidden = showNotes;
+            if (notesCard)
+                notesCard.hidden = !showNotes;
+            const cardTitle = sourcesCard?.querySelector('.ncb-context-card-title');
+            if (cardTitle && !showNotes)
+                cardTitle.textContent = label === 'Sources' ? 'Sources used' : label;
+            if (showNotes)
+                renderNotesTab(root);
+        });
+    });
+}
+function saveReplyToNotes(aiRow, raw, btn) {
+    const chat = chatStore.getActive();
+    // De-dupe by exact text — Save twice should refuse, not double-add.
+    const already = chat.savedReplies.find((r) => r.text === raw);
+    if (already) {
+        flashAck(btn, 'Already saved');
+        return;
+    }
+    chat.savedReplies.unshift({
+        id: 'rep_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6),
+        text: raw,
+        createdAt: Date.now(),
+    });
+    touchActiveChat();
+    saveChatStore();
+    flashAck(btn, 'Saved');
+    // If the Notes tab is currently visible, refresh it inline.
+    const root = aiRow.closest('.ncb-root');
+    if (root) {
+        const notesCard = root.querySelector('.ncb-notes-card');
+        if (notesCard && !notesCard.hidden)
+            renderNotesTab(root);
+        // Always keep the count pill fresh — visible only when Notes tab is open
+        // but cheap to update so we don't desync if user opens it later.
+        const count = root.querySelector('.ncb-notes-count');
+        if (count)
+            count.textContent = String(chat.savedReplies.length);
+    }
+}
+function renderNotesTab(root) {
+    const notesCard = root.querySelector('.ncb-notes-card');
+    if (!notesCard)
+        return;
+    const list = notesCard.querySelector('.ncb-notes-list');
+    const count = notesCard.querySelector('.ncb-notes-count');
+    if (!list)
+        return;
+    const chat = chatStore.getActive();
+    if (count)
+        count.textContent = String(chat.savedReplies.length);
+    if (chat.savedReplies.length === 0) {
+        list.innerHTML =
+            '<p class="ncb-notes-empty">Save useful AI replies here by tapping the Save to notes button under any reply.</p>';
+        return;
+    }
+    list.innerHTML = chat.savedReplies
+        .map((r) => `
+      <article class="ncb-saved-card" data-id="${escapeAttr(r.id)}">
+        <div class="ncb-saved-body">${renderInlineMarkdown(r.text)}</div>
+        <div class="ncb-saved-foot">
+          <span class="ncb-saved-time">${escapeHtml(relativeTime(r.createdAt))}</span>
+          <div class="ncb-saved-actions">
+            <button type="button" class="ncb-saved-copy" title="Copy">
+              <svg class="ncb-icon ncb-icon--xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+            </button>
+            <button type="button" class="ncb-saved-remove" title="Remove" aria-label="Remove saved reply">
+              <svg class="ncb-icon ncb-icon--xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            </button>
+          </div>
+        </div>
+      </article>
+    `)
+        .join('');
+    list.querySelectorAll('.ncb-saved-card').forEach((card) => {
+        const id = card.dataset.id;
+        if (!id)
+            return;
+        card.querySelector('.ncb-saved-remove')?.addEventListener('click', () => {
+            chat.savedReplies = chat.savedReplies.filter((r) => r.id !== id);
+            touchActiveChat();
+            saveChatStore();
+            renderNotesTab(root);
+        });
+        card.querySelector('.ncb-saved-copy')?.addEventListener('click', (ev) => {
+            const target = ev.currentTarget;
+            const reply = chat.savedReplies.find((r) => r.id === id);
+            if (reply)
+                copyToClipboard(reply.text, target);
         });
     });
 }
@@ -839,6 +928,7 @@ const chatStore = {
             title: 'New chat',
             messages: [],
             attachedFolders: [],
+            savedReplies: [],
             pinned: false,
             createdAt: now,
             updatedAt: now,
@@ -881,6 +971,8 @@ function loadChatStore() {
             c.messages = [];
         if (!Array.isArray(c.attachedFolders))
             c.attachedFolders = [];
+        if (!Array.isArray(c.savedReplies))
+            c.savedReplies = [];
         if (typeof c.pinned !== 'boolean')
             c.pinned = false;
         if (typeof c.createdAt !== 'number')
@@ -1032,8 +1124,14 @@ function loadActiveChatIntoCenter(root) {
             appendBubbleActions(row, m.text);
         }
     });
-    // Re-render attached folders for this chat.
+    // Re-render attached folders + saved-replies count for this chat.
     renderAttachChips(root);
+    const count = root.querySelector('.ncb-notes-count');
+    if (count)
+        count.textContent = String(chat.savedReplies.length);
+    const notesCard = root.querySelector('.ncb-notes-card');
+    if (notesCard && !notesCard.hidden)
+        renderNotesTab(root);
 }
 // ============ PR-06: file upload + pdf extraction + files row + regenerate ============
 const NCB_FILE_LIMIT = 10;
