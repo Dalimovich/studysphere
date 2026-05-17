@@ -114,7 +114,6 @@ export function sdRenderCourses(state: CoursesRenderState): void {
     const col = state.COLORS[i % state.COLORS.length] || '#2563EB';
     const card = document.createElement('div');
     card.className = 'sd-course-card';
-    card.style.position = 'relative';
 
     const folderCount = (c.userFolders || []).reduce(
       (s, fd) => s + (fd.files ? fd.files.length : 0), 0
@@ -136,9 +135,26 @@ export function sdRenderCourses(state: CoursesRenderState): void {
     const count =
       liveCount || cachedCount || parseInt(localStorage.getItem('ss_fc_' + c.id) || '0', 10);
 
+    // Glow strip — full-bleed gradient on top so the card reads from a distance.
     const colorBar = document.createElement('div');
     colorBar.className = 'sd-course-bar';
-    colorBar.style.background = col;
+    colorBar.style.background =
+      'linear-gradient(90deg, ' + col + ' 0%, ' + col + '88 100%)';
+
+    // Subject monogram derived from the first letters of the course name.
+    const monogram = document.createElement('div');
+    monogram.className = 'sd-course-monogram';
+    monogram.style.background =
+      'linear-gradient(135deg, ' + col + '38, ' + col + '14)';
+    monogram.style.color = col;
+    monogram.textContent = (c.name || '?')
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
 
     const courseName = document.createElement('div');
     courseName.className = 'sd-course-name';
@@ -152,17 +168,22 @@ export function sdRenderCourses(state: CoursesRenderState): void {
     badge.className = 'sd-course-badge';
     badge.textContent = count + ' file' + (count !== 1 ? 's' : '');
 
-    // course.files is only hydrated when the user opens the course. On a
-    // fresh dashboard render that hasn't happened yet, so kick off a
-    // background count fetch and refresh the badge + ss_fc_<id> cache.
     if (!liveCount) _hydrateCardCount(c.id, badge);
+
+    const footer = document.createElement('div');
+    footer.className = 'sd-course-footer';
+
+    const openCta = document.createElement('span');
+    openCta.className = 'sd-course-open';
+    openCta.textContent = 'Open course →';
+
+    footer.append(badge, openCta);
 
     const delBtn = document.createElement('button');
     delBtn.className = 'sd-del-btn';
     delBtn.title = 'Remove';
+    delBtn.setAttribute('aria-label', 'Remove course');
     delBtn.textContent = '✕';
-    delBtn.style.cssText =
-      'position:absolute;top:8px;right:8px;background:rgba(255,100,100,.15);border:none;color:rgba(255,120,120,.8);border-radius:6px;padding:2px 7px;cursor:pointer;font-size:.8rem;line-height:1';
 
     delBtn.addEventListener('click', (e: Event) => {
       e.stopPropagation();
@@ -171,7 +192,9 @@ export function sdRenderCourses(state: CoursesRenderState): void {
       sdRenderCourses(state);
     });
 
-    card.append(colorBar, courseName, courseMeta, badge, delBtn);
+    card.append(colorBar, monogram, courseName, courseMeta, footer, delBtn);
+
+    if (count === 0) card.classList.add('sd-course-card-empty');
 
     card.addEventListener('click', () => {
       if (typeof window.hideStudip === 'function') window.hideStudip();
