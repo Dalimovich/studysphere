@@ -853,12 +853,6 @@ function initImportModal(root) {
         searchTerm = '';
         if (searchInput)
             searchInput.value = '';
-        // PR-10: eagerly hydrate any course whose folder list is empty so the
-        // user doesn't have to "open the course first" before importing.
-        void eagerlyHydrateCourses(() => {
-            if (overlay.hidden) return;
-            renderList();
-        });
         // Build the course list each open so newly-added courses appear.
         const courses = listCourses();
         select.innerHTML = courses.length
@@ -867,8 +861,15 @@ function initImportModal(root) {
         activeCourse = courses[0] || null;
         overlay.hidden = false;
         overlay.setAttribute('aria-hidden', 'false');
-        renderList();
         syncCount();
+        // Force fresh re-list for the active course so courses never opened
+        // directly on Minallo still populate their files.
+        forceHydrateActive();
+        // Eager-hydrate the rest in the background.
+        void eagerlyHydrateCourses(() => {
+            if (overlay.hidden) return;
+            renderList();
+        });
     };
     const close = () => {
         overlay.hidden = true;
@@ -880,19 +881,30 @@ function initImportModal(root) {
         activeFolder = null;
         picked.clear();
         syncCount();
-        renderList();
-        if (activeCourse && (!activeCourse.userFolders || activeCourse.userFolders.length === 0)) {
-            const w = window;
-            if (w._ufMerge) {
-                try {
-                    Promise.resolve(w._ufMerge(activeCourse))
-                        .then(() => { if (!overlay.hidden) renderList(); })
-                        .catch(() => { /* ignore */ });
-                }
-                catch { /* ignore */ }
-            }
-        }
+        forceHydrateActive();
     });
+    const showLoading = () => {
+        if (!activeCourse) return;
+        listEl.innerHTML =
+            '<p class="ncb-folder-empty">Loading ' +
+            escapeHtml(courseLabel(activeCourse)) + '…</p>';
+        if (crumb) crumb.hidden = true;
+    };
+    const forceHydrateActive = () => {
+        if (!activeCourse) { renderList(); return; }
+        const w = window;
+        if (!w._ufMerge) { renderList(); return; }
+        const hadDataBefore =
+            (activeCourse.userFolders && activeCourse.userFolders.length > 0) ||
+            (activeCourse.files && activeCourse.files.length > 0);
+        if (!hadDataBefore) showLoading(); else renderList();
+        try {
+            Promise.resolve(w._ufMerge(activeCourse))
+                .then(() => { if (!overlay.hidden) renderList(); })
+                .catch(() => { if (!overlay.hidden) renderList(); });
+        }
+        catch { renderList(); }
+    };
     searchInput?.addEventListener('input', () => {
         searchTerm = searchInput.value.trim();
         renderList();

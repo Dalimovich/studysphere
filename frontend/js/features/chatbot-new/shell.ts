@@ -999,14 +999,6 @@ function initImportModal(root: HTMLElement): void {
     searchTerm = '';
     if (searchInput) searchInput.value = '';
 
-    // PR-10: eagerly hydrate any course whose folder list is empty so the
-    // user doesn't have to "open the course first" before importing.
-    // Re-render as each course's folders/files arrive so the modal fills in.
-    void eagerlyHydrateCourses(() => {
-      if (overlay.hidden) return;
-      renderList();
-    });
-
     // Build the course list each open so newly-added courses appear.
     const courses = listCourses();
     select.innerHTML = courses.length
@@ -1016,8 +1008,18 @@ function initImportModal(root: HTMLElement): void {
 
     overlay.hidden = false;
     overlay.setAttribute('aria-hidden', 'false');
-    renderList();
     syncCount();
+
+    // Force a fresh re-list for the active course. This handles courses
+    // the user has never opened directly on Minallo (which would otherwise
+    // show "No files in this course" because their userFolders is empty).
+    forceHydrateActive();
+    // Eager-hydrate the rest in the background so switching the dropdown
+    // is instant once their data lands.
+    void eagerlyHydrateCourses(() => {
+      if (overlay.hidden) return;
+      renderList();
+    });
   };
   const close = (): void => {
     overlay.hidden = true;
@@ -1030,20 +1032,43 @@ function initImportModal(root: HTMLElement): void {
     activeFolder = null;
     picked.clear();
     syncCount();
-    renderList();
-    // If the newly selected course has no folders yet, kick off a hydration
-    // and re-render once it lands.
-    if (activeCourse && (!activeCourse.userFolders || activeCourse.userFolders.length === 0)) {
-      const w = window as unknown as { _ufMerge?: (course: SemCourse) => unknown };
-      if (w._ufMerge) {
-        try {
-          Promise.resolve(w._ufMerge(activeCourse) as unknown)
-            .then(() => { if (!overlay.hidden) renderList(); })
-            .catch(() => { /* ignore */ });
-        } catch { /* ignore */ }
-      }
-    }
+    // Always force a fresh re-list for the selected course. Reason:
+    // a course may have populated its userFolders during an earlier
+    // session but be stale, OR be empty because hydration hasn't run.
+    // We can't tell the difference from the data, so re-fetch.
+    forceHydrateActive();
   });
+
+  // Show a temporary "Loading…" hint inside the file list while we wait
+  // for _ufMerge to come back for the active course.
+  const showLoading = (): void => {
+    if (!activeCourse) return;
+    listEl.innerHTML =
+      '<p class="ncb-folder-empty">Loading ' +
+      escapeHtml(courseLabel(activeCourse)) +
+      '…</p>';
+    if (crumb) crumb.hidden = true;
+  };
+
+  // Hydrate the active course and re-render when it lands. Forces a
+  // fetch every time (no "skip if non-empty" check) so stale or
+  // partially-populated courses get a fresh listing.
+  const forceHydrateActive = (): void => {
+    if (!activeCourse) { renderList(); return; }
+    const w = window as unknown as { _ufMerge?: (course: SemCourse) => unknown };
+    if (!w._ufMerge) { renderList(); return; }
+    const hadDataBefore =
+      (activeCourse.userFolders && activeCourse.userFolders.length > 0) ||
+      (activeCourse.files && activeCourse.files.length > 0);
+    if (!hadDataBefore) showLoading(); else renderList();
+    try {
+      Promise.resolve(w._ufMerge(activeCourse) as unknown)
+        .then(() => { if (!overlay.hidden) renderList(); })
+        .catch(() => { if (!overlay.hidden) renderList(); });
+    } catch {
+      renderList();
+    }
+  };
 
   searchInput?.addEventListener('input', () => {
     searchTerm = searchInput.value.trim();
@@ -1119,14 +1144,18 @@ async function fetchCourseFileText(
   try {
     const bytes = await w._ufFetchBytes(uid, course, fileName, folderName);
     if (!bytes) return null;
+    // `bytes` is typed Uint8Array<ArrayBufferLike> from the global API.
+    // Cast through unknown so Blob/TextDecoder (which want ArrayBuffer
+    // specifically in tsc 5.x) accept it — at runtime both work fine.
+    const part = bytes as unknown as BlobPart;
     if (/\.pdf$/i.test(fileName)) {
-      const blob = new Blob([bytes], { type: 'application/pdf' });
+      const blob = new Blob([part], { type: 'application/pdf' });
       const file = new File([blob], fileName, { type: 'application/pdf' });
       return await extractPdfText(file);
     }
     if (/\.(txt|md)$/i.test(fileName)) {
       try {
-        return new TextDecoder('utf-8').decode(bytes);
+        return new TextDecoder('utf-8').decode(bytes as unknown as Uint8Array);
       } catch {
         return null;
       }
