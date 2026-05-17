@@ -478,10 +478,28 @@ function scrollMsgsToBottom(msgs) {
 function buildApiMessages(messages) {
     // Mirror chatbot.js: keep last ~20 messages, and inline images as Claude-shaped image blocks.
     const trimmed = messages.slice(-20);
-    return trimmed.map((m) => {
+    // Attached-folder documents (from Import from Course) get injected into
+    // the LATEST user message only — so the AI sees them every reply without
+    // copying them into every historical turn.
+    const folders = chatStore.getActive().attachedFolders;
+    const folderDocs = [];
+    folders.forEach((f) => (f.documents || []).forEach((d) => folderDocs.push(d)));
+    let lastUserIdx = -1;
+    for (let i = trimmed.length - 1; i >= 0; i--) {
+        if (trimmed[i].role === 'user') { lastUserIdx = i; break; }
+    }
+    return trimmed.map((m, idx) => {
         if (m.role === 'assistant')
             return { role: 'assistant', content: m.text };
         const blocks = [];
+        if (idx === lastUserIdx && folderDocs.length) {
+            folderDocs.forEach((d) => {
+                blocks.push({
+                    type: 'text',
+                    text: '<document filename="' + d.name + '" source="course-import">\n' + d.text + '\n</document>',
+                });
+            });
+        }
         (m.images || []).forEach((img) => {
             blocks.push({
                 type: 'image',
@@ -897,17 +915,95 @@ function initImportModal(root) {
         if (!overlay.hidden && ev.key === 'Escape')
             close();
     });
-    importBtn?.addEventListener('click', () => {
-        if (!picked.size)
-            return;
-        const items = Array.from(picked.values()).map((p) => ({
-            id: p.courseId + ':' + p.id, // stable, scoped to course so two courses can each have "lecture"
+    importBtn?.addEventListener('click', async () => {
+        if (!picked.size || !activeCourse) return;
+        if (importBtn.disabled) return;
+        importBtn.disabled = true;
+        const originalLabel = importBtn.textContent;
+        importBtn.textContent = 'Importing…';
+        try {
+            const items = await loadPickedDocuments(picked, activeCourse);
+            attachImportedFolders(root, items);
+            close();
+        }
+        catch (e) {
+            console.warn('[ncb] import-from-course: extraction failed', e);
+            const items = Array.from(picked.values()).map((p) => ({
+                id: p.courseId + ':' + p.id,
+                name: p.name,
+                count: p.meta,
+                documents: [],
+            }));
+            attachImportedFolders(root, items);
+            close();
+        }
+        finally {
+            importBtn.disabled = false;
+            importBtn.textContent = originalLabel;
+        }
+    });
+}
+
+// ---- Course-file extraction for "Import from Course" ----
+async function fetchCourseFileText(uid, course, fileName, folderName) {
+    const w = window;
+    if (!w._ufFetchBytes) return null;
+    try {
+        const bytes = await w._ufFetchBytes(uid, course, fileName, folderName);
+        if (!bytes) return null;
+        if (/\.pdf$/i.test(fileName)) {
+            const blob = new Blob([bytes], { type: 'application/pdf' });
+            const file = new File([blob], fileName, { type: 'application/pdf' });
+            return await extractPdfText(file);
+        }
+        if (/\.(txt|md)$/i.test(fileName)) {
+            try { return new TextDecoder('utf-8').decode(bytes); }
+            catch { return null; }
+        }
+        return null;
+    }
+    catch { return null; }
+}
+
+async function loadPickedDocuments(picked, course) {
+    const w = window;
+    const uid = w._currentUser?.id || w._currentUser?.sub;
+    const out = [];
+    for (const p of picked.values()) {
+        const docs = [];
+        if (uid) {
+            const targets = [];
+            if (p.kind === 'folder') {
+                const fd = (course.userFolders || []).find((x) => x.name === p.name);
+                if (fd) (fd.files || []).forEach((f) => targets.push({ name: f.name, folder: fd.name }));
+            }
+            else {
+                const inRoot = (course.files || []).find((f) => f.name === p.name);
+                if (inRoot) {
+                    targets.push({ name: p.name });
+                }
+                else {
+                    for (const fd of course.userFolders || []) {
+                        if ((fd.files || []).some((f) => f.name === p.name)) {
+                            targets.push({ name: p.name, folder: fd.name });
+                            break;
+                        }
+                    }
+                }
+            }
+            const results = await Promise.all(targets.map((t) => fetchCourseFileText(uid, course, t.name, t.folder)));
+            results.forEach((text, i) => {
+                if (text) docs.push({ name: targets[i].name, text });
+            });
+        }
+        out.push({
+            id: p.courseId + ':' + p.id,
             name: p.name,
             count: p.meta,
-        }));
-        attachImportedFolders(root, items);
-        close();
-    });
+            documents: docs,
+        });
+    }
+    return out;
 }
 function attachImportedFolders(root, folders) {
     const row = root.querySelector('.ncb-attach-row');
