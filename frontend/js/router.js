@@ -297,7 +297,16 @@ window.showPortalSection = function (sec) {
   _ssPushHistory({ view: 'portal', section: target }, '#portal=' + encodeURIComponent(urlSection));
 };
 
-if (!window.location.hash || window.location.hash.indexOf('access_token') === -1) {
+// Skip the initial portal-state replace when we're about to show the auth
+// modal — otherwise the URL flashes #portal=dashboard between landing and
+// the auth screen before _showModal wipes it.
+var _ssSkipBootRoute = false;
+try {
+  _ssSkipBootRoute = sessionStorage.getItem('ss_show_auth') === 'true';
+} catch (e) {}
+
+if (!_ssSkipBootRoute &&
+    (!window.location.hash || window.location.hash.indexOf('access_token') === -1)) {
   var _rst = {};
   try {
     _rst = JSON.parse(localStorage.getItem('ss_state') || '{}');
