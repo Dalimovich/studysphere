@@ -178,6 +178,14 @@
         applyLandingTranslation(_landingLang === 'en' ? 'de' : 'en');
     };
     if (!window._ssIsLoggedIn) {
+        // Wipe any stale #portal=… hash left over from a prior signed-in
+        // session so the URL bar doesn't leak app routes on the landing.
+        if (window.location.hash &&
+            window.location.hash.indexOf('access_token') === -1) {
+            try {
+                history.replaceState(null, '', window.location.pathname);
+            } catch (e) { /* ignore */ }
+        }
         // Load new-landing CSS before rendering the page. The old landing.css
         // remains in the repo (frontend/css/landing.css) but is no longer
         // injected — the new landing replaces it visually.

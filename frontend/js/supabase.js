@@ -536,6 +536,13 @@ function _showModal() {
 
   if (typeof window._ssHideSplash === 'function') window._ssHideSplash();
 
+  // Wipe any portal-* history state router.js left behind. Otherwise the URL
+  // shows #portal=dashboard while the user is on the auth screen, and Back
+  // pops to that entry → _ssApplyHistoryState shows the portal without auth.
+  try {
+    history.replaceState(null, '', window.location.pathname);
+  } catch (e) {}
+
   var modal = document.getElementById('authModal');
   if (modal) modal.style.display = 'flex';
 
@@ -654,6 +661,10 @@ window.addEventListener('ss-ready', function () {
 
   function _showModalClean() {
     _clearSavedAuth();
+
+    try {
+      history.replaceState(null, '', window.location.pathname);
+    } catch (e) {}
 
     var modal = document.getElementById('authModal');
     if (modal) modal.style.display = 'flex';

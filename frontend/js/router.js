@@ -329,6 +329,15 @@ if (!window.location.hash || window.location.hash.indexOf('access_token') === -1
 }
 
 window.addEventListener('popstate', function (e) {
+  // Guard: never restore portal/file views without an authenticated user.
+  // Otherwise Back from the landing (or after logout) pops to a stale entry
+  // from a prior session and silently re-mounts the app.
+  if (!_currentUser) {
+    try {
+      history.replaceState(null, '', window.location.pathname);
+    } catch (err) {}
+    return;
+  }
   _ssHandlingPop = true;
   try {
     _ssApplyHistoryState(e.state);
