@@ -333,7 +333,10 @@ export function initAuthModal(options) {
                 resetActivityTimer();
             }
             else if (event === 'SIGNED_OUT') {
-                window.location.reload();
+                // Replace (not reload) onto a clean URL so the post-logout
+                // history entry is unambiguously the landing — no stale
+                // #portal=… hash or OAuth error query left behind.
+                window.location.replace(window.location.origin + window.location.pathname);
             }
         });
     }
