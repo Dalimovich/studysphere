@@ -162,28 +162,41 @@ var _sb = {
       return d;
     },
     signOut: function () {
+      // Clear local state BEFORE the network call so a failed/offline logout
+      // can't leave stale tokens on disk that look "still signed in" on reload.
+      // Capture the auth header up front so the best-effort revocation still
+      // carries the user's bearer token.
+      var logoutHeaders = _sbHeaders();
+      _sbToken = null;
+      _currentUser = null;
+      _ssAuth('signed-out', { source: 'signOut' });
+      _sbClearStoredSession();
+      localStorage.removeItem('ss_state');
+      sessionStorage.removeItem('ss_last_active');
+      // Per-course chat history can contain private RAG questions/answers.
+      // Wipe so a different user signing into the same browser doesn't see it.
+      try {
+        var _qaKeys = [];
+        for (var _i = 0; _i < localStorage.length; _i++) {
+          var _k = localStorage.key(_i);
+          if (_k && _k.indexOf('ss_course_qa_') === 0) _qaKeys.push(_k);
+        }
+        _qaKeys.forEach(function (k) { localStorage.removeItem(k); });
+      } catch (e) {}
+      try {
+        sessionStorage.removeItem('ss_logged_in');
+      } catch (e) {}
+      try {
+        sessionStorage.removeItem('ss_portal_tab');
+      } catch (e) {}
+      clearTimeout(_activityTimer);
+      _sbAuthCallbacks.forEach(function (cb) {
+        cb('SIGNED_OUT', null);
+      });
       return fetch(SUPA_URL + '/auth/v1/logout', {
         method: 'POST',
-        headers: _sbHeaders()
-      }).then(function () {
-        _sbToken = null;
-        _currentUser = null;
-        _ssAuth('signed-out', { source: 'signOut' });
-        _sbClearStoredSession();
-        localStorage.removeItem('ss_state');
-        sessionStorage.removeItem('ss_last_active');
-        // ── Session routing: clear the login flag so next page load shows landing ─
-        try {
-          sessionStorage.removeItem('ss_logged_in');
-        } catch (e) {}
-        try {
-          sessionStorage.removeItem('ss_portal_tab');
-        } catch (e) {}
-        clearTimeout(_activityTimer);
-        _sbAuthCallbacks.forEach(function (cb) {
-          cb('SIGNED_OUT', null);
-        });
-      });
+        headers: logoutHeaders
+      }).catch(function () {});
     },
     getUser: function () {
       if (!_sbToken) return Promise.resolve(null);
