@@ -142,17 +142,36 @@ export function initMusicServices(options) {
             applyCurrentlyPlaying(d, false);
         });
     }
+    function spIsConfigured() {
+        const stored = localStorage.getItem('ss_spotify_cid') || '';
+        return !!(SPOTIFY_CLIENT_ID || stored);
+    }
     function spUpdateUI(connected) {
         const statusEl = document.getElementById('spotifyStatus');
         const btn = document.getElementById('spotifyConnectBtn');
         const player = document.getElementById('spotifyPlayer');
+        const configured = spIsConfigured();
         if (statusEl) {
-            statusEl.textContent = connected ? 'Connected ✓' : 'Not connected';
-            statusEl.className = 'music-service-status' + (connected ? ' connected' : '');
+            if (!configured && !connected) {
+                statusEl.textContent = 'Not configured';
+                statusEl.className = 'music-service-status';
+            }
+            else {
+                statusEl.textContent = connected ? 'Connected ✓' : 'Not connected';
+                statusEl.className = 'music-service-status' + (connected ? ' connected' : '');
+            }
         }
         if (btn) {
-            btn.textContent = connected ? 'Reconnect' : 'Connect';
-            btn.className = 'music-connect-btn' + (connected ? ' connected' : '');
+            if (!configured && !connected) {
+                btn.textContent = 'Unavailable';
+                btn.className = 'music-connect-btn music-connect-btn-disabled';
+                btn.disabled = true;
+            }
+            else {
+                btn.textContent = connected ? 'Reconnect' : 'Connect';
+                btn.className = 'music-connect-btn' + (connected ? ' connected' : '');
+                btn.disabled = false;
+            }
         }
         if (player)
             player.style.display = connected ? 'flex' : 'none';
@@ -200,25 +219,44 @@ export function initMusicServices(options) {
             showToast('Playlist save failed', 'Network error - saved locally only');
         }
     }
+    let _ytEditingIdx = null;
     function ytRenderList() {
-        const list = document.getElementById('youtubePlaylists');
+        const list = document.getElementById('ytPlaylistList');
         if (!list)
             return;
         list.innerHTML = '';
         const playlists = ytGetPlaylists();
+        if (playlists.length === 0) {
+            list.innerHTML = '<div class="yt-pl-empty">No playlists yet — add one below</div>';
+        }
         playlists.forEach((pl, i) => {
             const row = document.createElement('div');
             row.className = 'yt-playlist-row';
-            row.innerHTML =
-                '<div><div class="yt-pl-name">' +
-                    escapeHtml(pl.name) +
+            row.dataset['idx'] = String(i);
+            if (_ytEditingIdx === i) {
+                const url = 'https://www.youtube.com/playlist?list=' + pl.id;
+                row.classList.add('yt-pl-editing');
+                row.innerHTML =
+                    '<div class="yt-pl-edit-form">' +
+                        '<input class="yt-pl-edit-name" type="text" value="' + escapeHtml(pl.name) + '" placeholder="Name" />' +
+                        '<input class="yt-pl-edit-url" type="text" value="' + escapeHtml(url) + '" placeholder="YouTube playlist URL" />' +
                     '</div>' +
-                    '<div class="yt-pl-id">' +
-                    escapeHtml(pl.id.slice(0, 20)) +
-                    '...</div></div>' +
-                    '<button class="yt-pl-remove" data-idx="' +
-                    i +
-                    '" title="Remove">x</button>';
+                    '<div class="yt-pl-actions">' +
+                        '<button class="yt-pl-btn yt-pl-save" data-idx="' + i + '" title="Save">&#x2713;</button>' +
+                        '<button class="yt-pl-btn yt-pl-cancel" data-idx="' + i + '" title="Cancel">&#x2715;</button>' +
+                    '</div>';
+            }
+            else {
+                row.innerHTML =
+                    '<div class="yt-pl-info">' +
+                        '<div class="yt-pl-name">' + escapeHtml(pl.name) + '</div>' +
+                        '<div class="yt-pl-id">' + escapeHtml(pl.id) + '</div>' +
+                    '</div>' +
+                    '<div class="yt-pl-actions">' +
+                        '<button class="yt-pl-btn yt-pl-edit" data-idx="' + i + '" title="Edit">&#x270E;</button>' +
+                        '<button class="yt-pl-btn yt-pl-remove" data-idx="' + i + '" title="Remove">&#x2715;</button>' +
+                    '</div>';
+            }
             list.appendChild(row);
         });
         const st = document.getElementById('youtubeStatus');
@@ -276,7 +314,7 @@ export function initMusicServices(options) {
             showToast('Already saved', 'This playlist is already in your list');
             return;
         }
-        playlists.push({ name: name, id: id });
+        playlists.unshift({ name: name, id: id });
         void ytSavePlaylists(playlists);
         nameEl.value = '';
         urlEl.value = '';
@@ -286,8 +324,47 @@ export function initMusicServices(options) {
     function ytRemove(idx) {
         const playlists = ytGetPlaylists();
         playlists.splice(idx, 1);
+        if (_ytEditingIdx === idx) _ytEditingIdx = null;
         void ytSavePlaylists(playlists);
         ytRenderList();
+    }
+    function ytStartEdit(idx) {
+        _ytEditingIdx = idx;
+        ytRenderList();
+        const row = document.querySelector('.yt-playlist-row.yt-pl-editing');
+        const nameInput = row?.querySelector('.yt-pl-edit-name');
+        if (nameInput) {
+            nameInput.focus();
+            nameInput.select();
+        }
+    }
+    function ytCancelEdit() {
+        _ytEditingIdx = null;
+        ytRenderList();
+    }
+    function ytSaveEdit(idx) {
+        const row = document.querySelector('.yt-playlist-row[data-idx="' + idx + '"]');
+        if (!row) return;
+        const nameInput = row.querySelector('.yt-pl-edit-name');
+        const urlInput = row.querySelector('.yt-pl-edit-url');
+        if (!nameInput || !urlInput) return;
+        const newName = nameInput.value.trim() || 'Playlist';
+        const newId = ytExtractId(urlInput.value.trim());
+        if (!newId) {
+            showToast('Invalid URL', 'Paste a YouTube playlist URL with ?list=...');
+            return;
+        }
+        const playlists = ytGetPlaylists();
+        const dup = playlists.findIndex((p, j) => p.id === newId && j !== idx);
+        if (dup !== -1) {
+            showToast('Already saved', 'Another entry already uses this playlist');
+            return;
+        }
+        playlists[idx] = { name: newName, id: newId };
+        _ytEditingIdx = null;
+        void ytSavePlaylists(playlists);
+        ytRenderList();
+        showToast('Playlist updated', newName);
     }
     window._ytApplyFromDB = function (playlists) {
         if (!Array.isArray(playlists))
@@ -315,6 +392,9 @@ export function initMusicServices(options) {
             spRefresh = localStorage.getItem('ss_sp_refresh');
             spUpdateUI(true);
             spPollPlayback();
+        }
+        else {
+            spUpdateUI(false);
         }
         const params = new URLSearchParams(window.location.search);
         if (params.get('state') === 'spotify_pkce' && params.get('code')) {
@@ -363,11 +443,42 @@ export function initMusicServices(options) {
         if (ytList) {
             ytList.addEventListener('click', (e) => {
                 const target = e.target;
-                const btn = target ? target.closest('.yt-pl-remove') : null;
-                if (btn) {
-                    const idxAttr = btn.dataset['idx'];
-                    if (idxAttr !== undefined)
-                        ytRemove(parseInt(idxAttr, 10));
+                if (!target) return;
+                const editBtn = target.closest('.yt-pl-edit');
+                if (editBtn) {
+                    const idxAttr = editBtn.dataset['idx'];
+                    if (idxAttr !== undefined) ytStartEdit(parseInt(idxAttr, 10));
+                    return;
+                }
+                const saveBtn = target.closest('.yt-pl-save');
+                if (saveBtn) {
+                    const idxAttr = saveBtn.dataset['idx'];
+                    if (idxAttr !== undefined) ytSaveEdit(parseInt(idxAttr, 10));
+                    return;
+                }
+                const cancelBtn = target.closest('.yt-pl-cancel');
+                if (cancelBtn) {
+                    ytCancelEdit();
+                    return;
+                }
+                const removeBtn = target.closest('.yt-pl-remove');
+                if (removeBtn) {
+                    const idxAttr = removeBtn.dataset['idx'];
+                    if (idxAttr !== undefined) ytRemove(parseInt(idxAttr, 10));
+                }
+            });
+            ytList.addEventListener('keydown', (e) => {
+                if (_ytEditingIdx === null) return;
+                const target = e.target;
+                if (!target) return;
+                if (!target.matches('.yt-pl-edit-name, .yt-pl-edit-url')) return;
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    ytSaveEdit(_ytEditingIdx);
+                }
+                else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    ytCancelEdit();
                 }
             });
         }

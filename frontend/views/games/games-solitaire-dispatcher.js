@@ -158,7 +158,6 @@
     });
   }
   window._solShowPicker = function () {
-    ensureWired();
     stopCurrent();
     currentVariant = null;
     hideAllPickers();
@@ -170,7 +169,6 @@
     if (table) table.innerHTML = '';
   };
   window._solShowSpiderPicker = function () {
-    ensureWired();
     hideAllPickers();
     var sp = document.getElementById('solSpiderPicker');
     if (sp) sp.style.display = '';
@@ -179,7 +177,6 @@
   };
   window._solStartVariant = function (v) {
     if (!VARIANTS[v]) return;
-    ensureWired();
     stopCurrent();
     [
       window._klondikeCleanup,
@@ -205,23 +202,26 @@
   window._solStop = function () {
     stopCurrent();
   };
-  // The picker/game-area HTML is injected asynchronously by games.js (fetch),
-  // so this IIFE runs before those elements exist. Wire lazily on first show.
-  var _wired = false;
-  function ensureWired() {
-    if (_wired) return;
+  // Picker/game-area UI wiring. Must run AFTER games.html has been injected
+  // into #psec-games; games.js _init() calls this once the DOM is in place.
+  // Idempotent: re-running it would double-bind listeners, so we guard with a flag.
+  var _solUIWired = false;
+  window._solInitUI = function () {
+    if (_solUIWired) return;
+    // Wire variant picker cards
     var grid = document.getElementById('solVariantPicker');
-    if (!grid) return;
-    _wired = true;
-    grid.querySelectorAll('.sol-vc').forEach(function (el) {
-      el.addEventListener('click', function () {
-        if (el.id === 'solSpiderMenuBtn') {
-          window._solShowSpiderPicker();
-        } else {
-          window._solStartVariant(el.dataset.variant);
-        }
+    if (grid) {
+      grid.querySelectorAll('.sol-vc').forEach(function (el) {
+        el.addEventListener('click', function () {
+          if (el.id === 'solSpiderMenuBtn') {
+            window._solShowSpiderPicker();
+          } else {
+            window._solStartVariant(el.dataset.variant);
+          }
+        });
       });
-    });
+    }
+    // Spider sub-picker
     var spGrid = document.getElementById('solSpiderPicker');
     if (spGrid) {
       spGrid.querySelectorAll('.sol-spc').forEach(function (el) {
@@ -235,6 +235,7 @@
           window._solShowPicker();
         });
     }
+    // Back button in picker → hub
     var pb = document.getElementById('solPickerBack');
     if (pb)
       pb.addEventListener('click', function () {
@@ -243,6 +244,7 @@
         var hub = document.getElementById('gamesHub');
         if (hub) hub.style.display = '';
       });
+    // Game area buttons
     var sng = document.getElementById('solitaireNewGame');
     if (sng)
       sng.addEventListener('click', function () {
@@ -275,8 +277,8 @@
         var fn = hintFns[currentVariant];
         if (typeof fn === 'function') fn();
       });
-  }
-  window._solInitUI = ensureWired;
+    _solUIWired = true;
+  };
   // Single capture-phase click dispatcher â€” fires before any element handlers, can't be double-called
   var _solLastClick = 0;
   document.addEventListener(

@@ -1,4 +1,4 @@
-import { panelShow, panelHide } from '../../core/panels.js';
+import { panelHide } from '../../core/panels.js';
 import { listCourseDocuments } from '../../services/ai-service.js';
 import type { LegacyCourse } from '../../../globals.js';
 
@@ -183,7 +183,6 @@ export function renderCourses(state: CoursesRenderState): void {
       if (state.activeCourseId === c.id) {
         state.activeCourseId = null;
         panelHide(document.getElementById('courseOverview'));
-        panelShow(document.getElementById('welcomeState'));
         const crumb = document.getElementById('breadcrumb');
         if (crumb) crumb.textContent = 'Courses';
         renderCourses(state);

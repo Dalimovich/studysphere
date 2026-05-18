@@ -102,11 +102,6 @@
             aiChipsEl.innerHTML = aiChipsEl._originalHTML;
             aiChipsEl._originalHTML = null;
           }
-          // Navigate back to the course files overview
-          if (typeof window._showFilesView === 'function') window._showFilesView();
-          if (window.activeCourseRef && typeof window.showCourseSection === 'function') {
-            window.showCourseSection(window.activeCourseRef, 'files');
-          }
         })
       );
 
@@ -178,18 +173,6 @@
 
     window._glOpenSkill = function (skill) {
       _glActiveSkill = skill;
-
-      // Show skill detail, hide home
-      var home = document.getElementById('glHome');
-      var detail = document.getElementById('glSkillView');
-      if (home) home.style.display = 'none';
-      if (detail) detail.style.display = '';
-
-      // Update title and subtitle
-      var titleEl = document.getElementById('glSkillTitle');
-      var subEl = document.getElementById('glSkillSub');
-      if (titleEl) titleEl.textContent = _glSkillNames[skill] || skill;
-      if (subEl) subEl.textContent = _glSkillSubs[skill] || '';
       // Seed activeCourseId/activeCourseRef if not yet set, then load DB tools.
       var _glCourseForSkill = _glEnsurePracticeCourse();
       console.log('[practice course]', {
@@ -241,10 +224,6 @@
       if (aiChipsEl && aiChipsEl._originalHTML) {
         aiChipsEl.innerHTML = aiChipsEl._originalHTML;
         aiChipsEl._originalHTML = null;
-      }
-      if (typeof window._showFilesView === 'function') window._showFilesView();
-      if (window.activeCourseRef && typeof window.showCourseSection === 'function') {
-        window.showCourseSection(window.activeCourseRef, 'files');
       }
     };
 
