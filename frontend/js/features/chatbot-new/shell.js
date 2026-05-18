@@ -493,6 +493,19 @@ function appendAskStreamMeta(bubble, meta) {
                 '">' +
                 escapeHtml(label) +
                 '</div>';
+        // Phase 10 UX: compact inline chip in the bubble header.
+        const head = bubble.parentElement?.querySelector('.ncb-bubble-head');
+        if (head && !head.querySelector('.ncb-ask-verify-inline')) {
+            const glyph = verification.status === 'verified' ? '✓'
+                : verification.status === 'partially_verified' ? '⚠'
+                    : '⚠';
+            const chip = document.createElement('span');
+            chip.className = 'ncb-ask-verify-inline';
+            chip.dataset.status = verification.status;
+            chip.title = reason || label;
+            chip.textContent = glyph;
+            head.appendChild(chip);
+        }
     }
     if (footerHtml) {
         const footer = document.createElement('div');

@@ -576,6 +576,22 @@ function appendAskStreamMeta(bubble: HTMLElement, meta: Record<string, unknown>)
       '">' +
       escapeHtml(label) +
       '</div>';
+
+    // Phase 10 UX: also drop a compact inline chip into the bubble header so the
+    // status is visible at a glance, not just buried in the footer.
+    const head = bubble.parentElement?.querySelector('.ncb-bubble-head');
+    if (head && !head.querySelector('.ncb-ask-verify-inline')) {
+      const glyph =
+        verification.status === 'verified' ? '✓'
+          : verification.status === 'partially_verified' ? '⚠'
+          : '⚠';
+      const chip = document.createElement('span');
+      chip.className = 'ncb-ask-verify-inline';
+      chip.dataset.status = verification.status;
+      chip.title = reason || label;
+      chip.textContent = glyph;
+      head.appendChild(chip);
+    }
   }
   if (footerHtml) {
     const footer = document.createElement('div');
