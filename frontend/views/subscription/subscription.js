@@ -82,7 +82,7 @@ function applySubscription(sub) {
     if (proStatus) proStatus.style.display = 'none';
     if (upgradeBtn) {
       upgradeBtn.textContent = _hadTrial
-        ? '?? Subscribe — €11.99/month'
+        ? '?? Subscribe ï¿½ ï¿½11.99/month'
         : '?? Start free 7-day trial';
       upgradeBtn.disabled = false;
       upgradeBtn.style.display = '';
@@ -163,14 +163,14 @@ function _showPaywall() {
   var btn = document.getElementById('paywallUpgradeBtn');
   if (btn)
     btn.textContent = _hadTrial
-      ? '?? Subscribe — €11.99/month'
+      ? '?? Subscribe ï¿½ ï¿½11.99/month'
       : '?? Start free 7-day trial';
   var modal = document.getElementById('paywallModal');
   if (_hadTrial && modal) {
     var trialBadge = modal.querySelector('.sub-trial-badge');
     if (trialBadge) trialBadge.style.display = 'none';
     var desc = modal.querySelector('[data-paywall-desc]');
-    if (desc) desc.textContent = 'Subscribe to access all Minallo features for €11.99/month.';
+    if (desc) desc.textContent = 'Subscribe to access all Minallo features for ï¿½11.99/month.';
     var afterTrial = modal.querySelector('[data-after-trial]');
     if (afterTrial) afterTrial.textContent = '/ month';
     var cancelNote = modal.querySelector('[data-cancel-note]');
@@ -267,6 +267,20 @@ function _bindSubscriptionControls() {
   }
 
   var upgradeBtn = document.getElementById('subUpgradeBtn');
+  var consentBox = document.getElementById('subConsentWiderruf');
+  if (consentBox && upgradeBtn && !consentBox.dataset.bound) {
+    consentBox.dataset.bound = '1';
+    var syncEnabled = function () {
+      // Button stays disabled until the user actively ticks the Widerruf-Verzicht
+      // consent. We capture this client-side and the create-checkout function
+      // then records the choice in Stripe metadata so we have evidence of consent
+      // per Â§ 312j Abs. 3 / Â§ 356 Abs. 5 BGB.
+      upgradeBtn.disabled = !consentBox.checked;
+    };
+    consentBox.addEventListener('change', syncEnabled);
+    syncEnabled();
+  }
+
   if (upgradeBtn && !upgradeBtn.dataset.bound) {
     upgradeBtn.dataset.bound = '1';
     upgradeBtn.addEventListener('click', async function () {
@@ -274,10 +288,17 @@ function _bindSubscriptionControls() {
         showToast('Sign in required', 'Please log in first.');
         return;
       }
+      if (consentBox && !consentBox.checked) {
+        showToast('Hinweis', 'Bitte bestaetige die Widerrufs-Information, bevor du fortfaehrst.');
+        return;
+      }
       this.textContent = 'Redirecting...';
       this.disabled = true;
       try {
-        var data = await window._subService.createCheckoutSession(_hadTrial);
+        var data = await window._subService.createCheckoutSession(_hadTrial, {
+          consentWiderrufVerzicht: !!(consentBox && consentBox.checked),
+          consentTimestamp: new Date().toISOString()
+        });
         if (data.url) {
           location.href = data.url;
         } else {
@@ -298,14 +319,14 @@ function _bindSubscriptionControls() {
     paywallBtn.dataset.bound = '1';
     paywallBtn.addEventListener('click', async function () {
       if (!_currentUser) return;
-      this.textContent = 'Redirecting...';
-      this.disabled = true;
-      try {
-        var data = await window._subService.createCheckoutSession(_hadTrial);
-        if (data.url) location.href = data.url;
-      } catch (e) {}
-      this.textContent = '?? Start free 7-day trial';
-      this.disabled = false;
+      // Paywall has no inline consent block â€” route the user to the full
+      // subscription view where the consent checkbox lives. This ensures the
+      // Widerruf-Verzicht is captured before checkout in every flow.
+      var modal = document.getElementById('paywallModal');
+      if (modal) modal.style.display = 'none';
+      if (typeof window.showPortalSection === 'function') {
+        window.showPortalSection('subscription');
+      }
     });
   }
 
@@ -325,11 +346,28 @@ function _bindSubscriptionControls() {
   }
 }
 
+function _renderAiUsage() {
+  if (typeof window.refreshAiUsage !== 'function') return;
+  window.refreshAiUsage().then(function (u) {
+    if (!u) return;
+    var wrap = document.getElementById('subUsage');
+    var fill = document.getElementById('subUsageFill');
+    var count = document.getElementById('subUsageCount');
+    if (!wrap || !fill || !count) return;
+    wrap.hidden = false;
+    fill.style.width = Math.min(100, u.percentUsed) + '%';
+    count.textContent = u.used + ' / ' + u.limit + ' AI calls';
+    wrap.classList.toggle('sub-usage--warn', u.percentUsed >= 80 && u.percentUsed < 100);
+    wrap.classList.toggle('sub-usage--cap', u.percentUsed >= 100);
+  });
+}
+
 document.addEventListener('click', function (e) {
   if (e.target.closest('#psbSubscription'))
     setTimeout(function () {
       _bindSubscriptionControls();
       _initPayPalButton();
+      _renderAiUsage();
     }, 400);
 });
 

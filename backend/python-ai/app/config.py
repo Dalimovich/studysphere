@@ -47,6 +47,13 @@ class Settings(BaseSettings):
     vision_ocr_max_pages: int = Field(20, alias="MINALLO_VISION_OCR_MAX_PAGES")
     vision_ocr_render_dpi: int = Field(150, alias="MINALLO_VISION_OCR_DPI")
 
+    # --- Schreibtrainer: persistence stays off until the migrations land.
+    # Flip to true once user_writing_submissions / user_writing_weaknesses
+    # tables exist (docs/schreibtrainer-ai-spec.md §14 + §20).
+    writing_coach_persistence_enabled: bool = Field(
+        False, alias="WRITING_COACH_PERSISTENCE_ENABLED"
+    )
+
     # --- Misc
     log_level: str = Field("INFO", alias="LOG_LEVEL")
     environment: str = Field("development", alias="ENVIRONMENT")

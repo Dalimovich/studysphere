@@ -9,26 +9,69 @@ var SEMS = {
   ss24: { color: '#4CC9F0', courses: [] },
   ws2324: { color: '#FF6B35', courses: [] }
 };
-// Load user courses from localStorage
+// ── Per-user localStorage scoping ───────────────────────────────────────────
+// Course metadata is cached in localStorage so the dashboard renders instantly
+// before the Supabase profile fetch returns. The cache key MUST be namespaced
+// by the current user, otherwise account A's courses leak into account B when
+// they share a browser (exactly what happens for the German-learner account
+// when an engineering user signed in here first).
+//
+// Migration: the old global key `ss_user_courses` is read once at boot for the
+// currently-active user (if we can resolve them synchronously), then deleted
+// so the leak can't repeat. From then on, every read/write goes through the
+// scoped key `ss_user_courses:<userId>`.
+
+var COURSES_LS_PREFIX = 'ss_user_courses:';
+
+function _currentUserIdSync() {
+  // Best-effort sync lookup. Auth normally resolves later via _loadUserCourses,
+  // but if a session was restored from sb_token before this script ran, we may
+  // already have _currentUser on the window.
+  var u = window._currentUser;
+  return (u && (u.id || u.sub)) || null;
+}
+
+function _coursesKeyFor(uid) {
+  return uid ? COURSES_LS_PREFIX + uid : null;
+}
+
+function _readUserCoursesLs(uid) {
+  if (!uid) return null;
+  try {
+    var raw = localStorage.getItem(_coursesKeyFor(uid));
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (e) { return null; }
+}
+
+function _writeUserCoursesLs(uid, data) {
+  if (!uid) return;
+  try { localStorage.setItem(_coursesKeyFor(uid), JSON.stringify(data)); } catch (e) {}
+}
+
+function _clearSemsCourses() {
+  // Reset every semester's courses array to empty. Safer than reassigning
+  // SEMS because other modules hold direct references to the SEMS object.
+  Object.keys(SEMS).forEach(function (sid) { SEMS[sid].courses = []; });
+}
+
+// One-time sync hydration: if a user is already on window (warm reload),
+// load THEIR courses from the scoped key. Never trust the legacy global key
+// because that's the leak vector — wipe it instead.
 (function () {
   try {
-    var saved = JSON.parse(localStorage.getItem('ss_user_courses') || '{}');
-    // One-time migration: SS 2026 is the current semester. Courses previously
-    // saved under `ws2526` were actually summer-semester courses (the slot
-    // misnamed before ss2526 existed). Move them across if ss2526 is empty
-    // and ws2526 has data, then persist so the migration is sticky.
-    if (
-      saved &&
-      Array.isArray(saved.ws2526) && saved.ws2526.length > 0 &&
-      (!Array.isArray(saved.ss2526) || saved.ss2526.length === 0)
-    ) {
-      saved.ss2526 = saved.ws2526;
-      saved.ws2526 = [];
-      try { localStorage.setItem('ss_user_courses', JSON.stringify(saved)); } catch (e) {}
+    var uid = _currentUserIdSync();
+    if (uid) {
+      var saved = _readUserCoursesLs(uid);
+      if (saved && typeof saved === 'object') {
+        Object.keys(saved).forEach(function (sid) {
+          if (SEMS[sid] && Array.isArray(saved[sid])) SEMS[sid].courses = saved[sid];
+        });
+      }
     }
-    Object.keys(saved).forEach(function (sid) {
-      if (SEMS[sid]) SEMS[sid].courses = saved[sid];
-    });
+    // Drop the legacy unscoped key — its only effect now is leaking data
+    // between accounts on the same browser.
+    localStorage.removeItem('ss_user_courses');
   } catch (e) {}
 })();
 function _stripCourseForSave(c) {
@@ -45,9 +88,12 @@ function _saveUserCourses() {
   Object.keys(SEMS).forEach(function (sid) {
     data[sid] = SEMS[sid].courses.map(_stripCourseForSave);
   });
-  localStorage.setItem('ss_user_courses', JSON.stringify(data));
-  // Also persist to Supabase so courses sync across devices
+  // Only cache locally if we know which user this data belongs to. Saving
+  // without a user id is what created the cross-account leak in the first
+  // place.
   var uid = _currentUser && (_currentUser.id || _currentUser.sub);
+  if (uid) _writeUserCoursesLs(uid, data);
+  // Also persist to Supabase so courses sync across devices.
   if (uid) {
     fetch(SUPA_URL + '/rest/v1/profiles?id=eq.' + encodeURIComponent(uid), {
       method: 'PATCH',
@@ -170,10 +216,27 @@ window._prewarmCourses = _prewarmCourses;
 })();
 
 function _loadUserCourses(data) {
-  if (!data || typeof data !== 'object') return;
+  // The server is the source of truth. If it returns null / empty / not an
+  // object, the user has no courses — clear any stale SEMS state from a
+  // previous account on this browser. (This is what the German-learner
+  // account hit: empty server response, but SEMS still held the previous
+  // engineering account's localStorage data.)
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    _clearSemsCourses();
+    var uidEmpty = _currentUser && (_currentUser.id || _currentUser.sub);
+    if (uidEmpty) _writeUserCoursesLs(uidEmpty, {});
+    sdRenderCourses();
+    return;
+  }
+  // Snapshot the in-memory courses BEFORE wiping so we can preserve already-
+  // loaded files/userFolders below. Then wipe so courses removed on another
+  // device don't linger client-side, and finally apply the server payload.
+  var snapshot = {};
+  Object.keys(SEMS).forEach(function (sid) { snapshot[sid] = SEMS[sid].courses || []; });
+  _clearSemsCourses();
   Object.keys(data).forEach(function (sid) {
     if (SEMS[sid] && Array.isArray(data[sid])) {
-      var oldCourses = SEMS[sid].courses || [];
+      var oldCourses = snapshot[sid] || [];
       data[sid].forEach(function (c) {
         if (!c.files) c.files = [];
         // Preserve already-loaded files/userFolders from the old course object
@@ -189,10 +252,9 @@ function _loadUserCourses(data) {
       SEMS[sid].courses = data[sid];
     }
   });
-  // Persist to localStorage as cache
-  try {
-    localStorage.setItem('ss_user_courses', JSON.stringify(data));
-  } catch (e) {}
+  // Cache scoped by user id so accounts can't leak into each other.
+  var uid = _currentUser && (_currentUser.id || _currentUser.sub);
+  if (uid) _writeUserCoursesLs(uid, data);
   sdRenderCourses();
   // Fire-and-forget: pre-fetch every course's files now so cards show real
   // counts and opening a course is instant. Fire on next microtask so the

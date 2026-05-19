@@ -1020,6 +1020,15 @@ function initImportModal(root: HTMLElement): void {
   if (!trigger || !overlay || trigger.dataset.ncbBound === '1') return;
   trigger.dataset.ncbBound = '1';
 
+  // German-learner accounts don't have RAG-indexed courses — surfacing this
+  // button only leads to a "No courses loaded" empty state and (worse, before
+  // the per-user-id localStorage scoping fix) leaks the previous account's
+  // courses. Hide it for learners.
+  if ((window as unknown as { _userType?: string })._userType === 'learner') {
+    trigger.style.display = 'none';
+    return;
+  }
+
   const closeBtn = overlay.querySelector<HTMLButtonElement>('.ncb-modal-close');
   const cancelBtn = overlay.querySelector<HTMLButtonElement>('.ncb-modal-cancel');
   const importBtn = overlay.querySelector<HTMLButtonElement>('.ncb-modal-import');
@@ -1106,8 +1115,7 @@ function initImportModal(root: HTMLElement): void {
           <p class="ncb-folder-name">${escapeHtml(f.name)}</p>
           <p class="ncb-folder-sub">File</p>
         </div>
-        <span class="ncb-folder-pick">
-          <svg class="ncb-icon ncb-icon--sm ncb-folder-pick-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ${sel ? 'hidden' : ''}><path d="M20 6 9 17l-5-5"/></svg>
+        <span class="ncb-folder-pick" aria-hidden="true">
           <svg class="ncb-icon ncb-icon--sm ncb-folder-pick-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ${sel ? '' : 'hidden'}><path d="M20 6 9 17l-5-5"/></svg>
         </span>
       </div>`;
@@ -1138,8 +1146,7 @@ function initImportModal(root: HTMLElement): void {
         <button type="button" class="ncb-folder-open" aria-label="Open ${escapeAttr(fd.name)}">
           <svg class="ncb-icon ncb-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
         </button>
-        <span class="ncb-folder-pick">
-          <svg class="ncb-icon ncb-icon--sm ncb-folder-pick-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ${sel ? 'hidden' : ''}><path d="M20 6 9 17l-5-5"/></svg>
+        <span class="ncb-folder-pick" aria-hidden="true">
           <svg class="ncb-icon ncb-icon--sm ncb-folder-pick-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ${sel ? '' : 'hidden'}><path d="M20 6 9 17l-5-5"/></svg>
         </span>
       </div>`;
@@ -1162,9 +1169,7 @@ function initImportModal(root: HTMLElement): void {
       });
       rowEl.classList.add('ncb-folder-row--selected');
     }
-    const chev = rowEl.querySelector<HTMLElement>('.ncb-folder-pick-chev');
     const check = rowEl.querySelector<HTMLElement>('.ncb-folder-pick-check');
-    if (chev) chev.hidden = picked.has(id);
     if (check) check.hidden = !picked.has(id);
     syncCount();
   };

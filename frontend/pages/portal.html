@@ -303,6 +303,40 @@
             </div>
             <div id="adminResults"></div>
           </div>
+
+          <!-- RETRIEVAL INSPECTOR -->
+          <div style="max-width: 960px; margin: 36px auto 0">
+            <h2 style="font-size: 1.1rem; margin-bottom: 6px">&#x1F50D; Retrieval inspector</h2>
+            <p style="color: var(--on-glass-muted); font-size: .8rem; margin-bottom: 14px">
+              Inspect the most recent <code>retrieval_debug_log</code> rows to see
+              which chunks the AI saw for a given question.
+            </p>
+            <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px">
+              <input
+                id="retrInspectorUser"
+                class="chat-friend-search"
+                type="text"
+                placeholder="user_id (uuid, optional)"
+                style="flex: 2; min-width: 220px"
+              />
+              <input
+                id="retrInspectorCourse"
+                class="chat-friend-search"
+                type="text"
+                placeholder="course_id (optional)"
+                style="flex: 1; min-width: 140px"
+              />
+              <button
+                id="retrInspectorLoad"
+                class="sub-btn sub-btn-upgrade"
+                style="width: auto; padding: 10px 20px"
+              >
+                Load
+              </button>
+            </div>
+            <div id="retrInspectorList"></div>
+            <div id="retrInspectorDetail" style="margin-top: 18px"></div>
+          </div>
         </div>
 
         <!-- PAYWALL MODAL -->
@@ -382,7 +416,7 @@
                 gap: 7px;
               "
             >
-              <div class="sub-feat">Unlimited AI messages</div>
+              <div class="sub-feat">Generous AI usage (fair-use, 500 calls/month)</div>
               <div class="sub-feat">PDF reader &amp; lecture notes</div>
               <div class="sub-feat">Multi-PDF summaries</div>
               <div class="sub-feat">Chat rooms</div>

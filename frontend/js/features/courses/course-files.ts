@@ -1,4 +1,6 @@
 import { showCourseSection } from './course-view.js';
+import { guessSourceType as _guessSourceType } from './source-type.js';
+import { filterOversizedFiles, warnRejected } from './upload-validate.js';
 import {
   listCourseDocuments,
   indexExistingDocument,
@@ -32,7 +34,11 @@ const _ragConfirmed: Record<string, 'ready' | 'triggered'> = {};
 
 export function bindFileEvents(co: HTMLElement, course: LegacyCourse): void {
   let selectMode = false;
-  let selectedFiles: SelectedFile[] = [];
+  // Shared selection store — keep one array reference so folder "select all"
+  // (course-folders.ts) and the multi-action bar agree on what is selected.
+  if (!window._selectedFiles) window._selectedFiles = [];
+  const selectedFiles = window._selectedFiles as SelectedFile[];
+  function clearSelection(): void { selectedFiles.length = 0; }
 
   function updateMultiBar(): void {
     const bar = co.querySelector<HTMLElement>('#coMultiBar');
@@ -47,6 +53,7 @@ export function bindFileEvents(co: HTMLElement, course: LegacyCourse): void {
     else if (selectedFiles.length > 1) btn.textContent = '✨ AI Chat (' + selectedFiles.length + ' files)';
     else btn.textContent = '✨ AI Chat';
   }
+  window._updateMultiBar = updateMultiBar;
 
   initCourseStudyTools(co, course);
 
@@ -65,7 +72,7 @@ export function bindFileEvents(co: HTMLElement, course: LegacyCourse): void {
       b.style.display = selectMode ? '' : 'none';
     });
     if (!selectMode) {
-      selectedFiles = [];
+      clearSelection();
       co.querySelectorAll('.co-file').forEach((el) => el.classList.remove('selected'));
       co.querySelectorAll('.co-file-cb').forEach((cb) => cb.classList.remove('checked'));
       updateMultiBar();
@@ -74,7 +81,7 @@ export function bindFileEvents(co: HTMLElement, course: LegacyCourse): void {
 
   // ── Multi-select clear ───────────────────────────────────────────────────
   co.querySelector<HTMLElement>('#coMultiClear')?.addEventListener('click', () => {
-    selectedFiles = [];
+    clearSelection();
     co.querySelectorAll('.co-file').forEach((el) => el.classList.remove('selected'));
     co.querySelectorAll('.co-file-cb').forEach((cb) => cb.classList.remove('checked'));
     updateMultiBar();
@@ -159,7 +166,7 @@ export function bindFileEvents(co: HTMLElement, course: LegacyCourse): void {
     toDelete.forEach((s) => {
       window._ufDelete?.(course, s.name, s.folder || null, s.sname || null);
     });
-    selectedFiles = [];
+    clearSelection();
     showCourseSection(course, 'files');
     if (typeof window.showToast === 'function') {
       window.showToast('Deleted', toDelete.length + ' file' + (toDelete.length !== 1 ? 's' : '') + ' removed');
@@ -185,7 +192,7 @@ export function bindFileEvents(co: HTMLElement, course: LegacyCourse): void {
         course.userFolders = null as unknown as LegacyCourse['userFolders'];
         course.files = ((course.files || []) as unknown as CourseFileLite[])
           .filter((f) => !(f._uploaded && toMove.some((s) => s.name === f.name))) as unknown as LegacyCourse['files'];
-        selectedFiles = [];
+        clearSelection();
         await window._ufMerge?.(course);
         showCourseSection(course, 'files');
         const destCard = toCourse.id !== course.id ? toCourse.name || toCourse.id : null;
@@ -450,8 +457,8 @@ export function bindFileEvents(co: HTMLElement, course: LegacyCourse): void {
 
   if (uploadInput) {
     uploadInput.addEventListener('change', function (this: FolderUploadInput) {
-      const files = Array.from(this.files || []);
-      if (!files.length) return;
+      const picked = Array.from(this.files || []);
+      if (!picked.length) return;
       const uid = window._currentUser && (window._currentUser.id || window._currentUser.sub);
       if (!uid) {
         if (typeof window.showToast === 'function') {
@@ -459,6 +466,13 @@ export function bindFileEvents(co: HTMLElement, course: LegacyCourse): void {
         }
         return;
       }
+
+      const { valid: files, rejected } = filterOversizedFiles(picked);
+      warnRejected(rejected, files.length === 0);
+      // Reset the input so picking the same oversized file again still fires
+      // `change`. Otherwise the user is stuck after one rejection.
+      try { this.value = ''; } catch { /* ignore */ }
+      if (!files.length) return;
 
       const modal = openUploadModal();
       let cancelled = false;
@@ -611,7 +625,7 @@ function openUploadModal(): UploadModalHandle {
             '<path d="M16 16l-4-4-4 4"/><path d="M12 12v9"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/><path d="M16 16l-4-4-4 4"/>') +
           _stageHtml('processing', 'Processing', 'pending',
             '<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>') +
-          _stageHtml('ready', 'Study Plan', 'pending',
+          _stageHtml('ready', 'Ready for AI', 'pending',
             '<path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/>') +
         '</div>' +
         '<div class="co-upmodal-bars">' +
@@ -801,20 +815,6 @@ function setCourseStudyMode(co: HTMLElement, course: LegacyCourse, mode: string)
       })();
     }
   }
-}
-
-function _guessSourceType(fileName: string): string {
-  const n = fileName.toLowerCase();
-  if (n.includes('lösung') || n.includes('loesung') || n.includes('solution')) return 'solution';
-  if (n.includes('aufgabe') || n.includes('exercise') || n.includes('übung') || n.includes('ag_')) return 'exercise';
-  if (n.includes('exam') || n.includes('klausur') || n.includes('prüfung')) return 'exam';
-  if (
-    n.includes('formelzettel') || n.includes('formelsammlung') || n.includes('formel') ||
-    n.includes('zusammenfassung') || n.includes('summary') || n.includes('cheatsheet') ||
-    n.includes('cheat sheet') || n.includes('merkblatt') || n.includes('überblick')
-  ) return 'summary';
-  if (n.includes('notes') || n.includes('notiz') || n.includes('mitschrift')) return 'notes';
-  return 'lecture';
 }
 
 interface DocMeta {

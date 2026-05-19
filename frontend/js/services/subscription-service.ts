@@ -9,11 +9,23 @@ function _authHeaders(): Record<string, string> {
   };
 }
 
-export async function createCheckoutSession(noTrial?: boolean): Promise<{ url?: string }> {
+export interface CheckoutConsent {
+  consentWiderrufVerzicht: boolean;
+  consentTimestamp: string;
+}
+
+export async function createCheckoutSession(
+  noTrial?: boolean,
+  consent?: CheckoutConsent
+): Promise<{ url?: string }> {
   const res = await fetch('/api/create-checkout', {
     method: 'POST',
     headers: _authHeaders(),
-    body: JSON.stringify({ noTrial: !!noTrial }),
+    body: JSON.stringify({
+      noTrial: !!noTrial,
+      consentWiderrufVerzicht: !!(consent && consent.consentWiderrufVerzicht),
+      consentTimestamp: (consent && consent.consentTimestamp) || ''
+    }),
   });
   return res.json().catch(() => ({}));
 }

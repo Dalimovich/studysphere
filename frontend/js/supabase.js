@@ -186,6 +186,16 @@ var _sb = {
         }
         _qaKeys.forEach(function (k) { localStorage.removeItem(k); });
       } catch (e) {}
+      // Wipe in-memory course state so the next account on this browser
+      // doesn't see the previous user's courses (the per-user-id localStorage
+      // cache stays — it's already namespaced, just not visible to other UIDs).
+      try {
+        if (typeof SEMS !== 'undefined' && SEMS) {
+          Object.keys(SEMS).forEach(function (sid) { SEMS[sid].courses = []; });
+        }
+        // Drop the legacy unscoped key in case an older client wrote to it.
+        localStorage.removeItem('ss_user_courses');
+      } catch (e) {}
       try {
         sessionStorage.removeItem('ss_logged_in');
       } catch (e) {}

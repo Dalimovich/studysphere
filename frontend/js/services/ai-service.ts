@@ -1,6 +1,8 @@
 // All AI endpoints flow through Netlify proxies (which forward to python-ai).
 // See docs/python-ai-endpoints.md for shapes.
 
+import { detectAiCapError } from './ai-usage.js';
+
 function _backendUrl(): string {
   return window.BACKEND_URL || '';
 }
@@ -22,6 +24,7 @@ export async function sendAiRequest(payload: unknown): Promise<unknown> {
     headers: _authJsonHeaders(),
     body: JSON.stringify(payload),
   });
+  await detectAiCapError(response);
   return response.json();
 }
 
@@ -47,16 +50,21 @@ export async function sendRagRequest(
   courseId: string,
   question: string,
   mode?: string,
-  documentId?: string | null,
+  activeDocumentId?: string | null,
   activeFileName?: string | null,
-  openFileContext?: unknown
+  openFileContext?: unknown,
+  documentIds?: string[] | null,
 ): Promise<RagAskResponse> {
   const payload: Record<string, unknown> = {
     courseId,
     question,
     mode: mode || 'strict',
   };
-  if (documentId) payload.documentId = documentId;
+  // activeDocumentId = ranking hint (currently open PDF).
+  // documentIds = hard filter, set only when the user explicitly scopes
+  // the question to a chosen subset of documents.
+  if (activeDocumentId) payload.activeDocumentId = activeDocumentId;
+  if (documentIds && documentIds.length) payload.documentIds = documentIds;
   if (activeFileName) payload.activeFileName = activeFileName;
   if (openFileContext) payload.openFileContext = openFileContext;
 
@@ -65,6 +73,7 @@ export async function sendRagRequest(
     headers: _authJsonHeaders(),
     body: JSON.stringify(payload),
   });
+  await detectAiCapError(response);
   if (!response.ok) throw new Error('HTTP ' + response.status);
   return response.json() as Promise<RagAskResponse>;
 }

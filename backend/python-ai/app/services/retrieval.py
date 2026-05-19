@@ -48,8 +48,13 @@ _MISTAKE_RE = re.compile(r"fehler|mistake|achtung|attention|nicht verwechseln|do
 _TOC_RE = re.compile(r"^\s*\d+\s*\.{3,}", re.MULTILINE)
 
 # Phase 6 ranking constants.
-_ACTIVE_DOC_BOOST = 0.25      # chunks from the doc the user is reading
-_PREFERRED_DOC_BOOST = 0.20   # chunks from the user-selected document set (when used as a hint, not a filter)
+# The previous +0.25 active-doc boost was larger than the typical similarity
+# spread (~0.10-0.35), so chunks from the open doc swamped top-K even when
+# another doc held the actual answer. Drop to a tie-breaker level — enough
+# to win when similarity is comparable, but not enough to override a
+# materially more relevant chunk from a different document.
+_ACTIVE_DOC_BOOST = 0.10      # chunks from the doc the user is reading
+_PREFERRED_DOC_BOOST = 0.08   # chunks from the user-selected document set (when used as a hint, not a filter)
 _QUALITY_PENALTY_WEAK = 0.15
 _QUALITY_PENALTY_FAILED = 0.30
 
@@ -646,3 +651,157 @@ def retrieve_exercise_block(
         if hit:
             return hit
     return _select(None)
+
+
+# ── Exact-match formula lookup ──────────────────────────────────────────────
+
+
+@dataclass
+class FormulaHit:
+    """A direct hit on a document_formulas row. Surfaces ahead of vector
+    retrieval when the user's query references a named formula or symbol —
+    the analogue of ExerciseHit for formulas. Prepended to chunks so the
+    answerer sees the canonical formula before any similarity-based context.
+    """
+
+    document_id: str
+    formula_name: str | None
+    formula_markdown: str
+    symbols: list[str]
+    page_number: int
+
+    def to_api(self) -> dict[str, Any]:
+        return {
+            "documentId":       self.document_id,
+            "formulaName":      self.formula_name,
+            "formulaMarkdown":  self.formula_markdown,
+            "symbols":          self.symbols,
+            "pageNumber":       self.page_number,
+        }
+
+
+# Keywords that *imply* a formula question. Matching one is necessary
+# (otherwise every question fires a formula lookup) but not sufficient —
+# we still need a meaningful query token or symbol to match against.
+_FORMULA_INTENT_KEYWORDS = (
+    "formel", "formula", "gleichung", "equation", "satz", "theorem",
+    "moment", "spannung", "kraft", "energie", "leistung", "ableitung",
+    "integral", "taylor", "fourier", "matrix", "vektor", "betrag",
+)
+
+
+def find_formula_intent(query: str) -> set[str]:
+    """Return the meaningful tokens from the query when it looks like a
+    formula question. Empty set = don't bother hitting document_formulas.
+    """
+    if not query:
+        return set()
+    lower = query.lower()
+    if not any(kw in lower for kw in _FORMULA_INTENT_KEYWORDS):
+        return set()
+    return _meaningful_tokens(query)
+
+
+def retrieve_formula_block(
+    *,
+    user_id: str,
+    course_id: str,
+    query: str,
+    document_ids: list[str] | None = None,
+    active_document_id: str | None = None,
+    max_hits: int = 3,
+) -> list[FormulaHit]:
+    """Look up canonical formulas matching the query.
+
+    Match heuristic (cheap, no embeddings):
+      - formula_name ILIKE any meaningful query token, OR
+      - any element of symbols[] equals a query token (case-insensitive)
+
+    Search order: active document → selected documents → whole course.
+    Returns up to max_hits formulas, de-duplicated by (document_id, page).
+    Returns [] when the query has no formula intent or no rows match.
+    """
+    tokens = find_formula_intent(query)
+    if not tokens:
+        return []
+    sb = get_supabase()
+
+    # Two narrow queries (name-match + symbols-overlap), merged in Python.
+    # Avoids brittle PostgREST `or=` compound filters with commas inside
+    # ilike patterns and array literals — and keeps the SQL trivially safe.
+    select_cols = (
+        "document_id, formula_name, formula_markdown, symbols, page_number"
+    )
+    name_tokens = [t for t in tokens if len(t) >= 4]
+    symbol_tokens = list(tokens)
+
+    def _base(doc_filter: list[str] | None):
+        q = (
+            sb.table("document_formulas")
+            .select(select_cols)
+            .eq("user_id", user_id)
+            .eq("course_id", course_id)
+        )
+        if doc_filter:
+            q = q.in_("document_id", doc_filter)
+        return q
+
+    def _select(doc_filter: list[str] | None) -> list[FormulaHit]:
+        rows: list[dict] = []
+        # 1) formula_name ILIKE any meaningful token
+        for tok in name_tokens:
+            try:
+                resp = _base(doc_filter).ilike(
+                    "formula_name", f"%{tok}%",
+                ).limit(max_hits).execute()
+                rows.extend(resp.data or [])
+            except Exception:
+                log.exception("document_formulas name lookup failed")
+        # 2) symbols overlap with query tokens (text[] cs)
+        if symbol_tokens:
+            try:
+                resp = _base(doc_filter).overlaps(
+                    "symbols", symbol_tokens,
+                ).limit(max_hits).execute()
+                rows.extend(resp.data or [])
+            except Exception:
+                log.exception("document_formulas symbols lookup failed")
+
+        # De-duplicate by (document_id, page_number) preserving first occurrence.
+        seen_local: set[tuple[str, int]] = set()
+        out: list[FormulaHit] = []
+        for r in rows:
+            key = (r["document_id"], r["page_number"])
+            if key in seen_local:
+                continue
+            seen_local.add(key)
+            out.append(FormulaHit(
+                document_id=r["document_id"],
+                formula_name=r.get("formula_name"),
+                formula_markdown=r.get("formula_markdown") or "",
+                symbols=list(r.get("symbols") or []),
+                page_number=r["page_number"],
+            ))
+            if len(out) >= max_hits:
+                break
+        return out
+
+    seen: set[tuple[str, int]] = set()
+    hits: list[FormulaHit] = []
+
+    def _push(new_hits: list[FormulaHit]) -> None:
+        for h in new_hits:
+            key = (h.document_id, h.page_number)
+            if key in seen:
+                continue
+            seen.add(key)
+            hits.append(h)
+
+    if active_document_id:
+        _push(_select([active_document_id]))
+    if document_ids and len(hits) < max_hits:
+        _push(_select(document_ids))
+    if len(hits) < max_hits:
+        _push(_select(None))
+
+    return hits[:max_hits]

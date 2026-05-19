@@ -72,24 +72,19 @@
   <link rel="apple-touch-icon" sizes="128x128" href="/assets/favicon.png" />
   <meta name="theme-color" content="#0b1220" />
 
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fredoka+One&family=Nunito:wght@400;600;700;800&display=swap"
-    rel="stylesheet"
-  />
+  <!-- Fonts are no longer loaded from Google's CDN. LG Muenchen I (3 O 17493/20)
+       held that fetching Google Fonts without consent is a GDPR violation, so we
+       fall back to the platform's system font stack defined in css/styles.css.
+       Self-host any custom WOFF2 under /assets/fonts/ if a stronger brand font
+       is required later. -->
 
+  <!-- Google Sign-In client is required for authentication and is documented
+       as such in the privacy policy (Drittlandsuebermittlung). Loaded only on
+       the logged-out landing; after sign-in users never re-fetch this page. -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 
-  <link rel="stylesheet" href="/css/base.css?v=5" />
-  <link rel="stylesheet" href="/css/theme.css?v=5" />
-  <link rel="stylesheet" href="/css/styles.css?v=7" />
-  <link rel="stylesheet" href="/css/courses-redesign.css?v=33" />
-  <link rel="stylesheet" href="/css/app-design-system.css?v=5" />
-  <link rel="stylesheet" href="/css/layout.css?v=5" />
-  <link rel="stylesheet" href="/css/document-rail.css?v=15" />
-  <!-- Landing-fragment CSS preloaded in <head> so it's ready the moment
-       loader.js injects the landing HTML — no flash of unstyled content. -->
+  <!-- Keep the logged-out first paint lean. Dashboard CSS is injected only
+       after auth in loader.js; the public landing needs just these two files. -->
   <link rel="stylesheet" href="/css/new-landing.css?v=1" />
   <link rel="stylesheet" href="/css/auth.css?v=4" />
   <style>
@@ -142,21 +137,20 @@
       </main>
     </div>
 
-    <!-- Hide the splash once the SPA tells us it's mounted.
-         Lives in an external file because CSP blocks inline scripts. -->
-    <script src="js/ss-ready-marker.js?v=1"></script>
-
-    <script src="js/minallo.js?v=2"></script>
-    <script src="js/config.js?v=1"></script>
+    <!-- All boot scripts are deferred: they download in parallel with the
+         HTML body parse and execute in document order once parsing is done.
+         Module scripts (loader.js, ai-typing-config.js) are deferred by
+         default; classic scripts need the `defer` attribute explicitly.
+         Order preserved: ss-ready-marker → minallo → config → ai-typing →
+         auth-bootstrap → supabase → loader.
+         The runtime contract (auth-bootstrap before supabase before loader)
+         relies on the in-order execution `defer` guarantees. -->
+    <script src="js/ss-ready-marker.js?v=1" defer></script>
+    <script src="js/minallo.js?v=2" defer></script>
+    <script src="js/config.js?v=1" defer></script>
     <script type="module" src="js/features/ai-chat/ai-typing-config.js?v=1"></script>
-
-    <!-- Auth/session bootstrap: runs synchronously before supabase.js and loader.js -->
-    <script src="js/auth-bootstrap.js?v=4"></script>
-
-    <!-- Supabase REST client + auth logic (_enterApp, _showModal, _verifyAndEnter) -->
-    <script src="js/supabase.js?v=6"></script>
-
-    <!-- Section loader: fetches and injects HTML sections, fires ss-ready when done -->
+    <script src="js/auth-bootstrap.js?v=4" defer></script>
+    <script src="js/supabase.js?v=6" defer></script>
     <script type="module" src="js/loader.js?v=6"></script>
   </body>
 </html>

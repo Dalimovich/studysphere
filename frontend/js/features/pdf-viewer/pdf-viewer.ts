@@ -16,21 +16,34 @@ interface StorageError extends Error {
   _storageError?: boolean;
 }
 
-function _bookmarkKey(fileName: string | null | undefined): string {
-  return 'ss_page_' + (fileName || '');
+export function pageKey(
+  courseId: string | number | null | undefined,
+  storageOrName: string | null | undefined
+): string {
+  const cid = courseId != null && courseId !== '' ? String(courseId) : 'demo';
+  return 'ss_page_' + cid + '::' + (storageOrName || '');
+}
+
+function _activePageKey(): string | null {
+  const id = window.activeStorageName || window.activeFileName;
+  if (!id) return null;
+  return pageKey(window.activeCourseId, id);
 }
 
 function _savePageBookmark(): void {
-  const name = window.activeFileName;
+  const key = _activePageKey();
   const page = window.pdfPage;
-  if (name && page && page > 1) {
-    try { sessionStorage.setItem(_bookmarkKey(name), String(page)); } catch { /* ignore */ }
+  if (key && page && page > 1) {
+    try { sessionStorage.setItem(key, String(page)); } catch { /* ignore */ }
   }
 }
 
-function _restorePageBookmark(fileName: string): number | null {
+function _restorePageBookmark(
+  courseId: string | number | null | undefined,
+  storageOrName: string
+): number | null {
   try {
-    const saved = sessionStorage.getItem(_bookmarkKey(fileName));
+    const saved = sessionStorage.getItem(pageKey(courseId, storageOrName));
     return saved ? parseInt(saved, 10) : null;
   } catch { return null; }
 }
@@ -40,9 +53,32 @@ export function openFile(f: FileLite, course: LegacyCourse): void {
 
   const mySeq = ++(window._pdfOpenSeq as number);
   window.activeFileName = f.name;
+  window.activeStorageName = f._storageName || null;
   window.currentCourseShort = course.short;
   window.activeCourseRef = course;
   if (course.id) window.activeCourseId = course.id;
+
+  // Resolve this PDF's indexed document UUID so the AI panel can scope
+  // retrieval directly via documentIds (no fragile filename-match fallback
+  // at every question). Reset first so a stale value from the previous file
+  // never leaks into the new one if the lookup fails or runs slowly.
+  (window as unknown as { activeRagDocumentId?: string | null }).activeRagDocumentId = null;
+  if (course.id) {
+    void import('../../services/ai-service.js').then((mod) => {
+      // Bail if the user opened a different file before the lookup resolved.
+      if ((window._pdfOpenSeq as number) !== mySeq) return;
+      return mod.listCourseDocuments(course.id!).then((docs) => {
+        if ((window._pdfOpenSeq as number) !== mySeq) return;
+        const target = (f.name || '').toLowerCase();
+        const match = docs.find(
+          (d) => d.processing_status === 'ready' && (d.file_name || '').toLowerCase() === target
+        );
+        if (match?.id) {
+          (window as unknown as { activeRagDocumentId?: string | null }).activeRagDocumentId = match.id;
+        }
+      });
+    }).catch(() => { /* best effort */ });
+  }
 
   if (typeof window._statsTrackFile === 'function') {
     window._statsTrackFile(f.name, course.short || course.name || '');
@@ -199,15 +235,22 @@ export function openFile(f: FileLite, course: LegacyCourse): void {
               window.pdfDoc = pdfDoc;
               window.pdfTotal = pdfDoc.numPages;
               window.pdfPage = 1;
-              window.pdfShowAll = true;
+              // Default to single-page mode for large PDFs — rendering all
+              // pages of a 200-page Skript freezes mid-range laptops. The
+              // toolbar button below stays in sync.
+              const _largePdf = pdfDoc.numPages > 20;
+              window.pdfShowAll = !_largePdf;
               window.pdfFullText = '';
               if (typeof window.updatePageInfo === 'function') window.updatePageInfo();
               if (typeof window.updateZoomPct === 'function') window.updateZoomPct();
               const pdfAll = document.getElementById('pdfAll');
-              if (pdfAll) pdfAll.textContent = 'Single page';
+              if (pdfAll) pdfAll.textContent = _largePdf ? 'All pages' : 'Single page';
               if (typeof window._annotLoad === 'function') window._annotLoad(f.name);
               if (typeof window.renderPages === 'function') window.renderPages();
-              const savedPage = _restorePageBookmark(f.name);
+              const savedPage = _restorePageBookmark(
+                (f._course || course).id,
+                f._storageName || f.name
+              );
               if (savedPage && savedPage > 1 && savedPage <= pdfDoc.numPages) {
                 setTimeout(() => {
                   if (window._pdfOpenSeq !== mySeq) return;
@@ -218,19 +261,26 @@ export function openFile(f: FileLite, course: LegacyCourse): void {
                   }
                 }, 700);
               }
-              setTimeout(() => {
-                const tp: Promise<string>[] = [];
-                for (let pi = 1; pi <= pdfDoc.numPages; pi++) {
-                  tp.push(
-                    (pdfDoc.getPage(pi) as Promise<{ getTextContent: () => Promise<{ items: Array<{ str: string }> }> }>).then((pg) =>
-                      pg.getTextContent().then((tc) => tc.items.map((it) => it.str).join(' '))
-                    )
-                  );
-                }
-                Promise.all(tp).then((pages) => {
-                  window.pdfFullText = pages.join('\n');
-                });
-              }, 400);
+              // Skip eager text extraction when the backend has already
+              // indexed this PDF — RAG retrieval covers AI answers, and
+              // ai-ask.ts falls back to on-demand extraction for chips.
+              const _ragIndexed = !!(window as unknown as { activeRagDocumentId?: string | null }).activeRagDocumentId;
+              if (!_ragIndexed) {
+                setTimeout(() => {
+                  const maxPages = Math.min(pdfDoc.numPages, 30);
+                  const tp: Promise<string>[] = [];
+                  for (let pi = 1; pi <= maxPages; pi++) {
+                    tp.push(
+                      (pdfDoc.getPage(pi) as Promise<{ getTextContent: () => Promise<{ items: Array<{ str: string }> }> }>).then((pg) =>
+                        pg.getTextContent().then((tc) => tc.items.map((it) => it.str).join(' '))
+                      )
+                    );
+                  }
+                  Promise.all(tp).then((pages) => {
+                    window.pdfFullText = pages.join('\n');
+                  });
+                }, 400);
+              }
             });
         });
       })
@@ -306,17 +356,19 @@ export function openFile(f: FileLite, course: LegacyCourse): void {
               window.pdfDoc = pdfDoc;
               window.pdfTotal = pdfDoc.numPages;
               window.pdfPage = 1;
-              window.pdfShowAll = true;
+              const _largePdf = pdfDoc.numPages > 20;
+              window.pdfShowAll = !_largePdf;
               window.pdfFullText = '';
               if (typeof window.updatePageInfo === 'function') window.updatePageInfo();
               if (typeof window.updateZoomPct === 'function') window.updateZoomPct();
               const pdfAll = document.getElementById('pdfAll');
-              if (pdfAll) pdfAll.textContent = 'Single page';
+              if (pdfAll) pdfAll.textContent = _largePdf ? 'All pages' : 'Single page';
               if (typeof window._annotLoad === 'function') window._annotLoad(f.name);
               if (typeof window.renderPages === 'function') window.renderPages();
               setTimeout(() => {
+                const maxPages = Math.min(pdfDoc.numPages, 30);
                 const textPromises: Promise<string>[] = [];
-                for (let pi = 1; pi <= pdfDoc.numPages; pi++) {
+                for (let pi = 1; pi <= maxPages; pi++) {
                   textPromises.push(
                     (pdfDoc.getPage(pi) as Promise<{ getTextContent: () => Promise<{ items: Array<{ str: string }> }> }>).then((pg) =>
                       pg.getTextContent().then((tc) => tc.items.map((it) => it.str).join(' '))

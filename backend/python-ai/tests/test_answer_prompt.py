@@ -93,8 +93,10 @@ def test_non_math_question_with_strong_context_uses_strong_prompt(q: str) -> Non
 
 def test_math_prompt_contains_required_sections() -> None:
     body = _SYSTEM_PROMPT_MATH
+    # The "Sources used" preamble was removed — citations are now inline,
+    # not listed up-front. The remaining sections are still mandatory.
     for heading in (
-        "Sources used", "Given", "Required", "Formula",
+        "Given", "Required", "Formula",
         "Substitution", "Calculation", "Unit check", "Final answer",
         "Confidence",
     ):

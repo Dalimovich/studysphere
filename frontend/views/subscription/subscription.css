@@ -153,6 +153,92 @@ body:not(.night) .sub-feat::before {
   color: var(--on-glass);
 }
 
+.sub-legal-block {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin: 10px 0 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.sub-legal-legend {
+  padding: 0 6px;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--on-glass-muted);
+}
+.sub-legal-list {
+  margin: 6px 0 10px;
+  padding-left: 18px;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--on-glass);
+}
+.sub-legal-list li {
+  margin-bottom: 3px;
+}
+.sub-legal-checkbox {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--on-glass);
+  cursor: pointer;
+}
+.sub-legal-checkbox input[type='checkbox'] {
+  margin-top: 3px;
+  flex: 0 0 auto;
+}
+.sub-legal-note {
+  margin: 10px 0 0;
+  font-size: 0.72rem;
+  color: var(--on-glass-muted);
+}
+.sub-btn-upgrade:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.sub-usage {
+  margin: 12px 0 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.sub-usage-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--on-glass-muted);
+  margin-bottom: 6px;
+}
+.sub-usage-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.sub-usage-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #6366f1, #8b5cf6);
+  transition: width 240ms ease, background 240ms ease;
+}
+.sub-usage--warn .sub-usage-bar-fill {
+  background: linear-gradient(90deg, #fbbf24, #fb923c);
+}
+.sub-usage--cap .sub-usage-bar-fill {
+  background: linear-gradient(90deg, #f87171, #ef4444);
+}
+.sub-usage-count {
+  margin-top: 6px;
+  font-size: 0.78rem;
+  color: var(--on-glass-muted);
+  text-align: right;
+}
+
 @media (max-width: 768px) {
   .sub-grid {
     grid-template-columns: 1fr;

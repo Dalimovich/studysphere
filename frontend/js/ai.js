@@ -288,6 +288,10 @@ askAI = function (question, skipUserBubble) {
     });
 };
 window.askAI = askAI;
+// ai-ask-bridge captures _legacyAskAI at init time, which runs before ai.js
+// loads — so publish it explicitly so snipped/attached images reach the
+// rendered user bubble + the backend.
+window._legacyAskAI = askAI;
 
 // ── chipPrompt — quick action buttons ────────────────────────────────────
 function chipPrompt(type, level) {

@@ -32,6 +32,20 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
     noTrial = body.noTrial;
   }
 
+  // German digital-services consent: § 312j Abs. 3 BGB requires explicit consent
+  // to begin performance before the 14-day withdrawal period ends. Without it
+  // the consumer keeps the full Widerruf right after using the service, which
+  // is a refund liability we don't want to carry. Refuse the checkout if the
+  // client didn't capture the consent.
+  const consent = body.consentWiderrufVerzicht;
+  if (consent !== true) {
+    return fail(400, 'Bitte bestaetige die Widerrufs-Information, bevor du fortfaehrst.');
+  }
+  const consentTimestamp =
+    typeof body.consentTimestamp === 'string' && body.consentTimestamp.trim()
+      ? body.consentTimestamp.trim().slice(0, 64)
+      : new Date().toISOString();
+
   try {
     const params = new URLSearchParams();
     params.append('mode', 'subscription');
@@ -42,6 +56,16 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
     params.append('payment_method_types[]', 'paypal');
     if (!noTrial) params.append('subscription_data[trial_period_days]', '7');
     params.append('metadata[no_trial]', noTrial ? 'true' : 'false');
+    params.append('metadata[consent_widerruf_verzicht]', 'true');
+    params.append('metadata[consent_widerruf_verzicht_at]', consentTimestamp);
+    // Source IP is captured by Netlify on the request; persist it so we can
+    // evidence the consent if a chargeback claim asserts the user never agreed.
+    const sourceIp =
+      (event.headers && (event.headers['x-nf-client-connection-ip']
+        || event.headers['x-forwarded-for']
+        || event.headers['client-ip']))
+      || '';
+    if (sourceIp) params.append('metadata[consent_widerruf_verzicht_ip]', String(sourceIp).slice(0, 64));
     params.append('success_url', allowedOrigin + '?payment=success&session_id={CHECKOUT_SESSION_ID}');
     params.append('cancel_url', allowedOrigin + '?payment=cancelled');
     params.append('metadata[user_id]', user.id);

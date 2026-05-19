@@ -1,3 +1,5 @@
+import { HOCHSCHULEN, type Hochschule } from '../../data/hochschulen.js';
+
 declare global {
   interface Window {
     VERTIEFUNG_MAP?: Record<string, string[]>;
@@ -29,6 +31,9 @@ interface ProfilePayload {
   email: string;
   auth_email?: string;
   university?: string;
+  university_name?: string;
+  university_state?: string;
+  university_type?: string;
   programme?: string;
   vertiefung?: string;
   matrikel?: string;
@@ -43,6 +48,9 @@ interface CachePayload {
   full_name: string;
   email: string;
   university?: string;
+  university_name?: string;
+  university_state?: string;
+  university_type?: string;
   programme?: string;
   vertiefung?: string;
   matrikel?: string;
@@ -51,8 +59,31 @@ interface CachePayload {
   german_level?: string;
 }
 
+import { listSuggestions, submitSuggestion } from '../../services/suggestions-service.js';
+
 let _obTest = '';
 let _obLevel = '';
+let _obSelectedHochschule: Hochschule | null = null;
+
+// Per-major cache of crowd-approved Vertiefung suggestions. Filled lazily
+// when the user picks a major in step 3a. Avoids re-fetching on every
+// keystroke in the Vertiefung input.
+const _obVertSuggestions: Record<string, string[]> = {};
+let _obVertSuggestionsLoading: Record<string, boolean> = {};
+
+async function _loadVertSuggestions(major: string): Promise<void> {
+  if (!major || _obVertSuggestions[major] !== undefined) return;
+  if (_obVertSuggestionsLoading[major]) return;
+  _obVertSuggestionsLoading[major] = true;
+  try {
+    const items = await listSuggestions('vertiefung', major);
+    _obVertSuggestions[major] = items.map((i) => i.value);
+  } catch {
+    _obVertSuggestions[major] = [];
+  } finally {
+    _obVertSuggestionsLoading[major] = false;
+  }
+}
 
 const _obTestLevels: Record<string, string[]> = {
   TestDaF: ['TDN 3', 'TDN 4', 'TDN 5'],
@@ -180,6 +211,67 @@ export function showOnboarding(email?: string): void {
   if (modal) modal.style.display = 'flex';
 }
 
+function setupUniAutocomplete(): void {
+  const inp = document.getElementById('obUni') as HTMLInputElement | null;
+  const drop = document.getElementById('obUniDrop');
+  if (!inp || !drop) return;
+
+  function _showUniDrop(q: string): void {
+    if (!drop || !inp) return;
+    const needle = q.toLowerCase();
+    // Match against short OR full name so users can search either way.
+    const items = needle
+      ? HOCHSCHULEN.filter(
+          (h) =>
+            h.short.toLowerCase().includes(needle) ||
+            h.name.toLowerCase().includes(needle)
+        )
+      : HOCHSCHULEN;
+    // Cap to 50 results — autocomplete lists longer than that overwhelm the
+    // dropdown and the user is expected to type more to narrow down.
+    const shown = items.slice(0, 50);
+    if (!shown.length) {
+      drop.style.display = 'none';
+      return;
+    }
+    drop.innerHTML = '';
+    shown.forEach((h) => {
+      const opt = document.createElement('div');
+      const short = document.createElement('div');
+      short.textContent = h.short;
+      short.style.cssText = 'font-weight:600;color:rgba(255,255,255,.9)';
+      const sub = document.createElement('div');
+      sub.textContent = h.name + ' · ' + h.state;
+      sub.style.cssText =
+        'font-size:.72rem;font-weight:500;color:rgba(255,255,255,.4);margin-top:2px';
+      opt.appendChild(short);
+      opt.appendChild(sub);
+      opt.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        inp.value = h.short;
+        _obSelectedHochschule = h;
+        drop.style.display = 'none';
+      });
+      drop.appendChild(opt);
+    });
+    drop.style.display = 'block';
+  }
+
+  inp.addEventListener('focus', () => {
+    _showUniDrop(inp.value.trim());
+  });
+  inp.addEventListener('input', () => {
+    // Free-text edits invalidate the previously-selected university.
+    _obSelectedHochschule = null;
+    _showUniDrop(inp.value.trim());
+  });
+  inp.addEventListener('blur', () => {
+    setTimeout(() => {
+      drop.style.display = 'none';
+    }, 150);
+  });
+}
+
 function setupProgAutocomplete(): void {
   const inp = document.getElementById('obProg') as HTMLInputElement | null;
   const drop = document.getElementById('obProgDrop');
@@ -222,11 +314,19 @@ function setupProgAutocomplete(): void {
     const row = document.getElementById('obVertiefungRow');
     const vInp = document.getElementById('obVertiefung') as HTMLInputElement | null;
     if (!row) return;
+    // Always show the Vertiefung field — even when the major has no entries
+    // in VERTIEFUNG_MAP. Users can free-type, and those values feed the
+    // crowd-suggestions pipeline so the dropdown grows over time.
+    row.style.display = 'flex';
     const VERTIEFUNG_MAP = window.VERTIEFUNG_MAP || {};
     const list = VERTIEFUNG_MAP[major];
     const hasVertiefung = !!(list && list.length);
-    row.style.display = hasVertiefung ? 'flex' : 'none';
-    if (!hasVertiefung && vInp) vInp.value = '';
+    if (vInp) {
+      vInp.placeholder = hasVertiefung
+        ? 'e.g. Mechatronik'
+        : 'Type your specialization (optional)';
+    }
+    if (major) void _loadVertSuggestions(major);
   }
 
   inp.addEventListener('focus', () => {
@@ -256,7 +356,17 @@ function setupVertOnboardingAutocomplete(): void {
     const VERTIEFUNG_MAP = window.VERTIEFUNG_MAP || {};
     const VERTIEFUNG_LIST = window.VERTIEFUNG_LIST || [];
     const mapped = VERTIEFUNG_MAP[major];
-    const base = mapped && mapped.length ? mapped : VERTIEFUNG_LIST;
+    // Combine static map + crowd-approved suggestions (per-major). Use a Set
+    // for case-insensitive dedupe so a manually-promoted suggestion that
+    // also exists in the static map doesn't appear twice.
+    const crowd = major ? (_obVertSuggestions[major] || []) : [];
+    const baseList = mapped && mapped.length ? mapped : VERTIEFUNG_LIST;
+    const seen = new Set<string>();
+    const base: string[] = [];
+    [...baseList, ...crowd].forEach((v) => {
+      const key = v.toLowerCase();
+      if (!seen.has(key)) { seen.add(key); base.push(v); }
+    });
     const items = q ? base.filter((v) => v.toLowerCase().includes(q.toLowerCase())) : base;
     if (!items.length) {
       drop.style.display = 'none';
@@ -348,6 +458,7 @@ function setupVertProfileAutocomplete(): void {
 }
 
 export function initOnboarding(): void {
+  setupUniAutocomplete();
   setupProgAutocomplete();
   setupVertOnboardingAutocomplete();
   setupVertProfileAutocomplete();
@@ -452,16 +563,28 @@ export function initOnboarding(): void {
   };
 
   window._obFinish = async function () {
+    const uni = inputValue('obUni');
     const prog = inputValue('obProg');
     const vertiefung = inputValue('obVertiefung');
     const sem = inputValue('obSem');
     const matrikel = inputValue('obMatrikel');
     const err = document.getElementById('obErr3a');
     if (!err) return;
-    if (!prog || !sem || !matrikel) {
+    if (!uni || !prog || !sem || !matrikel) {
       err.textContent = 'Please fill in all fields';
       err.style.display = 'block';
       return;
+    }
+    // Require the user to pick a real entry from the dropdown so we always
+    // persist the registry metadata (state, type) alongside the short name.
+    if (!_obSelectedHochschule || _obSelectedHochschule.short !== uni) {
+      const match = HOCHSCHULEN.find((h) => h.short.toLowerCase() === uni.toLowerCase());
+      if (!match) {
+        err.textContent = 'Please pick a university from the list';
+        err.style.display = 'block';
+        return;
+      }
+      _obSelectedHochschule = match;
     }
     err.style.display = 'none';
     const btn = document.getElementById('obFinish') as HTMLButtonElement | null;
@@ -494,13 +617,27 @@ export function initOnboarding(): void {
     if (pVert) pVert.value = vertiefung;
     if (pMat) pMat.value = matrikel;
 
+    // Crowd-source the Vertiefung dropdown: each submission increments the
+    // counter; entries with ≥ 5 submissions auto-approve. Skip values that
+    // are already part of the static VERTIEFUNG_MAP for this major (they're
+    // already in everyone's dropdown).
+    if (vertiefung) {
+      const staticList = (window.VERTIEFUNG_MAP || {})[prog] || [];
+      const inStatic = staticList.some((v) => v.toLowerCase() === vertiefung.toLowerCase());
+      if (!inStatic) void submitSuggestion('vertiefung', prog, vertiefung);
+    }
+
     const _currentUser = window._currentUser;
+    const hs = _obSelectedHochschule!;
     const payload: ProfilePayload = {
       id: _currentUser?.id,
       full_name: fullName,
       email: info.email,
       auth_email: _currentUser?.email || '',
-      university: 'TU Braunschweig',
+      university: hs.short,
+      university_name: hs.name,
+      university_state: hs.state,
+      university_type: hs.type,
       programme: programmeStr,
       vertiefung: vertiefung,
       matrikel: matrikel,
@@ -513,7 +650,10 @@ export function initOnboarding(): void {
       {
         full_name: fullName,
         email: info.email,
-        university: 'TU Braunschweig',
+        university: hs.short,
+        university_name: hs.name,
+        university_state: hs.state,
+        university_type: hs.type,
         programme: programmeStr,
         vertiefung: vertiefung,
         matrikel: matrikel,

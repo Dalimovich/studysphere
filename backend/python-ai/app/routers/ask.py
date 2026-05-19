@@ -20,9 +20,11 @@ from ..services.answer import generate_answer
 from ..services.cache import fetch_document_version_hash, lookup_answer, save_answer
 from ..services.retrieval import (
     ExerciseHit,
+    FormulaHit,
     find_exercise_reference,
     retrieve_chunks,
     retrieve_exercise_block,
+    retrieve_formula_block,
 )
 from ..services.retrieval_debug import DebugPayload, record_retrieval_debug
 from ..supabase_client import get_supabase
@@ -84,6 +86,43 @@ def _prepend_exercise_chunks(hit: ExerciseHit, chunks: list) -> list:
         if not (c.document_id == hit.document_id and
                 c.page_start == hit.page_start and
                 c.chunk_type in ("exercise", "solution"))
+    ]
+    return prepended + keep
+
+
+def _prepend_formula_chunks(hits: list[FormulaHit], chunks: list) -> list:
+    """Convert FormulaHits into RetrievedChunk-shaped entries and push them
+    to the front of the chunk list. Same shape trick as the exercise helper
+    so the answerer doesn't need to know formulas are a separate source.
+    """
+    if not hits:
+        return chunks
+    from ..services.retrieval import RetrievedChunk  # local import: avoids cycle
+
+    prepended: list[RetrievedChunk] = []
+    for i, h in enumerate(hits):
+        title = h.formula_name or "Formel"
+        symbols = ", ".join(h.symbols) if h.symbols else ""
+        body = h.formula_markdown
+        if symbols:
+            body = f"{body}\n\nSymbols: {symbols}"
+        prepended.append(RetrievedChunk(
+            chunk_id=f"formula-{h.document_id}-{h.page_number}-{i}",
+            document_id=h.document_id,
+            page_start=h.page_number,
+            page_end=h.page_number,
+            text=body,
+            score=97.0 - i,        # below exercise (99/98), above vector hits
+            similarity=1.0,
+            chunk_type="formula",
+            section_title=title,
+        ))
+    # Drop any vector chunks already pointing at the same (doc, page) so we
+    # don't duplicate context.
+    skip = {(h.document_id, h.page_number) for h in hits}
+    keep = [
+        c for c in chunks
+        if (c.document_id, c.page_start) not in skip
     ]
     return prepended + keep
 
@@ -294,6 +333,19 @@ async def ask_endpoint(payload: AskRequest) -> AskResponse:
     if exercise_hit:
         chunks = _prepend_exercise_chunks(exercise_hit, chunks)
 
+    # Formula exact-match: cheap heuristic over document_formulas. Surfaces
+    # the canonical formula when the question names it (or its symbol)
+    # before the vector ranker gets to pick a general explanation chunk.
+    formula_hits = retrieve_formula_block(
+        user_id=payload.userId,
+        course_id=payload.courseId,
+        query=question,
+        document_ids=payload.documentIds,
+        active_document_id=payload.activeDocumentId,
+    )
+    if formula_hits:
+        chunks = _prepend_formula_chunks(formula_hits, chunks)
+
     # Backfill doc_name_map for any chunk pointing at a doc we didn't ask
     # about explicitly (e.g. when documentIds is None and we let retrieval
     # roam over the whole course).
@@ -333,7 +385,13 @@ async def ask_endpoint(payload: AskRequest) -> AskResponse:
         endpoint="ask", question=question,
         active_document_id=payload.activeDocumentId,
         selected_document_ids=payload.documentIds,
-        retrieval_strategy=("exercise-exact+vector" if exercise_hit else "vector+bm25"),
+        retrieval_strategy=(
+            "+".join(
+                (["exercise-exact"] if exercise_hit else [])
+                + (["formula-exact"] if formula_hits else [])
+                + ["vector+bm25"]
+            )
+        ),
         retrieval_mode=answer.get("retrievalMode"),
         candidate_doc_count=len({c.document_id for c in chunks}) if chunks else 0,
         exercise_hit=(

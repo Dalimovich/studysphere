@@ -5,7 +5,11 @@ function updatePageInfo() {
   if (tot) tot.textContent = pdfTotal;
   // Persist page position in sessionStorage so it survives refresh
   if (activeFileName && pdfPage && pdfPage > 1) {
-    try { sessionStorage.setItem('ss_page_' + activeFileName, String(pdfPage)); } catch (e) {}
+    try {
+      var _id = window.activeStorageName || activeFileName;
+      var _cid = window.activeCourseId != null && window.activeCourseId !== '' ? String(window.activeCourseId) : 'demo';
+      sessionStorage.setItem('ss_page_' + _cid + '::' + _id, String(pdfPage));
+    } catch (e) {}
   }
 }
 function _pdfVisiblePage() {
@@ -22,64 +26,126 @@ function _pdfVisiblePage() {
 }
 window._pdfVisiblePage = _pdfVisiblePage;
 
+// Render one page's canvas + text-layer into a placeholder wrap. Sets the
+// final dimensions (PDFs aren't always uniform), inserts the canvas before
+// the text layer, and ensures any annot-committed/annot-live canvases stay
+// on top via their z-index — DOM order doesn't matter for the annot layer
+// because it uses `position:absolute; z-index:5/6`.
+function _pdfRenderIntoWrap(wrap, num) {
+  if (!pdfDoc) return;
+  if (wrap.dataset.rendered === '1') return;
+  wrap.dataset.rendered = '1';
+  pdfDoc.getPage(num).then(function (page) {
+    var body = document.getElementById('pdfBody');
+    var cW = (body && body.clientWidth ? body.clientWidth : wrap.clientWidth) - 32;
+    var vp0 = page.getViewport({ scale: 1 });
+    var scale = pdfScale * (cW / vp0.width);
+    var vp = page.getViewport({ scale: scale });
+    wrap.style.width = vp.width + 'px';
+    wrap.style.height = vp.height + 'px';
+
+    var canvas = document.createElement('canvas');
+    canvas.width = vp.width;
+    canvas.height = vp.height;
+    var textDiv = document.createElement('div');
+    textDiv.className = 'pdf-text-layer';
+    textDiv.style.width = vp.width + 'px';
+    textDiv.style.height = vp.height + 'px';
+    // Insert canvas + text layer at the *start* of the wrap so any annot
+    // canvases that were already attached (when annotation mode was toggled
+    // before this page rendered) remain above via their inset:0 + z-index.
+    wrap.insertBefore(textDiv, wrap.firstChild);
+    wrap.insertBefore(canvas, textDiv);
+
+    page
+      .render({ canvasContext: canvas.getContext('2d'), viewport: vp })
+      .promise.then(function () {
+        return page.getTextContent();
+      })
+      .then(function (tc) {
+        textDiv.style.setProperty('--scale-factor', String(vp.scale));
+        var rl = pdfjsLib.renderTextLayer({
+          textContentSource: tc,
+          container: textDiv,
+          viewport: vp,
+          textDivs: []
+        });
+        if (rl && rl.promise) rl.promise.catch(function () {});
+        if (!window.pdfPageTexts) window.pdfPageTexts = {};
+        window.pdfPageTexts[num] = tc.items.map(function (it) { return it.str; }).join(' ');
+      });
+    textDiv.addEventListener('mouseup', function () {
+      setTimeout(function () {
+        var sel = window.getSelection();
+        if (sel && sel.toString().trim().length > 3) showSelectionBanner(sel.toString().trim());
+      }, 30);
+    });
+  });
+}
+
 function renderPages() {
   if (!pdfDoc) return;
   var body = document.getElementById('pdfBody');
   body.innerHTML = '';
+  // Stop any previous virtualization observer.
+  if (window._pdfPageObserver && typeof window._pdfPageObserver.disconnect === 'function') {
+    window._pdfPageObserver.disconnect();
+    window._pdfPageObserver = null;
+  }
   var navStyle = pdfShowAll ? 'none' : 'inline-flex';
   document.getElementById('pdfPrev').style.display = navStyle;
   document.getElementById('pdfNext').style.display = navStyle;
   document.getElementById('pdfPageInfo').style.display = 'inline-flex';
-  var toRender = pdfShowAll
-    ? Array.from({ length: pdfTotal }, function (_, i) {
-        return i + 1;
-      })
-    : [pdfPage];
-  toRender.forEach(function (num) {
-    pdfDoc.getPage(num).then(function (page) {
-      var cW = body.clientWidth - 32;
-      var vp0 = page.getViewport({ scale: 1 });
-      var scale = pdfScale * (cW / vp0.width);
-      var vp = page.getViewport({ scale: scale });
-      var wrap = document.createElement('div');
-      wrap.className = 'pdf-page-wrap';
-      wrap.dataset.pageNum = num;
-      wrap.style.width = vp.width + 'px';
-      wrap.style.height = vp.height + 'px';
-      var canvas = document.createElement('canvas');
-      canvas.width = vp.width;
-      canvas.height = vp.height;
-      wrap.appendChild(canvas);
-      var textDiv = document.createElement('div');
-      textDiv.className = 'pdf-text-layer';
-      textDiv.style.width = vp.width + 'px';
-      textDiv.style.height = vp.height + 'px';
-      wrap.appendChild(textDiv);
-      body.appendChild(wrap);
-      page
-        .render({ canvasContext: canvas.getContext('2d'), viewport: vp })
-        .promise.then(function () {
-          return page.getTextContent();
-        })
-        .then(function (tc) {
-          textDiv.style.setProperty('--scale-factor', String(vp.scale));
-          var rl = pdfjsLib.renderTextLayer({
-            textContentSource: tc,
-            container: textDiv,
-            viewport: vp,
-            textDivs: []
-          });
-          if (rl && rl.promise) rl.promise.catch(function () {});
-          // Store per-page text for AI Notes page-range targeting
-          if (!window.pdfPageTexts) window.pdfPageTexts = {};
-          window.pdfPageTexts[num] = tc.items.map(function (it) { return it.str; }).join(' ');
-        });
-      textDiv.addEventListener('mouseup', function () {
-        setTimeout(function () {
-          var sel = window.getSelection();
-          if (sel && sel.toString().trim().length > 3) showSelectionBanner(sel.toString().trim());
-        }, 30);
+
+  // Single-page mode: original eager render (cheap — just one page).
+  if (!pdfShowAll) {
+    var wrap = document.createElement('div');
+    wrap.className = 'pdf-page-wrap';
+    wrap.dataset.pageNum = pdfPage;
+    body.appendChild(wrap);
+    _pdfRenderIntoWrap(wrap, pdfPage);
+    return;
+  }
+
+  // Show-all mode: virtualize. Default to ~50 pages of 800px placeholders so
+  // total scroll height is roughly right; the first page's true viewport
+  // overrides this once we have it, and each page corrects itself when it
+  // actually renders. The IntersectionObserver triggers _pdfRenderIntoWrap
+  // for any page that enters the viewport ± rootMargin.
+  var pageCount = pdfTotal;
+  pdfDoc.getPage(1).then(function (page1) {
+    var cW = body.clientWidth - 32;
+    var vp0 = page1.getViewport({ scale: 1 });
+    var scale = pdfScale * (cW / vp0.width);
+    var vp = page1.getViewport({ scale: scale });
+    var defaultW = vp.width;
+    var defaultH = vp.height;
+
+    var frag = document.createDocumentFragment();
+    for (var i = 1; i <= pageCount; i++) {
+      var w = document.createElement('div');
+      w.className = 'pdf-page-wrap';
+      w.dataset.pageNum = String(i);
+      w.style.width = defaultW + 'px';
+      w.style.height = defaultH + 'px';
+      frag.appendChild(w);
+    }
+    body.appendChild(frag);
+
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        var w = entry.target;
+        if (w.dataset.rendered === '1') return;
+        observer.unobserve(w);
+        var num = parseInt(w.dataset.pageNum || '1', 10);
+        _pdfRenderIntoWrap(w, num);
       });
+    }, { root: body, rootMargin: '800px 0px' });
+    window._pdfPageObserver = observer;
+
+    body.querySelectorAll('.pdf-page-wrap').forEach(function (w) {
+      observer.observe(w);
     });
   });
 }

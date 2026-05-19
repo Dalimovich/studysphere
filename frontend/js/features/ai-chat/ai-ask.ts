@@ -415,7 +415,21 @@ export function initAskAI(
               _openFileCtx = _rawText.slice(Math.max(0, _lastExerciseIdx - 200), _lastExerciseIdx + 3000);
             }
           }
-          if (!_openFileCtx) _openFileCtx = _rawText.slice(0, 3000);
+          if (!_openFileCtx) {
+            // No exercise term matched — fall back to the page the user is
+            // currently looking at, since their question is most likely about
+            // what's on screen. pdfPageTexts is populated per page as it
+            // renders (or pre-extracted up front by pdf-viewer). Falls all
+            // the way back to the document start only as a last resort.
+            const _pp = window.pdfPage as number | undefined;
+            const _ppt = (window as unknown as { pdfPageTexts?: Record<number, string> }).pdfPageTexts;
+            const _currentPageText = _pp && _ppt ? _ppt[_pp] : '';
+            if (_currentPageText && _currentPageText.trim().length > 60) {
+              _openFileCtx = _currentPageText.slice(0, 3000);
+            } else {
+              _openFileCtx = _rawText.slice(0, 3000);
+            }
+          }
         }
 
         if (_hasRag) {
@@ -592,10 +606,21 @@ export function initAskAI(
               headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
               signal: _streamController.signal,
               body: JSON.stringify({
+                // documentIds is a HARD filter — only send when the user
+                // explicitly scopes the question to a chosen set (not when
+                // they merely have a PDF open). The currently-open file is
+                // passed as activeDocumentId (a ranking hint), so retrieval
+                // can still pull in lecture + exercise + formula sheets.
                 courseId: _courseId,
                 question: question,
-                documentIds: _activeDocId ? [_activeDocId] : undefined,
+                documentIds: undefined,
                 activeDocumentId: _activeDocId || undefined,
+                // Tell the backend which file the user is reading and give it
+                // a slice of the actually-visible text. Without this the model
+                // sees only retrieved chunks, which can miss the section the
+                // user is pointing at when they say "this question".
+                activeFileName: activeFileName || undefined,
+                openFileContext: _openFileCtx || undefined,
                 bypassCache: opts && opts.forceRefresh ? true : undefined,
               }),
             })

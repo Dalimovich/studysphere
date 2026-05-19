@@ -6855,3 +6855,211 @@ body:not(.night) #portal {
 #portal #aiResizeHandle:hover {
   background: rgba(99, 102, 241, 0.28);
 }
+
+/* ── AI Fair-Use banner ─────────────────────────────────────────────────────
+ * Sits at the top of #portal once the user crosses 80% of the monthly cap.
+ * Uses the same glass surface + on-glass tokens as the rest of the portal so
+ * it visually belongs without introducing a new design language.
+ */
+.ai-usage-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin: 14px 18px 0;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--on-glass);
+  font-size: 0.92rem;
+  line-height: 1.4;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
+  animation: aiUsageBannerIn 240ms ease-out;
+}
+body.night .ai-usage-banner {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.07);
+}
+.ai-usage-banner--warn {
+  border-color: rgba(251, 191, 36, 0.45);
+  box-shadow: 0 6px 24px rgba(251, 191, 36, 0.08);
+}
+.ai-usage-banner--cap {
+  border-color: rgba(248, 113, 113, 0.55);
+  box-shadow: 0 6px 24px rgba(248, 113, 113, 0.12);
+}
+.ai-usage-banner-icon {
+  flex: 0 0 auto;
+  font-size: 1.4rem;
+  line-height: 1;
+  padding-top: 2px;
+}
+.ai-usage-banner-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.ai-usage-banner-title {
+  font-weight: 700;
+  letter-spacing: -0.005em;
+  color: var(--on-glass);
+}
+.ai-usage-banner-sub {
+  margin-top: 2px;
+  color: var(--on-glass-muted);
+  font-size: 0.85rem;
+}
+.ai-usage-banner-meter {
+  margin-top: 10px;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+body.night .ai-usage-banner-meter {
+  background: rgba(255, 255, 255, 0.06);
+}
+.ai-usage-banner-meter-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #fbbf24, #fb923c);
+  transition: width 240ms ease;
+}
+.ai-usage-banner--cap .ai-usage-banner-meter-fill {
+  background: linear-gradient(90deg, #f87171, #ef4444);
+}
+.ai-usage-banner-close {
+  flex: 0 0 auto;
+  background: transparent;
+  border: none;
+  color: var(--on-glass-muted);
+  font-size: 1.2rem;
+  line-height: 1;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background 120ms ease, color 120ms ease;
+}
+.ai-usage-banner-close:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--on-glass);
+}
+@keyframes aiUsageBannerIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── AI cap modal ───────────────────────────────────────────────────────────
+ * Triggered when an AI request returns 429 with code 'ai_monthly_cap'. Same
+ * glass card style as #paywallModal so the visual language stays consistent.
+ */
+.ai-cap-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: aiCapModalIn 180ms ease-out;
+}
+.ai-cap-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.ai-cap-modal-card {
+  position: relative;
+  max-width: 460px;
+  width: 100%;
+  padding: 28px 26px 22px;
+  border-radius: 18px;
+  background: var(--dp-solid, #0f172a);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--on-glass);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+  text-align: center;
+}
+body:not(.night) .ai-cap-modal-card {
+  background: #ffffff;
+  border-color: rgba(15, 23, 42, 0.1);
+}
+.ai-cap-modal-icon {
+  font-size: 2rem;
+  margin-bottom: 8px;
+}
+.ai-cap-modal-title {
+  margin: 0 0 8px;
+  font-size: 1.18rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.ai-cap-modal-text {
+  margin: 0 0 10px;
+  color: var(--on-glass-muted);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+.ai-cap-modal-text strong {
+  color: var(--on-glass);
+}
+.ai-cap-modal-meta {
+  margin: 0 0 18px;
+  color: var(--on-glass-muted);
+  font-size: 0.8rem;
+}
+.ai-cap-modal-meta a {
+  color: var(--on-glass);
+  text-decoration: underline;
+}
+.ai-cap-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+.ai-cap-modal-btn {
+  flex: 1 1 auto;
+  min-width: 140px;
+  padding: 10px 16px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 0.92rem;
+  cursor: pointer;
+  border: 1px solid transparent;
+  text-decoration: none;
+  text-align: center;
+  transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
+}
+.ai-cap-modal-btn-primary {
+  background: linear-gradient(180deg, #6366f1, #4f46e5);
+  color: #ffffff;
+  border-color: rgba(99, 102, 241, 0.6);
+}
+.ai-cap-modal-btn-primary:hover {
+  transform: translateY(-1px);
+}
+.ai-cap-modal-btn-secondary {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--on-glass);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+body:not(.night) .ai-cap-modal-btn-secondary {
+  background: rgba(15, 23, 42, 0.05);
+  border-color: rgba(15, 23, 42, 0.1);
+}
+.ai-cap-modal-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+@keyframes aiCapModalIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@media (max-width: 480px) {
+  .ai-usage-banner { margin: 10px 12px 0; padding: 12px 14px; }
+  .ai-cap-modal-card { padding: 22px 18px 18px; }
+}

@@ -14,6 +14,11 @@ interface StripeSession {
   error?: { message?: string };
 }
 
+interface StripeSubscription {
+  current_period_end?: number;
+  trial_end?: number | null;
+}
+
 interface SubscriptionRow {
   plan: string;
   status: string;
@@ -70,9 +75,31 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
 
     const isTrialCheckout =
       session.payment_status === 'no_payment_required' && session.metadata?.no_trial !== 'true';
-    const expires = new Date(
-      Date.now() + (isTrialCheckout ? 8 : 31) * 24 * 60 * 60 * 1000
-    ).toISOString();
+
+    // Pull the real period boundary from Stripe so we don't drift from the
+    // billing cycle. The webhook also writes this on customer.subscription.*
+    // events; this read is belt-and-braces for the success-redirect path.
+    let expires: string | null = null;
+    if (session.subscription) {
+      try {
+        const subRes = await stripeGet<StripeSubscription>(
+          '/v1/subscriptions/' + encodeURIComponent(session.subscription)
+        );
+        if (subRes.status >= 200 && subRes.status < 300) {
+          const target = isTrialCheckout
+            ? subRes.body.trial_end || subRes.body.current_period_end
+            : subRes.body.current_period_end;
+          if (typeof target === 'number' && Number.isFinite(target)) {
+            expires = new Date(target * 1000).toISOString();
+          }
+        }
+      } catch { /* fall back to default below */ }
+    }
+    if (!expires) {
+      expires = new Date(
+        Date.now() + (isTrialCheckout ? 8 : 31) * 24 * 60 * 60 * 1000
+      ).toISOString();
+    }
     await supaRequest('POST', 'subscriptions?on_conflict=user_id',
       {
         id: userId, user_id: userId, plan: 'pro', status: isTrialCheckout ? 'trialing' : 'active',

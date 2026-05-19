@@ -4,11 +4,15 @@ import { jsonResponse, fail, handleOptions } from '../lib/responses';
 import { optionalEnv, requireEnv } from '../lib/env';
 import { verifySupabaseToken, extractBearerToken } from '../lib/supabase-auth';
 import { pythonAiConfigured, forwardToPython } from '../lib/python-ai-proxy';
-import { enforceEventRateLimit } from '../lib/rate-limit';
+import { enforceEventRateLimit, enforceMonthlyAiCap, AI_MONTHLY_CAP } from '../lib/rate-limit';
+import { requireActiveSubscription } from '../lib/subscription-gate';
 import { logSecurityEvent } from '../lib/logger';
 import type { LambdaResponse, NetlifyEvent } from '../lib/types';
 
-const AI_ASK_RATE_LIMIT_MAX = parseInt(optionalEnv('AI_ASK_RATE_LIMIT_MAX', '60'), 10);
+// Dropped from 60 → 30/hour. Matches the /ask-stream Python limit so the two
+// surfaces share one budget. 30/hr × 24 ≈ 720/day, well below abusive but
+// still ample for legitimate study use.
+const AI_ASK_RATE_LIMIT_MAX = parseInt(optionalEnv('AI_ASK_RATE_LIMIT_MAX', '30'), 10);
 const AI_ASK_RATE_LIMIT_WINDOW = parseInt(optionalEnv('AI_ASK_RATE_LIMIT_WINDOW_MS', String(60 * 60 * 1000)), 10);
 const MAX_QUESTION_LENGTH = 8000;
 const MAX_DOCUMENT_IDS = 25;
@@ -55,6 +59,10 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
   if (!user) return fail(401, 'Invalid or expired token');
   if (!pythonAiConfigured()) return fail(503, 'AI service not configured');
   const serviceKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
+  const subBlocked = await requireActiveSubscription(serviceKey, user.id, 'ai_ask');
+  if (subBlocked) return subBlocked;
+  const monthlyCapped = await enforceMonthlyAiCap(serviceKey, user.id, AI_MONTHLY_CAP);
+  if (monthlyCapped) return monthlyCapped;
   const limited = await enforceEventRateLimit(
     serviceKey,
     user.id,
@@ -77,18 +85,34 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
 
   const documentIds: string[] | null = Array.isArray(body.documentIds)
     ? (body.documentIds as string[]).slice(0, MAX_DOCUMENT_IDS)
-    : typeof body.documentId === 'string' ? [body.documentId] : null;
+    : null;
+  // activeDocumentId is a ranking hint (the PDF the user is reading), NOT a
+  // hard filter. Falls back to body.documentId for legacy callers that sent
+  // the open file as a single-doc filter — we now treat it as a hint so the
+  // model can still pull in lecture/exercise/formula sheets from the course.
+  const activeDocumentId: string | null =
+    typeof body.activeDocumentId === 'string' && body.activeDocumentId
+      ? body.activeDocumentId
+      : typeof body.documentId === 'string' && body.documentId
+        ? body.documentId
+        : null;
   await logSecurityEvent(serviceKey, user.id, 'ai_ask', {
     course_id: courseId,
-    document_count: documentIds ? documentIds.length : 0
+    document_count: documentIds ? documentIds.length : 0,
+    active_document: activeDocumentId ? 1 : 0,
   });
 
   const upstream = await forwardToPython<AskResponseBody>('ask', {
     userId: user.id,
     courseId,
     documentIds,
+    activeDocumentId,
     question,
-    bypassCache: Boolean(body.bypassCache)
+    // bypassCache is intentionally NOT forwarded from the client — the answer
+    // cache is our biggest cost mitigation, so the public API is not allowed
+    // to defeat it. Cache invalidation happens automatically via
+    // document_version_hash when documents change.
+    bypassCache: false
   });
 
   if (!upstream.ok) return jsonResponse(upstream.status, upstream.body);

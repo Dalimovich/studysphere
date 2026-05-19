@@ -19,11 +19,27 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from ..jwt_auth import verify_supabase_jwt
+from ..services.access_control import (
+    enforce_monthly_ai_cap,
+    enforce_rate_limit,
+    require_active_subscription,
+)
 from ..services.answer_stream import stream_answer
 from ..services.cache import fetch_document_version_hash, lookup_answer, save_answer
-from ..services.retrieval import retrieve_chunks, retrieve_exercise_block
+from ..services.retrieval import retrieve_chunks, retrieve_exercise_block, retrieve_formula_block
 from ..services.retrieval_debug import DebugPayload, record_retrieval_debug
 from ..supabase_client import get_supabase
+
+# Same hourly cap as the Netlify /api/ai/ask path so the two surfaces share
+# one budget. Override via env if needed; defaults to 30/hour to leave headroom
+# for the new tighter limits and stay well inside per-user cost expectations.
+_ASK_STREAM_RATE_LIMIT_MAX = 30
+_ASK_STREAM_RATE_LIMIT_WINDOW_SECONDS = 60 * 60
+_MAX_STREAM_QUESTION_CHARS = 8000
+_MAX_STREAM_OPEN_FILE_CTX_CHARS = 20000
+# Mirror backend/lib/rate-limit.ts default. Override at deploy time by editing
+# the constant if a more generous cap is needed.
+_AI_MONTHLY_CAP = 500
 
 log = logging.getLogger(__name__)
 
@@ -56,7 +72,16 @@ class AskStreamRequest(BaseModel):
     documentIds: list[str] | None = None
     activeDocumentId: str | None = None
     question: str
-    bypassCache: bool = False
+    # The file name + a slice of text from whatever the user is currently
+    # looking at in the PDF reader. Surfaced into the user message so the
+    # model can ground "this question / this section" references even when
+    # retrieval doesn't surface the exact chunk. Both optional.
+    activeFileName: str | None = None
+    openFileContext: str | None = None
+    # bypassCache is intentionally NOT exposed on the public API. The cache
+    # is keyed by document_version_hash so it invalidates automatically when
+    # documents change; letting the client opt out defeats the single biggest
+    # cost mitigation. Any field the client sends is ignored.
 
 
 def _sse_bytes(payload: str) -> bytes:
@@ -66,6 +91,17 @@ def _sse_bytes(payload: str) -> bytes:
 @router.post("/ask-stream")
 async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(verify_supabase_jwt)):
     user_id = user["id"]
+    # Paid feature — verify subscription before doing anything expensive.
+    require_active_subscription(user_id, "ask_stream")
+    enforce_monthly_ai_cap(user_id, _AI_MONTHLY_CAP)
+    enforce_rate_limit(
+        user_id,
+        "ask_stream",
+        _ASK_STREAM_RATE_LIMIT_MAX,
+        _ASK_STREAM_RATE_LIMIT_WINDOW_SECONDS,
+        "AI request limit reached. Please try again later.",
+    )
+
     if payload.documentIds:
         for did in payload.documentIds:
             _require_uuid(did, "documentId")
@@ -80,11 +116,20 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
     question = (payload.question or "").strip()
     if not question:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="question is required")
+    if len(question) > _MAX_STREAM_QUESTION_CHARS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="question is too long")
+    if payload.openFileContext and len(payload.openFileContext) > _MAX_STREAM_OPEN_FILE_CTX_CHARS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="openFileContext is too long")
 
     # ── Cache check (same logic as /ask) ─────────────────────────────────────
+    # When the request carries openFileContext (the user is reading a PDF
+    # and asking "this question / this section"), the answer is bound to
+    # whatever page is visible — not just the document set. Bypass cache to
+    # avoid returning a previous answer composed against a different page.
     version_hash = ""
     cached = None
-    if payload.documentIds and not payload.bypassCache:
+    has_open_ctx = bool(payload.openFileContext and payload.openFileContext.strip())
+    if payload.documentIds and not has_open_ctx:
         version_hash = fetch_document_version_hash(user_id, payload.courseId, payload.documentIds)
         cached = lookup_answer(
             user_id=user_id, course_id=payload.courseId,
@@ -158,6 +203,15 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
         from .ask import _prepend_exercise_chunks  # reuse the same helper
         chunks = _prepend_exercise_chunks(exercise_hit, chunks)
 
+    formula_hits = retrieve_formula_block(
+        user_id=user_id, course_id=payload.courseId, query=question,
+        document_ids=payload.documentIds,
+        active_document_id=payload.activeDocumentId,
+    )
+    if formula_hits:
+        from .ask import _prepend_formula_chunks  # reuse the same helper
+        chunks = _prepend_formula_chunks(formula_hits, chunks)
+
     missing_ids = [c.document_id for c in chunks if c.document_id not in doc_name_map]
     if missing_ids:
         sb = get_supabase()
@@ -176,6 +230,8 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
         import json
         gen_iter = stream_answer(
             question=question, chunks=chunks, doc_names=doc_name_map,
+            active_file_name=payload.activeFileName,
+            open_file_context=payload.openFileContext,
         )
         for chunk_bytes in gen_iter:
             # Decode the SSE event so we can intercept the closing 'done' frame.
@@ -212,7 +268,7 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
             yield chunk_bytes
 
         # After the generator finishes, persist to cache.
-        if version_hash and not payload.bypassCache and full_text_buf:
+        if version_hash and full_text_buf:
             try:
                 save_answer(
                     user_id=user_id, course_id=payload.courseId,
@@ -242,7 +298,13 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
             endpoint="ask-stream", question=question,
             active_document_id=payload.activeDocumentId,
             selected_document_ids=payload.documentIds,
-            retrieval_strategy=("exercise-exact+vector" if exercise_hit else "vector+bm25"),
+            retrieval_strategy=(
+                "+".join(
+                    (["exercise-exact"] if exercise_hit else [])
+                    + (["formula-exact"] if formula_hits else [])
+                    + ["vector+bm25"]
+                )
+            ),
             retrieval_mode=captured_meta.get("retrievalMode"),
             candidate_doc_count=len({c.document_id for c in chunks}) if chunks else 0,
             exercise_hit=(

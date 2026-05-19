@@ -1,126 +1,141 @@
 // Writing Coach — AI integration module.
 //
-// Calls a backend AI endpoint with the user's paragraph + selected CEFR level
-// and returns a structured analysis matching the agreed schema.
+// Calls /api/ai/writing-coach (Netlify → Python service) with the user's
+// paragraph + profile level + task type. Returns the full analysis shape
+// defined in docs/schreibtrainer-ai-spec.md.
 //
-// The real backend call is intentionally not wired yet — `analyzeParagraph`
-// currently returns a deterministic mock so the UI can be built and verified
-// without spending tokens. To plug in the real AI, replace the body of
-// `analyzeParagraph` with a fetch to the backend endpoint; the rest of the
-// app does not need to change.
+// userId is taken server-side from the verified Supabase JWT — never
+// passed from the client.
 
-export type IssueType =
-  | 'grammar'
-  | 'spelling'
-  | 'word_order'
-  | 'tense'
-  | 'vocabulary'
-  | 'style'
-  | 'good';
+export type FeedbackType = 'grammar' | 'vocabulary' | 'style' | 'pattern';
+export type Severity = 'high' | 'medium' | 'low' | 'optional';
+export type Confidence = 'high' | 'medium' | 'low';
+export type TaskType =
+  | 'email'
+  | 'stellungnahme'
+  | 'argumentation'
+  | 'zusammenfassung'
+  | 'bericht'
+  | 'motivationsschreiben'
+  | 'freier_text';
+export type ExplanationLanguage = 'English' | 'German' | 'Simple';
 
-export type IssueColor = 'red' | 'orange' | 'yellow' | 'blue' | 'green';
+export interface RuleCard {
+  title: string;
+  rule: string;
+  example: string;
+  miniExerciseHint: string;
+}
 
-export interface WritingIssue {
-  type: IssueType;
-  color: IssueColor;
+export interface FeedbackItem {
+  type: FeedbackType;
+  label: string;
+  category: string;
+  severity: Severity;
+  confidence: Confidence;
   original: string;
-  correction: string;
+  suggestion: string;
+  spanStart: number;
+  spanEnd: number;
+  count?: number;
+  examples?: unknown[];
+  isActualError: boolean;
+  isLevelUpgrade: boolean;
   explanation: string;
+  ruleCard?: RuleCard | null;
+}
+
+export interface ScoreBlock {
+  overall: number | null;
+  grammar: number | null;
+  vocabulary: number | null;
+  structure: number | null;
+  style: number | null;
+  taskFulfillment: number | null;
+}
+
+export interface StructureFeedback {
+  verdict: 'weak' | 'adequate' | 'strong';
+  missing: string[];
+  note: string;
+}
+
+export interface ExamReadiness {
+  wouldPass: boolean;
+  verdict: 'likely' | 'borderline' | 'unlikely';
+  missing: string[];
+  note: string;
+}
+
+export interface InsufficientContext {
+  reason: 'tooShort' | 'tooVague' | 'offTopic';
+  message: string;
+  minWords: number;
 }
 
 export interface WritingAnalysis {
+  profileLevel: string;
+  taskType: TaskType;
+  estimatedLevel: string;
+  score: ScoreBlock;
+  scoreExplanation: string;
   correctedText: string;
   improvedText: string;
-  estimatedLevel: string;
-  issues: WritingIssue[];
-  vocabularySuggestions: WritingIssue[];
-  practiceTips: string[];
+  strengths: string[];
+  feedbackItems: FeedbackItem[];
+  structureFeedback: StructureFeedback | null;
+  examReadiness: ExamReadiness | null;
+  practiceRecommendations: string[];
+  longitudinalNote: string | null;
+  insufficientContext: InsufficientContext | null;
 }
 
 export interface AnalyzeOptions {
   text: string;
-  level: string;
+  profileLevel: string;
+  taskType?: TaskType;
+  explanationLanguage?: ExplanationLanguage;
   signal?: AbortSignal;
 }
 
+function _backendUrl(): string {
+  const w = window as unknown as { BACKEND_URL?: string };
+  return w.BACKEND_URL || '';
+}
+
+function _token(): string {
+  const w = window as unknown as { _sbToken?: string };
+  return w._sbToken || '';
+}
+
 export async function analyzeParagraph(opts: AnalyzeOptions): Promise<WritingAnalysis> {
-  // Simulated latency so the loading state is visible during UI testing.
-  await _wait(900, opts.signal);
-  return _mockAnalysis(opts.text, opts.level);
-}
-
-function _wait(ms: number, signal?: AbortSignal): Promise<void> {
-  return new Promise<void>((resolve, reject) => {
-    if (signal?.aborted) {
-      reject(new DOMException('Aborted', 'AbortError'));
-      return;
-    }
-    const t = window.setTimeout(resolve, ms);
-    signal?.addEventListener('abort', () => {
-      window.clearTimeout(t);
-      reject(new DOMException('Aborted', 'AbortError'));
-    });
+  const res = await fetch(_backendUrl() + '/api/ai/writing-coach', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer ' + _token(),
+    },
+    body: JSON.stringify({
+      text: opts.text,
+      profileLevel: opts.profileLevel,
+      taskType: opts.taskType || 'freier_text',
+      explanationLanguage: opts.explanationLanguage || 'English',
+    }),
+    signal: opts.signal,
   });
-}
-
-function _mockAnalysis(text: string, level: string): WritingAnalysis {
-  const trimmed = text.trim();
-  const isAdvanced = level === 'B2' || level === 'C1' || level === 'C2';
-
-  const issues: WritingIssue[] = [
-    {
-      type: 'grammar',
-      color: 'red',
-      original: 'habe gegangen',
-      correction: 'bin gegangen',
-      explanation: "The verb 'gehen' takes 'sein' in the Perfekt tense.",
-    },
-    {
-      type: 'grammar',
-      color: 'red',
-      original: 'in Schule',
-      correction: 'in die Schule',
-      explanation: 'Movement / direction takes the accusative.',
-    },
-    {
-      type: 'tense',
-      color: 'orange',
-      original: 'ich mache',
-      correction: 'ich habe gemacht',
-      explanation: 'The sentence refers to yesterday, so Perfekt is preferred.',
-    },
-  ];
-
-  const vocab: WritingIssue[] = [
-    {
-      type: 'vocabulary',
-      color: 'yellow',
-      original: 'Hausaufgaben machen',
-      correction: 'Hausaufgaben erledigen',
-      explanation: "'erledigen' sounds more natural and slightly more advanced.",
-    },
-  ];
-
-  const corrected = trimmed
-    ? trimmed
-        .replace(/\bhabe\s+gegangen\b/gi, 'bin gegangen')
-        .replace(/\bin\s+Schule\b/gi, 'in die Schule')
-    : 'Ich bin gestern in die Schule gegangen und habe viele Hausaufgaben gemacht.';
-
-  const improved = isAdvanced
-    ? 'Gestern bin ich zur Schule gegangen und habe anschließend meine Hausaufgaben erledigt.'
-    : 'Gestern bin ich in die Schule gegangen und habe meine Hausaufgaben gemacht.';
-
-  return {
-    correctedText: corrected,
-    improvedText: improved,
-    estimatedLevel: 'A2/B1',
-    issues,
-    vocabularySuggestions: vocab,
-    practiceTips: [
-      'Practice Perfekt with sein and haben.',
-      'Review accusative after movement prepositions.',
-      'Practice word order with time expressions (gestern, heute, danach).',
-    ],
-  };
+  // Surface the cap modal if the user has exhausted this month's allowance.
+  // Import inline to avoid a circular dep with services/ai-usage during boot.
+  try {
+    const { detectAiCapError } = await import('../../services/ai-usage.js');
+    await detectAiCapError(res);
+  } catch { /* no-op */ }
+  if (!res.ok) {
+    let detail = 'HTTP ' + res.status;
+    try {
+      const j = (await res.json()) as { error?: string };
+      if (j.error) detail = j.error;
+    } catch { /* ignore */ }
+    throw new Error(detail);
+  }
+  return (await res.json()) as WritingAnalysis;
 }
