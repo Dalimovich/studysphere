@@ -29,7 +29,8 @@ interface StripeUpdateResponse extends BillingError {
 }
 
 // Coupon configured in Stripe Dashboard: €3.00 off for 3 months.
-const RETENTION_COUPON_ID = 'renewal';
+// The ID is what Stripe matches on; the "name" field is just for display.
+const RETENTION_COUPON_ID = 'retention-25';
 
 export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
   if (event.httpMethod === 'OPTIONS') return handleOptions();
