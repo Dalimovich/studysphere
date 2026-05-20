@@ -152,7 +152,11 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
     });
 
     return jsonResponse(200, { ok: true, plan: 'pro', status: 'active' });
-  } catch {
+  } catch (e: unknown) {
+    // Surface the underlying cause to Netlify function logs so we can
+    // actually debug failures (DB writes, PayPal API, etc.).
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error('[activate-paypal-subscription] failed:', msg, e);
     return fail(500, 'Could not activate subscription');
   }
 };
