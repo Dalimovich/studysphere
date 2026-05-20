@@ -72,14 +72,20 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
       );
       if (listRes.status >= 200 && listRes.status < 300) {
         const items = listRes.body.data || [];
-        const active = items.find(
-          (s) => s.status === 'active' || s.status === 'trialing' || s.status === 'past_due'
+        // Accept any subscription that still has a future billing cycle —
+        // i.e. anything except hard-terminated ones. Stripe returns them
+        // newest-first so the first match is the most relevant.
+        const usable = items.find(
+          (s) => s.status !== 'canceled' && s.status !== 'incomplete_expired'
         );
-        if (active) stripeSubId = active.id;
+        if (usable) stripeSubId = usable.id;
+      } else {
+        return fail(502, 'Stripe lookup failed (' + listRes.status + ')');
       }
     }
     if (!stripeSubId) {
-      return fail(404, 'No active Stripe subscription to discount');
+      return fail(404, 'No active Stripe subscription to discount (customer=' +
+        (sub.stripe_customer_id || 'n/a') + ')');
     }
 
     const params = new URLSearchParams();
