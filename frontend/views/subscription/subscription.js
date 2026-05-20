@@ -130,9 +130,17 @@ var _billingConfigPromise = null;
 
 function _loadBillingConfig() {
   if (_billingConfigPromise) return _billingConfigPromise;
-  _billingConfigPromise = window._subService
-    ? window._subService.loadBillingConfig()
-    : Promise.reject(new Error('Subscription service not ready'));
+  if (!window._subService) {
+    // Don't cache the failure — _subService becomes available shortly
+    // after main.js finishes loading. Caching a rejection would make
+    // every subsequent call (e.g. on hashchange) error forever.
+    return Promise.reject(new Error('Subscription service not ready'));
+  }
+  _billingConfigPromise = window._subService.loadBillingConfig().catch(function (err) {
+    // Same idea: clear the cache on failure so the next call retries.
+    _billingConfigPromise = null;
+    throw err;
+  });
   return _billingConfigPromise;
 }
 
