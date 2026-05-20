@@ -6,53 +6,88 @@ function _subT(key, fallback) {
  * cancellation. Resolves to true if the user accepts the discount,
  * false if they want to continue cancelling. Matches the rest of the
  * app's modal chrome and adapts to light/dark mode via body.night. */
+/** Two-step cancel flow:
+ *   Step 1: confirmation ("Are you sure you want to cancel?")
+ *   Step 2 (if user confirms): retention discount offer
+ * Resolves with one of:
+ *   'accept'   → user took the discount → stay on Pro, apply coupon
+ *   'cancel'   → user declined the discount → continue cancellation flow
+ *   'dismiss'  → user backed out at step 1 → do nothing
+ */
 function _showRetentionOffer() {
   return new Promise(function (resolve) {
     var overlay = document.createElement('div');
     overlay.className = 'sub-retention-overlay';
     overlay.innerHTML =
       '<div class="sub-retention-modal" role="dialog" aria-modal="true">' +
-        '<div class="sub-retention-emoji" aria-hidden="true">&#x1F389;</div>' +
-        '<h2 class="sub-retention-title">' +
-          _subT('sub_retention_title', 'Wait — one-time offer just for you') +
-        '</h2>' +
-        '<p class="sub-retention-sub">' +
-          _subT('sub_retention_sub', 'Stay with Minallo Pro and lock in a permanent discount.') +
-        '</p>' +
-        '<div class="sub-retention-price-row">' +
-          '<span class="sub-retention-price-old">&euro;11.99</span>' +
-          '<svg class="sub-retention-arrow" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></svg>' +
-          '<span class="sub-retention-price-new">&euro;8.99</span>' +
-          '<span class="sub-retention-per">/' +
-            _subT('sub_retention_per', 'month') +
-          '</span>' +
+        '<div class="sub-retention-step" data-step="confirm">' +
+          '<div class="sub-retention-emoji" aria-hidden="true">&#x1F914;</div>' +
+          '<h2 class="sub-retention-title">' +
+            _subT('sub_confirm_cancel_title', 'Are you sure you want to cancel?') +
+          '</h2>' +
+          '<p class="sub-retention-sub">' +
+            _subT('sub_confirm_cancel_sub', 'You will lose access to Pro features at the end of your billing period.') +
+          '</p>' +
+          '<div class="sub-retention-actions">' +
+            '<button type="button" class="sub-retention-decline" data-action="keep">' +
+              _subT('sub_confirm_keep', 'Keep my subscription') +
+            '</button>' +
+            '<button type="button" class="sub-retention-danger" data-action="continue">' +
+              _subT('sub_confirm_continue', 'Yes, cancel') +
+            '</button>' +
+          '</div>' +
         '</div>' +
-        '<p class="sub-retention-note">' +
-          _subT('sub_retention_note', 'This offer is only available right now. After this, the price returns to €11.99/month.') +
-        '</p>' +
-        '<div class="sub-retention-actions">' +
-          '<button type="button" class="sub-retention-decline" data-action="decline">' +
-            _subT('sub_retention_decline', 'No thanks, cancel anyway') +
-          '</button>' +
-          '<button type="button" class="sub-retention-accept" data-action="accept">' +
-            _subT('sub_retention_accept', 'Keep Pro for €8.99/month') +
-          '</button>' +
+        '<div class="sub-retention-step" data-step="offer" style="display:none">' +
+          '<div class="sub-retention-emoji" aria-hidden="true">&#x1F389;</div>' +
+          '<h2 class="sub-retention-title">' +
+            _subT('sub_retention_title', 'Wait — one-time offer just for you') +
+          '</h2>' +
+          '<p class="sub-retention-sub">' +
+            _subT('sub_retention_sub', 'Before you go, here is a special discount.') +
+          '</p>' +
+          '<div class="sub-retention-price-row">' +
+            '<span class="sub-retention-price-old">&euro;11.99</span>' +
+            '<svg class="sub-retention-arrow" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></svg>' +
+            '<span class="sub-retention-price-new">&euro;8.99</span>' +
+            '<span class="sub-retention-per">/' +
+              _subT('sub_retention_per', 'month') +
+            '</span>' +
+          '</div>' +
+          '<p class="sub-retention-note">' +
+            _subT('sub_retention_note', '€8.99 for your next 3 months, then back to €11.99. This offer is only shown once.') +
+          '</p>' +
+          '<div class="sub-retention-actions">' +
+            '<button type="button" class="sub-retention-decline" data-action="decline">' +
+              _subT('sub_retention_decline', 'No thanks, cancel anyway') +
+            '</button>' +
+            '<button type="button" class="sub-retention-accept" data-action="accept">' +
+              _subT('sub_retention_accept', 'Keep Pro for €8.99/month') +
+            '</button>' +
+          '</div>' +
         '</div>' +
       '</div>';
     document.body.appendChild(overlay);
 
-    function finish(accepted) {
+    function finish(result) {
       overlay.classList.add('is-closing');
       setTimeout(function () {
         if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
-        resolve(accepted);
+        resolve(result);
       }, 180);
     }
 
-    overlay.querySelector('.sub-retention-accept').addEventListener('click', function () { finish(true); });
-    overlay.querySelector('.sub-retention-decline').addEventListener('click', function () { finish(false); });
+    function showStep(name) {
+      overlay.querySelectorAll('.sub-retention-step').forEach(function (el) {
+        el.style.display = el.getAttribute('data-step') === name ? '' : 'none';
+      });
+    }
+
+    overlay.querySelector('[data-action="keep"]').addEventListener('click', function () { finish('dismiss'); });
+    overlay.querySelector('[data-action="continue"]').addEventListener('click', function () { showStep('offer'); });
+    overlay.querySelector('[data-action="accept"]').addEventListener('click', function () { finish('accept'); });
+    overlay.querySelector('[data-action="decline"]').addEventListener('click', function () { finish('cancel'); });
     overlay.addEventListener('click', function (e) {
-      if (e.target === overlay) finish(false);
+      if (e.target === overlay) finish('dismiss');
     });
   });
 }
@@ -469,34 +504,36 @@ function _bindSubscriptionControls() {
         var _retentionKey = 'ms_retention_offer_seen_' + (_currentUser.id || 'anon');
         var _alreadyOffered = false;
         try { _alreadyOffered = localStorage.getItem(_retentionKey) === '1'; } catch (_e) {}
-        if (!_alreadyOffered) {
-          var _accepted = await _showRetentionOffer();
-          if (_accepted) {
-            try {
-              await window._subService.applyRetentionDiscount();
-              try { localStorage.setItem(_retentionKey, '1'); } catch (_e) {}
-              applySubscription({
-                plan: 'pro',
-                status: 'active',
-                cancel_at_period_end: false,
-                stripe_customer_id: _stripeCustomerId,
-                paypal_subscription_id: _paypalSubscriptionId,
-                had_trial: _hadTrial
-              });
-              showToast(
-                _subT('sub_discount_applied_title', 'Discount applied!'),
-                _subT('sub_discount_applied_body', '€8.99/month for your next 3 months, then €11.99.')
-              );
-            } catch (e) {
-              showToast(
-                _subT('sub_error', 'Error'),
-                e.message || _subT('sub_discount_failed', 'Could not apply discount.')
-              );
-            }
-            return;
+        var _result = _alreadyOffered ? 'cancel' : await _showRetentionOffer();
+        // Result: 'dismiss' = back out at confirmation, 'accept' = take discount,
+        // 'cancel' = proceed to portal where they can fully cancel.
+        if (_result === 'dismiss') return;
+        if (_result === 'accept') {
+          try {
+            await window._subService.applyRetentionDiscount();
+            try { localStorage.setItem(_retentionKey, '1'); } catch (_e) {}
+            applySubscription({
+              plan: 'pro',
+              status: 'active',
+              cancel_at_period_end: false,
+              stripe_customer_id: _stripeCustomerId,
+              paypal_subscription_id: _paypalSubscriptionId,
+              had_trial: _hadTrial
+            });
+            showToast(
+              _subT('sub_discount_applied_title', 'Discount applied!'),
+              _subT('sub_discount_applied_body', '€8.99/month for your next 3 months, then €11.99.')
+            );
+          } catch (e) {
+            showToast(
+              _subT('sub_error', 'Error'),
+              e.message || _subT('sub_discount_failed', 'Could not apply discount.')
+            );
           }
-          try { localStorage.setItem(_retentionKey, '1'); } catch (_e) {}
+          return;
         }
+        // 'cancel' → fall through to the Stripe portal so the user can cancel
+        try { localStorage.setItem(_retentionKey, '1'); } catch (_e) {}
       }
       this.textContent = _subT('sub_loading', 'Loading...');
       this.disabled = true;
@@ -656,46 +693,40 @@ function _bindSubscriptionControls() {
     cancelBtn.dataset.bound = '1';
     cancelBtn.addEventListener('click', async function () {
       if (!_currentUser) return;
-      if (!confirm(_subT('sub_cancel_confirm', 'Cancel this subscription now?'))) return;
-      // One-time "stay for discount" offer — only shown the FIRST time
-      // the user confirms cancellation. Flag is keyed per-user so a fresh
-      // login doesn't bypass it.
+      // Two-step modal: confirm cancel → then offer the discount (once per
+      // user). Replaces the old native confirm() so the whole flow is in
+      // a styled popup that respects light/dark mode.
       var _retentionKey = 'ms_retention_offer_seen_' + (_currentUser.id || 'anon');
       var _alreadyOffered = false;
       try { _alreadyOffered = localStorage.getItem(_retentionKey) === '1'; } catch (_e) {}
-      if (!_alreadyOffered) {
-        var _accepted = await _showRetentionOffer();
-        if (_accepted) {
-          // Apply the €3.00-off-for-3-months coupon ("renewal") server-side.
-          // The server enforces single-use via subscriptions.retention_offer_used
-          // so the localStorage flag is just a fast client-side gate.
-          try {
-            await window._subService.applyRetentionDiscount();
-            try { localStorage.setItem(_retentionKey, '1'); } catch (_e) {}
-            // Sub stays active — clear any scheduled-cancel flag locally too.
-            applySubscription({
-              plan: 'pro',
-              status: 'active',
-              cancel_at_period_end: false,
-              stripe_customer_id: _stripeCustomerId,
-              paypal_subscription_id: _paypalSubscriptionId,
-              had_trial: _hadTrial
-            });
-            showToast(
-              _subT('sub_discount_applied_title', 'Discount applied!'),
-              _subT('sub_discount_applied_body', '€8.99/month for your next 3 months, then €11.99.')
-            );
-          } catch (e) {
-            showToast(
-              _subT('sub_error', 'Error'),
-              e.message || _subT('sub_discount_failed', 'Could not apply discount.')
-            );
-          }
-          return;
+      var _result = await _showRetentionOffer();
+      if (_result === 'dismiss') return;
+      if (_result === 'accept' && !_alreadyOffered) {
+        try {
+          await window._subService.applyRetentionDiscount();
+          try { localStorage.setItem(_retentionKey, '1'); } catch (_e) {}
+          applySubscription({
+            plan: 'pro',
+            status: 'active',
+            cancel_at_period_end: false,
+            stripe_customer_id: _stripeCustomerId,
+            paypal_subscription_id: _paypalSubscriptionId,
+            had_trial: _hadTrial
+          });
+          showToast(
+            _subT('sub_discount_applied_title', 'Discount applied!'),
+            _subT('sub_discount_applied_body', '€8.99/month for your next 3 months, then €11.99.')
+          );
+        } catch (e) {
+          showToast(
+            _subT('sub_error', 'Error'),
+            e.message || _subT('sub_discount_failed', 'Could not apply discount.')
+          );
         }
-        // User declined the offer — burn the flag and fall through to cancel.
-        try { localStorage.setItem(_retentionKey, '1'); } catch (_e) {}
+        return;
       }
+      // 'cancel' (or 'accept' after already used) → proceed to cancellation
+      try { localStorage.setItem(_retentionKey, '1'); } catch (_e) {}
       this.textContent = _subT('sub_cancelling', 'Cancelling...');
       this.disabled = true;
       try {

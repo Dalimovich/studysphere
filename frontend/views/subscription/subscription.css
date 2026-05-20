@@ -459,3 +459,23 @@ body:not(.night) .sub-retention-decline:hover {
   background: rgba(37, 99, 235, 0.06);
   color: #0f172a;
 }
+
+/* "Yes, cancel" danger button on step 1 of the retention popup. */
+.sub-retention-danger {
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  background: rgba(239, 68, 68, 0.14);
+  color: #fca5a5;
+}
+.sub-retention-danger:hover {
+  background: rgba(239, 68, 68, 0.22);
+  color: #fee2e2;
+}
+body:not(.night) .sub-retention-danger {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #dc2626;
+}
+body:not(.night) .sub-retention-danger:hover {
+  background: rgba(239, 68, 68, 0.14);
+  color: #b91c1c;
+}
