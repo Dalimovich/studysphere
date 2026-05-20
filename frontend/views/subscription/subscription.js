@@ -1,7 +1,7 @@
+function _subT(key, fallback) {
+  return (window._t && window._t(key)) || fallback;
+}
 (function () {
-  function _subT(key, fallback) {
-    return (window._t && window._t(key)) || fallback;
-  }
   var feature = {
     sectionId: 'psec-subscription',
     html: 'views/subscription/subscription.html',

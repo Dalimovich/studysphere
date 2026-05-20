@@ -219,22 +219,28 @@ export function initMusicServices(options: InitMusicServicesOptions): void {
     const btn = document.getElementById('spotifyConnectBtn') as HTMLButtonElement | null;
     const player = document.getElementById('spotifyPlayer');
     const configured = spIsConfigured();
+    const _t = (window as unknown as { _t?: (k: string) => string })._t;
+    const tr = (key: string, fallback: string): string => (_t && _t(key)) || fallback;
     if (statusEl) {
       if (!configured && !connected) {
-        statusEl.textContent = 'Not configured';
+        statusEl.textContent = tr('settings_spotify_not_configured', 'Not configured');
         statusEl.className = 'music-service-status';
       } else {
-        statusEl.textContent = connected ? 'Connected ✓' : 'Not connected';
+        statusEl.textContent = connected
+          ? tr('settings_spotify_connected', 'Connected ✓')
+          : tr('settings_spotify_not_connected', 'Not connected');
         statusEl.className = 'music-service-status' + (connected ? ' connected' : '');
       }
     }
     if (btn) {
       if (!configured && !connected) {
-        btn.textContent = 'Unavailable';
+        btn.textContent = tr('settings_spotify_unavailable', 'Unavailable');
         btn.className = 'music-connect-btn music-connect-btn-disabled';
         btn.disabled = true;
       } else {
-        btn.textContent = connected ? 'Reconnect' : 'Connect';
+        btn.textContent = connected
+          ? tr('settings_spotify_reconnect', 'Reconnect')
+          : tr('settings_spotify_connect', 'Connect');
         btn.className = 'music-connect-btn' + (connected ? ' connected' : '');
         btn.disabled = false;
       }
