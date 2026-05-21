@@ -34,13 +34,82 @@ from typing import Iterable
 MIN_GOOD_CHARS = 120         # below this we suspect weak extraction
 MIN_GOOD_LETTERS = 60        # letters (not digits/symbols) needed for "good"
 MATH_OPERATOR_RATIO = 0.18   # fraction of math symbols above which a line is math
+MATH_OPERATOR_RATIO_RELAXED = 0.12  # relaxed bar for lines that contain `=`
 
 # Math symbols we recognise as evidence a line is a formula.
 _MATH_CHARS = set("=<>±≤≥≠≈≡∑∫∂√πΣΔθωλμνβγα∇·×÷→←↔⇒⇐⇔∈∉⊂⊃∪∩∀∃∞^/*+\\")
 
+# Greek letters used as variable names in engineering / physics formulas.
+# Used both by the math-line classifier (line beginning with τ/σ/π/… is a
+# strong signal even at low operator density) and the assignment-pattern
+# sanity gate (RHS containing a Greek letter is allowed even without digits).
+_GREEK_VARS = "τσπμθΔΣωαβγδεζηκλνξορφχψτ°"
+
+# Quality-grading thresholds for `_grade_extraction`.
+_MIN_AVG_WORD_LEN = 3.0      # avg word shorter than this → fragmented OCR
+_MAX_AVG_WORD_LEN = 18.0     # avg word longer than this → no spaces, OCR garble
+# Why 0.50 (not 0.35): formula-heavy engineering pages legitimately contain
+# many single-char tokens (`z`, `F`, `d`, `J`, `A_S` → 'A' + 'S', …). The
+# tighter 0.35 bar demoted real Aufgabe pages to ``weak``. 0.50 still catches
+# true OCR fragmentation (``Sch w eiss n a h t`` scores 0.54+) without
+# punishing formula sheets.
+_MAX_BROKEN_WORD_RATIO = 0.50
+_MAX_PUNCT_DENSITY = 0.10    # punctuation chars / total chars
+
+# Numbered heading: `1`, `1.2`, `4.3.2`, etc., followed by text.
 _NUMBERED_HEADING = re.compile(r"^\s*(\d+(?:\.\d+){0,3})\s+(.{2,80})$")
+# ALL-CAPS short heading: "INTRODUCTION", "BACKGROUND", "TABLE OF CONTENTS".
 _SHORT_CAPS_HEADING = re.compile(r"^[A-Z][A-Z0-9 \-–&,/]{2,60}$")
-_TITLE_CASE_HEADING = re.compile(r"^[A-Z][\w][\w \-–&,/]{2,60}$")
+# Title-case heading: "Newton's Second Law", "Die Schraubenverbindung".
+# Allow apostrophes inside words and umlaut letters.
+_TITLE_CASE_HEADING = re.compile(r"^[A-ZÄÖÜ][\wÄÖÜäöüß'’][\wÄÖÜäöüß' \-–&,/’]{2,60}$")
+
+# Assignment line: `identifier = expression [unit]`. Catches engineering
+# formulas the symbol-ratio classifier misses because the line is mostly
+# letters (e.g. `Setzbetrag fz,ges = 20 μm = 0.02 mm`).
+_ASSIGNMENT_LINE_RE = re.compile(
+    r"^\s*"
+    # Optional German "label:" prefix — "Anzahl der Schrauben: z = 30",
+    # "Maximaler Überdruck im Behälter: p_max = 9 N/mm²". The label is a
+    # short noun phrase ending in `:`.
+    r"(?:[A-Za-zÄÖÜäöüß][A-Za-zÄÖÜäöüß\- ]{0,40}:\s*)?"
+    # 0-3 optional leading words (e.g. "Setzbetrag fz,ges = …").
+    r"(?:[A-Za-zÄÖÜäöüß][A-Za-zÄÖÜäöüß\-]+\s+){0,3}"
+    # Identifier head.
+    r"[A-Za-zÄÖÜäöüß" + _GREEK_VARS + r"]"
+    r"[A-Za-zÄÖÜäöüß0-9_,.\{\}\\\-" + _GREEK_VARS + r"]{0,30}"
+    r"\s*(?:=|≈|≃|≤|≥|:=)\s*"
+    # RHS: digits, letters (incl. umlauts/Greek), math operators, unit
+    # marks. Includes super/subscript digits (mm², kg₂) that show up in
+    # engineering text but aren't word/digit chars.
+    r"[-+0-9A-Za-zÄÖÜäöüß·×÷/\^\(\)\[\]\{\}\\,. \t²³⁰¹⁴⁵⁶⁷⁸⁹₀₁₂₃₄₅₆₇₈₉" + _GREEK_VARS + r"=]+"
+    r"\s*$"
+)
+# RHS must have at least one digit OR a Greek letter OR a math operator,
+# otherwise `Funktion = Quatsch` would match. Applied AFTER _ASSIGNMENT_LINE_RE.
+_ASSIGNMENT_RHS_GATE_RE = re.compile(
+    r"(?:=|≈|≃|≤|≥|:=)"
+    r"[^=≈≃≤≥]*"
+    r"(?:[0-9]|[" + _GREEK_VARS + r"]|[·×÷√π∑∫±])"
+)
+# A line starting with a Greek-letter variable followed by `=` within ~15
+# chars is a formula even at low operator ratio: "τ_Schw = F / A".
+_GREEK_LED_FORMULA_RE = re.compile(r"^\s*[" + _GREEK_VARS + r"][^\n=]{0,15}=")
+
+# German technical heading keyword set. Used by `_looks_like_heading`: a
+# short line containing one of these as a standalone word counts as a
+# heading even if it doesn't pass title-case / caps / numbered tests
+# (German nouns often start title-case but function words like "die"/"der"
+# don't, dropping the line below the 60% capitalised threshold).
+_DE_HEADING_KEYWORDS = frozenset({
+    "berechnung", "nachweis", "beanspruchung", "spannung", "kraft",
+    "moment", "lösung", "loesung", "aufgabe", "übung", "uebung",
+    "beispiel", "formel", "definition", "satz", "verfahren",
+    "schweißnaht", "schweissnaht", "schraubenverbindung", "festigkeit",
+    "verformung", "biegung", "torsion", "schub", "zug", "druck", "dehnung",
+    "gegeben", "gesucht", "lösungsansatz", "musterlösung", "musterloesung",
+})
+_WORD_RE = re.compile(r"[A-Za-zÄÖÜäöüß][A-Za-zÄÖÜäöüß\-]+", re.UNICODE)
 
 _BULLET_PREFIX = re.compile(r"^\s*(?:[-*•–]|\([a-zA-Z0-9]{1,3}\))\s+")
 
@@ -141,6 +210,10 @@ def _grade_extraction(text: str) -> str:
     Heuristic only — wrong on rare adversarial inputs (e.g. a page that is
     intentionally a single short title) but correct in aggregate, which is
     what the retrieval ranker cares about.
+
+    Phase 2 tightening: pages with the right character count but mangled
+    word shapes (broken pdfminer wraps, OCR garble) are demoted to ``weak``
+    so retrieval reranking penalises them via the page-quality boost.
     """
     if len(text) < 20:
         return "failed"
@@ -154,6 +227,41 @@ def _grade_extraction(text: str) -> str:
     # Almost-no-spaces text is usually a wall of OCR garbage.
     spaces = text.count(" ")
     if spaces < letters / 10:
+        return "weak"
+
+    # ── Phase 2 stricter checks ────────────────────────────────────────
+    # Tokenise INCLUDING single-letter fragments — those are the strongest
+    # OCR-fragmentation signal and would be filtered out by the multi-char
+    # `_WORD_RE`.
+    tokens = re.findall(r"[A-Za-zÄÖÜäöüß]+", text)
+    if not tokens:
+        return "weak"
+    token_count = len(tokens)
+
+    # 1. Avg token length. <3 → fragmented (pdfminer broke words at column
+    #    wraps, "Sch w eiss n a h t"); >18 → no real word boundaries.
+    avg_token_len = letters / token_count
+    if avg_token_len < _MIN_AVG_WORD_LEN or avg_token_len > _MAX_AVG_WORD_LEN:
+        return "weak"
+
+    # 2. Broken-token ratio. Single chars (other than common pronouns /
+    #    articles), or 4+-char tokens with no vowel, are OCR artifacts.
+    broken = 0
+    vowels = set("aeiouäöüAEIOUÄÖÜ")
+    keep_single = {"a", "i", "I", "A", "o", "O"}
+    for w in tokens:
+        if len(w) == 1 and w not in keep_single:
+            broken += 1
+            continue
+        if len(w) >= 4 and not (set(w) & vowels):
+            broken += 1
+    if broken / token_count > _MAX_BROKEN_WORD_RATIO:
+        return "weak"
+
+    # 3. Punctuation density — runaway punctuation (>10% of chars) usually
+    #    means the page is a TOC dotted-leader line or junk symbol stream.
+    punct = sum(1 for ch in text if ch in ".,;:!?")
+    if punct / max(len(text), 1) > _MAX_PUNCT_DENSITY:
         return "weak"
 
     return "good"
@@ -219,45 +327,138 @@ def _render_single_line(line: str) -> str:
 
 
 def _looks_like_heading(line: str) -> bool:
+    """Multi-signal heading detector.
+
+    Basic shape filter (length 3-80, ≤10 words, no trailing `,`/`;`) AND
+    at least one of:
+
+    * numbered prefix (``1.2 Force``)
+    * ALL-CAPS short line
+    * title-case ≥60% capitalised, ≤8 words (period allowed when ≤6 words —
+      "Biegung und Torsion." is a slide heading, not a sentence)
+    * colon-terminated ≤6-word line (``Spannungsnachweis:``, ``Lösung:``)
+    * contains a German technical heading keyword as a standalone word
+      (``Die Schweißnaht-Berechnung``)
+    """
     line = line.strip()
     if len(line) < 3 or len(line) > 80:
         return False
-    if line.endswith((".", ":", ",", ";", "?", "!")):
+    if line.endswith((",", ";")):
         return False
+    words = [w for w in line.split() if w]
+    if not words or len(words) > 10:
+        return False
+
+    # Internal colons / question / exclamation marks are sentence patterns
+    # — disqualify before the per-signal checks (covers "Spannung: das ist
+    # die Kraft pro Fläche").
+    if line.endswith(("?", "!")):
+        return False
+    inner = line[:-1] if line.endswith((":", ".")) else line
+    if ":" in inner or "?" in inner or "!" in inner:
+        return False
+
+    # Signal 1: numbered prefix.
     if _NUMBERED_HEADING.match(line):
         return True
+    # Signal 2: short ALL-CAPS.
     if _SHORT_CAPS_HEADING.match(line):
         return True
-    if _TITLE_CASE_HEADING.match(line):
-        words = [w for w in line.split() if w]
+    # Signal 3: title-case. Allow a trailing period when the line is short
+    # enough to obviously be a heading rather than a sentence.
+    title_candidate = line.rstrip(".").rstrip()
+    if _TITLE_CASE_HEADING.match(title_candidate):
         caps = sum(1 for w in words if w[:1].isupper())
-        return len(words) <= 8 and caps / max(len(words), 1) >= 0.6
+        cap_ratio = caps / max(len(words), 1)
+        if line.endswith("."):
+            # Period-terminated headings must be tighter to avoid catching
+            # short prose ("Es gilt das Hookesche Gesetz.", "Berechnen Sie
+            # die Spannung nach Hooke."). 4 words covers the realistic
+            # heading shape ("Biegung und Torsion.", "Lineare Elastizität.")
+            # without grabbing 5-6-word sentences.
+            if len(words) <= 4 and cap_ratio >= 0.6:
+                return True
+        elif len(words) <= 8 and cap_ratio >= 0.6:
+            return True
+    # Signal 4: colon-terminated short line.
+    if line.endswith(":") and len(words) <= 6:
+        return True
+    # Signal 5: German technical heading keyword. Short line, no sentence
+    # punctuation other than a trailing colon/period, contains a known
+    # heading word.
+    if len(words) <= 6 and not line.endswith((".", "?", "!")):
+        tokens = {w.lower().rstrip(":") for w in _WORD_RE.findall(line)}
+        # Also strip German compound suffix matches: "Schweißnaht-Berechnung"
+        # → tokens already split on `-` by _WORD_RE.
+        if tokens & _DE_HEADING_KEYWORDS:
+            return True
     return False
 
 
 def _format_heading(line: str) -> str:
     """Promote a heading line to an ATX heading at the right depth."""
+    line = line.strip()
     m = _NUMBERED_HEADING.match(line)
     if m:
         depth = min(m.group(1).count(".") + 2, 6)  # "1" → ##, "1.2" → ###, capped at ######
-        return "#" * depth + " " + line.strip()
-    return "## " + line.strip()
+        return "#" * depth + " " + line
+    # Strip a single trailing `:` so headings render as `## Lösung`, not
+    # `## Lösung:`. Trailing periods are kept — they're part of the heading
+    # text (`Biegung und Torsion.`).
+    if line.endswith(":"):
+        line = line[:-1].rstrip()
+    return "## " + line
 
 
 # ── Math detection ───────────────────────────────────────────────────────────
 
 
 def _looks_like_math(line: str) -> bool:
+    """True when a line should be wrapped as a `$$ ... $$` display-math block.
+
+    Multi-path classifier — any one of the following is sufficient:
+
+    1. Operator ratio ≥ 18% (symbol-dense math: ``A = π · d²/4``).
+    2. Operator ratio ≥ 12% AND line contains ``=`` (engineering assignment
+       with units: ``τ_Schw = F / A``).
+    3. Assignment pattern with a digit / Greek letter / math symbol on the
+       RHS (``Setzbetrag fz,ges = 20 μm = 0.02 mm`` — only 9% operators but
+       clearly a formula).
+    4. Greek-led formula (``τ = F/A``) — starts with τ/σ/π/… and has ``=``
+       within ~15 chars.
+
+    The pre-existing 18%-ratio rule is the fallback; the other three paths
+    are the Phase 2 additions to catch German engineering formulas the
+    symbol-ratio classifier was missing.
+    """
     s = line.strip()
     if len(s) < 2:
         return False
-    # Quick reject: lines that are clearly sentences shouldn't be math.
-    if s.endswith((".", "?", "!")) and " " in s and not any(
-        c in s for c in "=∑∫∂√≤≥≠≈≡"
+
+    has_eq = any(c in s for c in "=≈≃≤≥")
+    # Quick reject: sentences without ANY equation operator are never math.
+    if s.endswith((".", "?", "!")) and " " in s and not has_eq and not any(
+        c in s for c in "∑∫∂√≠≡"
     ):
         return False
+
     math_chars = sum(1 for ch in s if ch in _MATH_CHARS)
-    if math_chars == 0:
-        return False
     non_space = max(sum(1 for ch in s if not ch.isspace()), 1)
-    return math_chars / non_space >= MATH_OPERATOR_RATIO
+    ratio = math_chars / non_space
+
+    # Path 1: original symbol-density rule.
+    if ratio >= MATH_OPERATOR_RATIO:
+        return True
+    # Path 2: relaxed bar for assignment-like lines.
+    if has_eq and ratio >= MATH_OPERATOR_RATIO_RELAXED:
+        return True
+    # Path 3: assignment pattern with a non-prose RHS.
+    if (
+        _ASSIGNMENT_LINE_RE.match(s)
+        and _ASSIGNMENT_RHS_GATE_RE.search(s)
+    ):
+        return True
+    # Path 4: line starting with a Greek variable followed by `=`.
+    if _GREEK_LED_FORMULA_RE.match(s):
+        return True
+    return False

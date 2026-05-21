@@ -11,6 +11,9 @@ import pytest
 
 from app.services.markdown_indexing import (
     PageMarkdown,
+    _grade_extraction,
+    _looks_like_heading,
+    _looks_like_math,
     assemble_document_markdown,
     page_to_markdown,
     wrap_chunk_markdown,
@@ -218,3 +221,97 @@ def test_wrap_chunk_accepts_all_known_types(chunk_type):
         chunk_type=chunk_type,
     )
     assert f"<!-- chunk_type: {chunk_type} -->" in out
+
+
+# ── Phase 2 — math-line classifier (assignment-pattern path) ────────────────
+
+
+@pytest.mark.parametrize("line", [
+    "Setzbetrag fz,ges = 20 μm = 0.02 mm",
+    "τ_Schw = F / A",
+    "A = π · d · a",
+    "Umfang = π × 35 mm",
+    "F = 5.000 N",
+    "R_e = 355 N/mm²",
+    "J_S = 1 / (A_S · E_S + A_P · E_P)",
+    "d_3 = 20.32 mm",
+    "z = 30",
+    "Wirksame Schweißnahtdicke a = 5 mm",
+])
+def test_math_classifier_catches_engineering_formulas(line: str) -> None:
+    assert _looks_like_math(line), f"expected math: {line!r}"
+
+
+@pytest.mark.parametrize("line", [
+    "Die Schubspannung berechnet sich nach Hooke.",
+    "Funktion = Quatsch",                       # no numeric/Greek/operator RHS
+    "Section 4.3.2",                            # no `=`
+    "Vergleich von Methoden und Resultaten",    # no `=`
+    "Hooke entdeckte das Gesetz im Jahre 1660.",  # sentence with digit
+])
+def test_math_classifier_rejects_prose(line: str) -> None:
+    assert not _looks_like_math(line), f"prose treated as math: {line!r}"
+
+
+# ── Phase 2 — heading classifier (colon + DE keywords + period-tightened) ──
+
+
+@pytest.mark.parametrize("line", [
+    "4.3.2 Zulässige Spannung",
+    "Schweißnaht-Berechnung",
+    "Spannungsnachweis:",
+    "Biegung und Torsion.",
+    "Lösung:",
+    "Gegeben:",
+    "Die Schraubenverbindung",
+    "INTRODUCTION",
+    "Newton's Second Law",
+])
+def test_heading_classifier_catches_german_lecture_headings(line: str) -> None:
+    assert _looks_like_heading(line), f"expected heading: {line!r}"
+
+
+@pytest.mark.parametrize("line", [
+    "Die Schubspannung in der Schweißnaht beträgt 9,09 N/mm².",
+    "Zunächst berechnen wir die Querschnittsfläche.",
+    "Berechnen Sie die Spannung nach Hooke.",
+    "wobei A die Fläche der Schweißnaht ist",
+    "Es gilt das Hookesche Gesetz.",
+])
+def test_heading_classifier_rejects_prose(line: str) -> None:
+    assert not _looks_like_heading(line), f"prose treated as heading: {line!r}"
+
+
+def test_heading_strips_trailing_colon_in_formatted_output() -> None:
+    result = page_to_markdown("Lösung:\n\nFolgendes ist zu berechnen.", page_number=1)
+    assert "## Lösung" in result.markdown
+    assert "## Lösung:" not in result.markdown
+
+
+# ── Phase 2 — stricter page-quality grading ────────────────────────────────
+
+
+def test_fragmented_pdfminer_wrap_is_demoted_to_weak() -> None:
+    # Avg word length collapses well below 3 when pdfminer breaks every
+    # word at a column wrap — the grader must catch it.
+    fragmented = ("Sch w eiss n a h t b e rec h nung ist " * 6).strip()
+    assert _grade_extraction(fragmented) == "weak"
+
+
+def test_runaway_punctuation_is_demoted_to_weak() -> None:
+    # TOC dotted-leader lines and similar punctuation-heavy noise — looks
+    # passable on chars/letters but is useless for retrieval.
+    toc = "Einleitung ............ 1 .... Kapitel 2 .......... 14 .... Kapitel 3 .......... 25 .... Kapitel 4 ......... 33"
+    assert _grade_extraction(toc) == "weak"
+
+
+def test_normal_german_paragraph_still_grades_good() -> None:
+    # Regression guard: real lecture prose must remain "good" after the
+    # tightened checks.
+    text = (
+        "Die Schubspannung in einer Schweißnaht ergibt sich aus der "
+        "wirkenden Kraft geteilt durch die wirksame Querschnittsfläche. "
+        "Diese Beziehung gilt nur unter idealisierten Bedingungen, in "
+        "denen das Material homogen und der Querschnitt konstant ist."
+    )
+    assert _grade_extraction(text) == "good"
