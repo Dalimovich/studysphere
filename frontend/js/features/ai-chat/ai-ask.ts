@@ -327,13 +327,11 @@ export function initAskAI(
         }
 
         const _courseId = window.activeCourseId || window.currentCourseId || '';
-        let _hasRag = false;
         let _activeDocId = (window as unknown as { activeRagDocumentId?: string | null }).activeRagDocumentId || null;
         if (_courseId) {
           try {
             const _docs: CourseDocument[] = await listCourseDocuments(_courseId);
             const _readyDocs = _docs.filter((d) => d.processing_status === 'ready');
-            _hasRag = _readyDocs.length > 0;
             // If the user is reading a specific file, resolve its UUID so we
             // can target it directly via documentIds — otherwise /ask-stream
             // searches the whole course and may miss the open doc.
@@ -343,7 +341,7 @@ export function initAskAI(
               );
               if (_open?.id) _activeDocId = _open.id;
             }
-          } catch { _hasRag = false; }
+          } catch { /* keep _activeDocId as-is; backend will search the whole course */ }
         }
 
         // Extract a focused excerpt from the open PDF around the mentioned exercise/topic.
@@ -433,12 +431,12 @@ export function initAskAI(
         }
 
         // RAG-first routing: any question with a course_id goes through
-        // /ask-stream (which runs the Phase-1 verification + math-template
-        // gating + confidence-from-verification on the Python backend).
-        // Falling back to free-form Claude (sendAiRequest) when _hasRag is
-        // false meant questions about a course that had ZERO ready docs —
-        // or where listCourseDocuments() failed transiently — bypassed all
-        // grounding and let Claude invent textbook formulas. Python /ask-stream
+        // /ask-stream so the Phase-1 verification + math-template gating +
+        // confidence-from-verification on the Python backend always apply.
+        // The previous gate (`if (_hasRag)`) let questions fall through to
+        // free-form Claude whenever the course had zero ready docs or
+        // listCourseDocuments() failed transiently — bypassing all grounding
+        // and letting the model invent textbook formulas. /ask-stream
         // handles the "no chunks" case correctly (returns the weak prompt
         // with low confidence) so it's safe to always prefer it.
         if (_courseId) {
