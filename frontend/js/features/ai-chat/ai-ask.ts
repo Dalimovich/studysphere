@@ -432,7 +432,16 @@ export function initAskAI(
           }
         }
 
-        if (_hasRag) {
+        // RAG-first routing: any question with a course_id goes through
+        // /ask-stream (which runs the Phase-1 verification + math-template
+        // gating + confidence-from-verification on the Python backend).
+        // Falling back to free-form Claude (sendAiRequest) when _hasRag is
+        // false meant questions about a course that had ZERO ready docs —
+        // or where listCourseDocuments() failed transiently — bypassed all
+        // grounding and let Claude invent textbook formulas. Python /ask-stream
+        // handles the "no chunks" case correctly (returns the weak prompt
+        // with low confidence) so it's safe to always prefer it.
+        if (_courseId) {
           const _modeToggle = document.getElementById('aiModeStrict') as HTMLInputElement | null;
           const _ragMode = !_modeToggle || _modeToggle.checked ? 'strict' : 'general';
 

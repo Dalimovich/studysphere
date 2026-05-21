@@ -24,7 +24,15 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
 from typing import Any
+
+# Make `app.*` importable when invoked as `py scripts/reindex_existing_docs.py`
+# from the backend/python-ai/ directory. Mirrors how scripts/run_math_eval.py
+# expects to be run.
+_ROOT = Path(__file__).resolve().parent.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
 
 # Import order: keep the heavy app imports inside main() so `--help` works
 # without the backend env loaded.
