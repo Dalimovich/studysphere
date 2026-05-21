@@ -52,15 +52,44 @@
     window.Minallo.emit('auth:boot-route', { loggedIn: loggedIn });
   }
 
+  // Honour the saved theme preference. Default to night when nothing is set
+  // (matches the prior site-wide force).
   try {
-    if (localStorage.getItem('ss_dark') === '0') document.body.classList.remove('night');
+    var saved = localStorage.getItem('ss_dark');
+    var nightOn = saved === null ? true : saved !== '0';
+    document.body.classList.toggle('night', nightOn);
+    if (saved === null) localStorage.setItem('ss_dark', '1');
   } catch (e) {}
 
   if (loggedIn) {
     var sp = document.getElementById('ss-splash');
     if (sp) sp.style.display = 'flex';
   }
+
+  // When the user isn't authenticated, the URL must read minallo.de/ only.
+  // Wipes any stale #portal=… hash or ?error=… query so the landing + auth
+  // modal never display app-route URLs. The app's own router pushes the
+  // section hash back after sign-in.
+  if (!loggedIn) {
+    var hash = window.location.hash;
+    var search = window.location.search;
+    var hasOAuthHashToken = hash && hash.indexOf('access_token') !== -1;
+    if ((hash || search) && !hasOAuthHashToken) {
+      try {
+        history.replaceState(null, '', window.location.pathname);
+      } catch (e) {}
+    }
+  }
 })();
+
+// Back/forward cache (bfcache) defeats every in-memory auth check: Chrome
+// restores the cached, authenticated DOM without re-running scripts, so
+// _currentUser is still set and history-state restore re-mounts the app.
+// Always reload on bfcache restore — small flicker on Back navigation,
+// but the dashboard can never reappear post-logout from a cached entry.
+window.addEventListener('pageshow', function (e) {
+  if (e.persisted) window.location.reload();
+});
 
 window._onLoginSuccess = function () {
   try {

@@ -327,14 +327,21 @@ export function initAskAI(
         }
 
         const _courseId = window.activeCourseId || window.currentCourseId || '';
-        let _hasRag = false;
-        const _activeDocId = (window as unknown as { activeRagDocumentId?: string | null }).activeRagDocumentId || null;
+        let _activeDocId = (window as unknown as { activeRagDocumentId?: string | null }).activeRagDocumentId || null;
         if (_courseId) {
           try {
             const _docs: CourseDocument[] = await listCourseDocuments(_courseId);
             const _readyDocs = _docs.filter((d) => d.processing_status === 'ready');
-            _hasRag = _readyDocs.length > 0;
-          } catch { _hasRag = false; }
+            // If the user is reading a specific file, resolve its UUID so we
+            // can target it directly via documentIds — otherwise /ask-stream
+            // searches the whole course and may miss the open doc.
+            if (!_activeDocId && activeFileName) {
+              const _open = _readyDocs.find(
+                (d) => (d.file_name || '').toLowerCase() === activeFileName.toLowerCase()
+              );
+              if (_open?.id) _activeDocId = _open.id;
+            }
+          } catch { /* keep _activeDocId as-is; backend will search the whole course */ }
         }
 
         // Extract a focused excerpt from the open PDF around the mentioned exercise/topic.
@@ -406,10 +413,33 @@ export function initAskAI(
               _openFileCtx = _rawText.slice(Math.max(0, _lastExerciseIdx - 200), _lastExerciseIdx + 3000);
             }
           }
-          if (!_openFileCtx) _openFileCtx = _rawText.slice(0, 3000);
+          if (!_openFileCtx) {
+            // No exercise term matched — fall back to the page the user is
+            // currently looking at, since their question is most likely about
+            // what's on screen. pdfPageTexts is populated per page as it
+            // renders (or pre-extracted up front by pdf-viewer). Falls all
+            // the way back to the document start only as a last resort.
+            const _pp = window.pdfPage as number | undefined;
+            const _ppt = (window as unknown as { pdfPageTexts?: Record<number, string> }).pdfPageTexts;
+            const _currentPageText = _pp && _ppt ? _ppt[_pp] : '';
+            if (_currentPageText && _currentPageText.trim().length > 60) {
+              _openFileCtx = _currentPageText.slice(0, 3000);
+            } else {
+              _openFileCtx = _rawText.slice(0, 3000);
+            }
+          }
         }
 
-        if (_hasRag) {
+        // RAG-first routing: any question with a course_id goes through
+        // /ask-stream so the Phase-1 verification + math-template gating +
+        // confidence-from-verification on the Python backend always apply.
+        // The previous gate (`if (_hasRag)`) let questions fall through to
+        // free-form Claude whenever the course had zero ready docs or
+        // listCourseDocuments() failed transiently — bypassing all grounding
+        // and letting the model invent textbook formulas. /ask-stream
+        // handles the "no chunks" case correctly (returns the weak prompt
+        // with low confidence) so it's safe to always prefer it.
+        if (_courseId) {
           const _modeToggle = document.getElementById('aiModeStrict') as HTMLInputElement | null;
           const _ragMode = !_modeToggle || _modeToggle.checked ? 'strict' : 'general';
 
@@ -427,6 +457,9 @@ export function initAskAI(
             const TOKEN_INTERVAL = CFG.streamTokenInterval || 38;
 
             let _renderedBlockCount = 0;
+            // Both `evt.done` and the reader's `result.done` can race to call
+            // finalize() — guard so history/feedback bar aren't doubled.
+            let _finalized = false;
 
             function splitBlocks(text: string): string[] {
               const blocks: string[] = [];
@@ -580,9 +613,21 @@ export function initAskAI(
               headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
               signal: _streamController.signal,
               body: JSON.stringify({
+                // documentIds is a HARD filter — only send when the user
+                // explicitly scopes the question to a chosen set (not when
+                // they merely have a PDF open). The currently-open file is
+                // passed as activeDocumentId (a ranking hint), so retrieval
+                // can still pull in lecture + exercise + formula sheets.
                 courseId: _courseId,
                 question: question,
-                documentIds: _activeDocId ? [_activeDocId] : undefined,
+                documentIds: undefined,
+                activeDocumentId: _activeDocId || undefined,
+                // Tell the backend which file the user is reading and give it
+                // a slice of the actually-visible text. Without this the model
+                // sees only retrieved chunks, which can miss the section the
+                // user is pointing at when they say "this question".
+                activeFileName: activeFileName || undefined,
+                openFileContext: _openFileCtx || undefined,
                 bypassCache: opts && opts.forceRefresh ? true : undefined,
               }),
             })
@@ -672,6 +717,8 @@ export function initAskAI(
             }
 
             function finalize(meta: SseDoneEvent | null | undefined): void {
+              if (_finalized) return;
+              _finalized = true;
               window._activeStreamRender = null;
               const sources = (meta && meta.sources) || [];
               const confidence = (meta && meta.confidence) || 'medium';
@@ -806,6 +853,13 @@ export function initAskAI(
           : d.content
             ? d.content.map((b) => b.text || '').join('')
             : 'No response';
+
+        // Persist non-RAG answers too. The RAG/stream path saves history inside
+        // finalize(); without this the non-RAG branch silently dropped chat
+        // history on reload for users with no indexed course docs.
+        if (!d.error && rawTextLocal && rawTextLocal !== 'No response') {
+          _appendCourseHistory(window.activeCourseId || window.currentCourseId || '', question, rawTextLocal);
+        }
 
         const ansWrap = document.createElement('div');
         ansWrap.className = 'ai-msg-wrap';

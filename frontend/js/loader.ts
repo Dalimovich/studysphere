@@ -53,8 +53,8 @@ interface LandingTranslation {
       h1: 'Study smarter,<br>not harder.',
       subtitle:
         'One workspace for courses, PDFs, your AI tutor and lecture notes. Stop switching tabs — start understanding.',
-      cta: 'Start for free →',
-      note: 'Free forever · No credit card needed',
+      cta: 'Start free trial →',
+      note: '7-day free trial · Cancel anytime',
       features_label: 'What you get',
       features_title: 'Everything you need to ace your degree',
       f1_title: 'Smart PDF Viewer',
@@ -78,7 +78,7 @@ interface LandingTranslation {
       cta2_title: 'Ready to study smarter?',
       cta2_desc:
         'Join thousands of students already using Minallo to save time, understand more and stress less.',
-      cta2_btn: 'Create your free account →',
+      cta2_btn: 'Start your free trial →',
       stats_rating: 'Average rating',
       stats_students: 'Students',
       stats_pdfs: 'PDFs analysed',
@@ -93,7 +93,7 @@ interface LandingTranslation {
       subtitle:
         'Ein Arbeitsbereich für Kurse, PDFs, deinen KI-Tutor und Vorlesungsnotizen. Höre auf, Tabs zu wechseln — fange an zu verstehen.',
       cta: 'Kostenlos starten →',
-      note: 'Für immer kostenlos · Keine Kreditkarte nötig',
+      note: '7 Tage kostenlos testen · Jederzeit kündbar',
       features_label: 'Was du bekommst',
       features_title: 'Alles, was du für deinen Abschluss brauchst',
       f1_title: 'Intelligenter PDF-Viewer',
@@ -222,15 +222,21 @@ interface LandingTranslation {
     // remains in the repo (frontend/css/landing.css) but is no longer
     // injected — the new landing replaces it visually.
     (function () {
-      const link = document.createElement('link');
-      link.rel = 'stylesheet';
-      link.href = 'css/new-landing.css?v=1';
-      document.head.appendChild(link);
-      // task-04: auth modal can be triggered from the landing too, ship its CSS up front.
-      const authLink = document.createElement('link');
-      authLink.rel = 'stylesheet';
-      authLink.href = 'css/auth.css?v=4';
-      document.head.appendChild(authLink);
+      function ensureStylesheet(href: string): void {
+        const path = href.split('?')[0] || href;
+        const exists = Array.from(document.querySelectorAll('link[rel="stylesheet"]')).some((link) => {
+          const current = link.getAttribute('href') || '';
+          const currentPath = current.split('?')[0] || current;
+          return current === href || currentPath.endsWith(path);
+        });
+        if (exists) return;
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = href;
+        document.head.appendChild(link);
+      }
+      ensureStylesheet('css/new-landing.css?v=1');
+      ensureStylesheet('css/auth.css?v=4');
     })();
 
     fetch('pages/new_landing.html')
@@ -346,13 +352,22 @@ interface LandingTranslation {
   // Inject feature CSS
   (function () {
     [
+      'css/base.css?v=5',
+      'css/theme.css?v=5',
+      'css/styles.css?v=7',
+      'css/courses-redesign.css?v=34',
+      'css/app-design-system.css?v=5',
+      'css/layout.css?v=6',
+      'css/document-rail.css?v=15',
       'css/auth.css?v=4',
+      'css/onboarding.css?v=1',
       'views/toast/toast.css',
       'views/chatbot/chatbot.css',
       'views/chatbot/ai-bubble.css',
       'views/chat/chat.css',
       'views/dashboard/dashboard.css',
       'views/practice/practice.css',
+      'views/writing-coach/writing-coach.css',
       'views/flashcards/flashcards.css',
       'views/quiz/quiz.css',
       'views/lecturenotes/lecturenotes.css',
@@ -362,6 +377,9 @@ interface LandingTranslation {
       'views/editor/editor.css',
       'views/games/games.css',
       'views/notes/notes-panel.css',
+      // Light-mode polish loads LAST so it wins source-order ties
+      // against feature CSS that still hard-codes greys.
+      'css/light-mode.css?v=41',
     ].forEach((href) => {
       const link = document.createElement('link');
       link.rel = 'stylesheet';
@@ -383,15 +401,19 @@ interface LandingTranslation {
   }
 
   function loadAppScript(): void {
-    const _v = Date.now();
+    const _v = String(window.MinalloConfig?.assetVersion || SS?.version || '1');
     if (SS) SS.emit('loader:app-script:start', {});
+
+    function versioned(src: string): string {
+      return src + (src.includes('?') ? '&' : '?') + 'v=' + encodeURIComponent(_v);
+    }
 
     function loadScript(src: string, readyKey: string, options?: LoadScriptOptions): Promise<void> {
       return new Promise<void>((resolve, reject) => {
         const opts = options || {};
         const script = document.createElement('script');
         if (opts.type) script.type = opts.type;
-        script.src = src + '?v=' + _v;
+        script.src = versioned(src);
         script.onload = () => {
           if (SS && readyKey) SS.markReady(readyKey, { file: src });
           resolve();
@@ -425,8 +447,6 @@ interface LandingTranslation {
       .then(() => {
         // Feature scripts load AFTER app.js so _init() can safely call app globals.
         // Track all loads so ss-ready only fires after every feature script is done.
-        // Game sub-modules (tetris/solitaire/bird/chess) must load before games.js (hub)
-        // so their window.* functions are defined when games.js _init() wires the buttons.
         const featureSrcs = [
           'views/toast/toast.js',
           'views/chatbot/chatbot.js?v=2',
@@ -445,24 +465,11 @@ interface LandingTranslation {
           'views/editor/merger.js',
           'views/editor/writer.js',
           'views/notes/notes-panel.js',
-          'views/games/games-tetris.js',
-          'views/games/games-solitaire-shared.js',
-          'views/games/games-solitaire-klondike.js',
-          'views/games/games-solitaire-spider.js',
-          'views/games/games-solitaire-scorpion.js',
-          'views/games/games-solitaire-freecell.js',
-          'views/games/games-solitaire-pyramid.js',
-          'views/games/games-solitaire-tripeaks.js',
-          'views/games/games-solitaire-vegas.js',
-          'views/games/games-solitaire-dispatcher.js',
-          'views/games/games-bird.js',
-          'views/games/games-chess.js',
-          'views/games/games.js',
         ];
         const featurePromises = featureSrcs.map((src) => {
           return new Promise<void>((res) => {
             const s = document.createElement('script');
-            s.src = src + '?v=' + _v;
+            s.src = versioned(src);
             s.onload = () => res();
             s.onerror = () => {
               console.error('Failed to load feature script:', src);
@@ -472,9 +479,61 @@ interface LandingTranslation {
           });
         });
 
+        // Games hub: ~150KB across 13 scripts (8 solitaire variants, tetris,
+        // bird, chess, hub dispatcher). Most users never open the games page
+        // in a session — defer to first click on the games nav.
+        // Sub-modules (tetris/solitaire/bird/chess) must load before games.js
+        // (hub) so their window.* functions are defined when games.js _init()
+        // wires the buttons — we therefore load them sequentially.
+        (function setupGamesLazy(): void {
+          const GAMES_SCRIPTS = [
+            'views/games/games-tetris.js',
+            'views/games/games-solitaire-shared.js',
+            'views/games/games-solitaire-klondike.js',
+            'views/games/games-solitaire-spider.js',
+            'views/games/games-solitaire-scorpion.js',
+            'views/games/games-solitaire-freecell.js',
+            'views/games/games-solitaire-pyramid.js',
+            'views/games/games-solitaire-tripeaks.js',
+            'views/games/games-solitaire-vegas.js',
+            'views/games/games-solitaire-dispatcher.js',
+            'views/games/games-bird.js',
+            'views/games/games-chess.js',
+            'views/games/games.js',
+          ];
+          let loaded = false;
+          function loadGames(): void {
+            if (loaded) return;
+            loaded = true;
+            GAMES_SCRIPTS.reduce<Promise<void>>(
+              (p, src) => p.then(() => new Promise<void>((res) => {
+                const s = document.createElement('script');
+                s.src = versioned(src);
+                s.onload = (): void => res();
+                s.onerror = (): void => { console.error('lazy-games failed:', src); res(); };
+                document.body.appendChild(s);
+              })),
+              Promise.resolve()
+            );
+          }
+          function bindTrigger(): boolean {
+            const btn = document.getElementById('psbGames');
+            if (!btn) return false;
+            btn.addEventListener('click', loadGames, { once: true });
+            return true;
+          }
+          if (!bindTrigger()) {
+            // Section HTML may still be injecting — retry until the nav button exists.
+            const obs = new MutationObserver(() => {
+              if (bindTrigger()) obs.disconnect();
+            });
+            obs.observe(document.body, { childList: true, subtree: true });
+          }
+        })();
+
         void Promise.all(featurePromises).then(() => {
           const aiScript = document.createElement('script');
-          aiScript.src = 'js/ai.js?v=' + _v;
+          aiScript.src = versioned('js/ai.js');
           aiScript.onload = () => {
             console.log('js/ai.js loaded');
             if (SS) {

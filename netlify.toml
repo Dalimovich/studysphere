@@ -13,6 +13,11 @@
   status = 200
 
 [[redirects]]
+  from = "/api/suggestions"
+  to = "/.netlify/functions/suggestions"
+  status = 200
+
+[[redirects]]
   from = "/api/create-checkout"
   to = "/.netlify/functions/create-checkout"
   status = 200
@@ -23,8 +28,18 @@
   status = 200
 
 [[redirects]]
+  from = "/api/paypal-webhook"
+  to = "/.netlify/functions/paypal-webhook"
+  status = 200
+
+[[redirects]]
   from = "/api/admin-users"
   to = "/.netlify/functions/admin-users"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/retrieval-logs"
+  to = "/.netlify/functions/admin-retrieval-logs"
   status = 200
 
 [[redirects]]
@@ -35,6 +50,26 @@
 [[redirects]]
   from = "/api/create-portal"
   to = "/.netlify/functions/create-portal"
+  status = 200
+
+[[redirects]]
+  from = "/api/pause-subscription"
+  to = "/.netlify/functions/pause-subscription"
+  status = 200
+
+[[redirects]]
+  from = "/api/resume-subscription"
+  to = "/.netlify/functions/resume-subscription"
+  status = 200
+
+[[redirects]]
+  from = "/api/cancel-subscription"
+  to = "/.netlify/functions/cancel-subscription"
+  status = 200
+
+[[redirects]]
+  from = "/api/apply-retention-discount"
+  to = "/.netlify/functions/apply-retention-discount"
   status = 200
 
 [[redirects]]
@@ -123,6 +158,26 @@
   status = 200
 
 [[redirects]]
+  from = "/api/ai/writing-coach"
+  to = "/.netlify/functions/ai-writing-coach"
+  status = 200
+
+[[redirects]]
+  from = "/api/ai/usage"
+  to = "/.netlify/functions/ai-usage"
+  status = 200
+
+[[redirects]]
+  from = "/api/ai/quiz-attempt"
+  to = "/.netlify/functions/ai-quiz-attempt"
+  status = 200
+
+[[redirects]]
+  from = "/api/ai/mastery"
+  to = "/.netlify/functions/ai-mastery"
+  status = 200
+
+[[redirects]]
   from = "/api/notes/generate"
   to = "/.netlify/functions/notes-generate"
   status = 200
@@ -143,20 +198,37 @@
     Access-Control-Allow-Headers = "Content-Type, Authorization"
     Access-Control-Max-Age = "86400"
 
+# JS / CSS are cache-busted with ?v=N query strings in loader.ts and the
+# entry HTML, so we can cache them aggressively. Bumping MinalloConfig.assetVersion
+# (or the per-file ?v=N) on deploy is what invalidates them in browsers.
 [[headers]]
   for = "/**/*.js"
   [headers.values]
-    Cache-Control = "no-cache, must-revalidate"
+    Cache-Control = "public, max-age=31536000, immutable"
 
 [[headers]]
   for = "/**/*.css"
   [headers.values]
-    Cache-Control = "no-cache, must-revalidate"
+    Cache-Control = "public, max-age=31536000, immutable"
 
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/favicon.ico"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# HTML files are NOT versioned in their URL (loader fetches /pages/portal.html
+# directly, not /pages/portal.html?v=N). Keep them short-cached so deploys are
+# visible quickly, but allow a small TTL + revalidation to skip the full
+# round-trip when nothing has changed.
 [[headers]]
   for = "/**/*.html"
   [headers.values]
-    Cache-Control = "no-cache, must-revalidate"
+    Cache-Control = "public, max-age=300, must-revalidate"
 
 [[headers]]
   for = "/*"
@@ -168,4 +240,4 @@
     Cross-Origin-Opener-Policy = "same-origin-allow-popups"
     Cross-Origin-Resource-Policy = "same-origin"
     Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=(self)"
-    Content-Security-Policy = "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self' https://accounts.google.com https://www.youtube.com https://www.paypal.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' 'unsafe-inline' https://accounts.google.com https://fonts.googleapis.com https://cdn.jsdelivr.net; img-src 'self' data: blob: https:; font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; connect-src 'self' https://minallo.de https://wprfkjeiawxlcnitsfdr.supabase.co https://python-ai.fly.dev https://api-m.paypal.com https://api.paypal.com https://accounts.spotify.com https://api.spotify.com wss://wprfkjeiawxlcnitsfdr.supabase.co https://unpkg.com; worker-src 'self' blob: https://cdnjs.cloudflare.com; frame-src 'self' blob: https://accounts.google.com https://www.youtube.com https://www.youtube-nocookie.com https://www.paypal.com; form-action 'self'; upgrade-insecure-requests"
+    Content-Security-Policy = "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self' 'unsafe-inline' https://accounts.google.com https://www.youtube.com https://www.paypal.com https://www.paypalobjects.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' 'unsafe-inline' https://accounts.google.com https://cdn.jsdelivr.net https://fonts.bunny.net; img-src 'self' data: blob: https:; font-src 'self' data: https://cdn.jsdelivr.net https://fonts.bunny.net https://fonts.gstatic.com; connect-src 'self' https://minallo.de https://accounts.google.com https://wprfkjeiawxlcnitsfdr.supabase.co https://python-ai.fly.dev https://api-m.paypal.com https://api.paypal.com https://www.paypal.com https://www.paypalobjects.com https://accounts.spotify.com https://api.spotify.com wss://wprfkjeiawxlcnitsfdr.supabase.co https://unpkg.com; worker-src 'self' blob: https://cdnjs.cloudflare.com; frame-src 'self' blob: https://accounts.google.com https://www.youtube.com https://www.youtube-nocookie.com https://www.paypal.com; form-action 'self'; upgrade-insecure-requests"

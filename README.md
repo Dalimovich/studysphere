@@ -1,268 +1,296 @@
+<div align="center">
+
 # Minallo
 
-Minallo is a student workspace built around courses, files, AI study tools, chat, notes, and subscriptions.
+**AI-integrated study platform for university students.**
 
-The app is currently a Netlify-hosted frontend with Supabase for auth, database, and storage, plus Netlify Functions for AI, payments, admin actions, and a few chat/security-sensitive flows.
+Upload course materials, ask grounded questions across your PDFs, generate
+notes, flashcards and quizzes, practice German writing, and chat with
+study partners — all in one workspace.
 
-## What The Website Does Right Now
+[minallo.de](https://minallo.de) &nbsp;·&nbsp;
+[Impressum](https://minallo.de/impressum.html) &nbsp;·&nbsp;
+[Datenschutz](https://minallo.de/privacy.html) &nbsp;·&nbsp;
+[AGB](https://minallo.de/terms.html)
 
-- Account auth with Supabase email/password and Google sign-in
-- Course dashboard with manual subject management and course-specific file areas
-- PDF viewing and PDF-based AI help
-- AI side panel and chatbot-style study flows
-- Lecture notes and editor tools
-- Real-time-style chat UI with:
-  - general rooms
-  - course rooms
-  - custom rooms
-  - direct-message style friend rooms
-- Friend search and friend list rendering
-- Profile and settings pages
-- Subscription UI with Stripe portal/checkout support and PayPal activation flow
-- Admin user search and subscription management tools
-- Small games and practice/study utility sections
-- Browser extension support under `frontend/extension`
+</div>
 
-## Current Stack
+---
 
-| Layer               | Tech                       |
-| ------------------- | -------------------------- |
-| Frontend            | Vanilla JS, HTML, CSS      |
-| Hosting             | Netlify                    |
-| Auth / DB / Storage | Supabase                   |
-| AI                  | Netlify Function to OpenAI |
-| Payments            | Stripe + PayPal            |
-| PDF Rendering       | pdf.js                     |
+## Highlights
 
-## Current Repo Layout
+- **Grounded RAG over your own PDFs** — hybrid vector + BM25 retrieval, page-cited answers, exercise/formula block detection.
+- **Streaming AI chat** — SSE-streamed answers direct from the Python AI service, bypassing function timeouts.
+- **Notes, flashcards, quizzes** — generated from indexed course materials with per-document anchoring.
+- **Deutsch Schreibtrainer** — German writing coach that scores against the user's profile level (A1 → C1 Hochschule) and task type (Stellungnahme, E-Mail, Bericht, …).
+- **Real-time chat** — friend list, course rooms, custom rooms, message reactions, all behind row-level security.
+- **Subscriptions** — Stripe + PayPal, 7-day trial, fair-use cost protection, full GDPR/§19-UStG legal pages.
+- **Browser extension** — capture lecture transcripts from YouTube and Opencast into Minallo notes.
 
-```txt
-frontend/
-  index.html
-  privacy.html
-  assets/
-  css/
-  extension/
-  features/
-    chat/
-    chatbot/
-    dashboard/
-    editor/
-    games/
-    lecturenotes/
-    practice/
-    profile/
-    settings/
-    subscription/
-    toast/
-  js/
-    main.js              ← entry point (imports app.js + feature modules)
-    app.js               ← compatibility bridge (being trimmed down)
-    app-data.js
-    app-pdf.js
-    app-storage.js
-    auth-bootstrap.js
-    config/
-      icons.js
-      pdf-config.js
-    core/
-      navigation.js
-      panels.js
-      state.js
-    features/
-      ai-chat/
-        ai-ask.js
-        ai-chips.js
-        ai-export.js
-        ai-markdown.js
-        ai-message-actions.js
-        multi-summary.js
-      admin/
-        admin-panel.js
-      auth/
-        onboarding.js
-        user-data.js
-      courses/
-        course-files.js
-        course-folders.js
-        course-view.js
-        courses-render.js
-      pdf-viewer/
-        pdf-text-extraction.js
-        pdf-viewer.js
-      settings/
-        language.js
-        settings.js
-      study-timer/
-        study-timer.js
-    services/
-      admin-service.js
-      ai-service.js
-      pdf-service.js
-      storage-service.js
-    utils/
-      escape-html.js
-    loader.js
-    router.js
-    minallo.js
-    supabase.js
-  pages/
+## Architecture
+
+```
+                                                   ┌────────────────────────────┐
+   Browser ──── HTTPS ─── Netlify (CDN + Functions)│  /api/ai/ask, /api/notes,  │
+                              │                    │  /api/create-checkout,     │
+                              │                    │  /api/stripe-webhook, …    │
+                              │                    └────────────┬───────────────┘
+                              │                                 │ JWT/internal-secret
+                              │                                 ▼
+                              │                       ┌──────────────────┐
+                              │                       │  python-ai.fly.dev  (FastAPI)
+                              │ SSE direct stream ──▶ │  /ask-stream,       │
+                              │ (bypasses Netlify     │  /writing-coach-…   │
+                              │  function timeout)    │  retrieval + LLM    │
+                              │                       └────────┬─────────────┘
+                              │                                │
+                              ▼                                ▼
+                  ┌────────────────────────────────────────────────┐
+                  │     Supabase: Postgres + Auth + Storage         │
+                  │     pgvector, RLS, idempotency ledgers          │
+                  └────────────────────────────────────────────────┘
+
+                  ┌────────────────────────┐    ┌────────────────────────┐
+                  │  Stripe (subscription) │    │  PayPal (subscription) │
+                  └────────────────────────┘    └────────────────────────┘
+```
+
+## Stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | Vanilla TypeScript + HTML + CSS, compiled to JS by `tsc` (no bundler at runtime) |
+| Hosting & functions | Netlify (static frontend + Node 20 functions) |
+| AI service | FastAPI on Fly.io, OpenAI for LLM + embeddings |
+| Database / Auth / Storage | Supabase (Postgres + pgvector, GoTrue, Storage buckets) |
+| Payments | Stripe Subscriptions + PayPal Subscriptions |
+| PDF rendering | pdf.js (CDN) |
+
+## Repository layout
+
+```
+frontend/                          Static site (publish dir for Netlify)
+  index.html, *.html               App shells + standalone pages
+  css/, assets/                    Styles + static assets
+  js/                              TypeScript sources compiled in place
+    main.ts, app.ts                Entry + portal bootstrap
+    config.js                      Public config (anon keys, public IDs)
+    auth-bootstrap.js              Supabase auth + Google Sign-In wiring
+    services/                      ai-service, subscription-service, …
+    features/                      ai-chat/, writing-coach/, study-timer/, …
+    pages/                         Landing-page logic
+  views/                           Per-feature HTML/CSS fragments
+  extension/                       Chrome browser extension
 
 backend/
-  functions/
-    _shared.js
-    ai.js
-    admin-users.js
-    chat-friends.js
-    send-chat-message.js
-    join-room-by-code.js
-    create-checkout.js
-    create-portal.js
-    verify-payment.js
-    stripe-webhook.js
-    activate-paypal-subscription.js
-  lib/
-    cors.js
-    responses.js
-    supabase-auth.js
-    supabase-admin.js
-    stripe.js
-    logger.js
+  functions/                       Netlify Functions (auth + proxy + webhooks)
+    ai-ask.ts, ai-generate.ts, …   Thin shells over the Python AI service
+    create-checkout.ts             Stripe Checkout session with Widerruf-Verzicht
+    stripe-webhook.ts              Idempotent, replay-protected, retry-on-failure
+    paypal-webhook.ts              Signature-verified via PayPal API
+    …
+  lib/                             cors, env, responses, rate-limit,
+                                   subscription-gate, stripe, supabase-admin, …
+  python-ai/                       FastAPI service deployed to Fly.io
+    app/routers/                   ask, ask-stream, generate, writing-coach, …
+    app/services/                  retrieval, answer, notes, flashcards, quiz,
+                                   writing_coach, access_control, …
 
-docs/
-  Minallo_admin_security.sql
-  Minallo_rls_hardening.sql
-  Minallo_storage_security.sql
-  Minallo_chat_room_rls_patch.sql
-
-.env.example
+supabase/migrations/               All schema + RLS migrations (run in order)
+docs/                              CLAUDE.md, schreibtrainer spec, launch
+                                   checklist, audit notes
+tests/                             Node tests for backend handlers + utils
 ```
 
-## Important Backend Endpoints
+## Public API surface
 
-These are exposed through `netlify.toml`:
+All routes are HTTPS, JWT-authenticated (Supabase token in
+`Authorization: Bearer …`), and gated by an active subscription where
+relevant.
 
-- `/api/ai`
-- `/api/admin-users`
-- `/api/chat-friends`
-- `/api/send-chat-message`
-- `/api/join-room-by-code`
-- `/api/create-checkout`
-- `/api/create-portal`
-- `/api/verify-payment`
-- `/api/stripe-webhook`
-- `/api/activate-paypal-subscription`
+| Route | Purpose |
+|---|---|
+| `POST /api/ai` | Generic vision-capable chat (gpt-4o, capped to 2048 completion tokens) |
+| `POST /api/ai/ask` | RAG question against indexed course PDFs |
+| `POST /api/ai/generate` | Quizzes / flashcards / summary notes |
+| `POST /api/ai/feedback` | Capture per-answer feedback (rating, text) |
+| `POST /api/ai/evaluate` | Retrieval-quality evaluation harness (internal) |
+| `POST /api/ai/writing-coach` | Deutsch Schreibtrainer analysis |
+| `POST /api/notes/generate` | Full markdown lecture-notes generation |
+| `GET  /api/notes` | List, fetch, persist generated notes |
+| `POST /api/documents/upload` | Upload + index a PDF into pgvector |
+| `POST /api/documents/list` | List user's indexed documents |
+| `POST /api/documents/delete` | Delete a document + its chunks |
+| `POST /api/documents/reindex-course` | Re-run indexing for an entire course |
+| `POST /api/create-checkout` | Stripe Checkout session (captures Widerruf-Verzicht) |
+| `POST /api/create-portal` | Stripe Billing Portal session |
+| `POST /api/verify-payment` | Post-Checkout subscription activation |
+| `POST /api/activate-paypal-subscription` | PayPal subscription activation |
+| `POST /api/stripe-webhook` | Stripe events (signature + idempotency + retry) |
+| `POST /api/paypal-webhook` | PayPal events (signature-verified via PayPal API) |
+| `POST /api/admin-users` | Admin dashboard (backend-checked against `public.admins`) |
+| `POST /api/chat-friends` | Friend list + cross-user profile read |
+| `POST /api/send-chat-message` | Chat send with content moderation + rate limit |
 
-## Security State
+The browser also calls `POST https://python-ai.fly.dev/ask-stream`
+directly for SSE streaming. This endpoint enforces the same JWT auth,
+subscription gate, and rate limit as the Netlify path.
 
-The project is no longer in the old wide-open Supabase stage. The current repo includes hardening work for:
+## Cost protection
 
-- row-level security for profiles, settings, notes, rooms, messages, reactions, pins, nicknames, typing indicators, friendships, blocked users, and subscriptions
-- private Supabase Storage buckets and object policies
-- backend-only subscription activation/write flows
-- admin authorization through backend checks and `admins` / `security_events`
-- chat message sending moved behind a backend function
-- chat friend list loading moved behind a backend function
-- basic chat/message rate limiting
-- Netlify security headers
+The platform is designed so a single subscriber cannot exceed the
+€11,99/month price.
 
-Supabase SQL files live in `docs/` and must be run in the Supabase SQL Editor for a real deployment.
+- **Subscription gate** on every paid endpoint (both Netlify and the
+  Python service) — verified against `subscriptions.status` and
+  `expires_at`.
+- **Per-endpoint hourly rate limits** (`AI_ASK_RATE_LIMIT_MAX`,
+  `NOTES_RATE_LIMIT_MAX`, …).
+- **Split monthly fair-use caps** per user, reset on the 1st of each
+  calendar month UTC: 2000 interactive calls (chat / RAG / writing-coach /
+  streaming asks) and 200 generation calls (quiz / flashcards / notes
+  summaries). Independent buckets so a quiz spree never locks out chat.
+- **Hard `max_tokens` caps** in every LLM call site.
+- **Cache-by-default** on RAG answers, keyed by document version hash so
+  invalidation is automatic on document changes. Client cannot opt out.
+- **Cap is contractually backed** in the AGB §4 ("Fair-Use") so users
+  cannot claim surprise.
 
-## Supabase Setup
+Worst-case spend at both caps: roughly $3-4/user/month with the default
+gpt-4o-mini baseline (writing-coach escalates to gpt-4o for C1+ levels),
+comfortably below the €11,99 list price.
 
-Run these SQL files in the Supabase SQL Editor:
+## Security
 
-1. `docs/Minallo_admin_security.sql`
-2. `docs/Minallo_rls_hardening.sql`
-3. `docs/Minallo_storage_security.sql`
-4. `docs/Minallo_chat_room_rls_patch.sql`
+- **Row-level security** on every user-data table, keyed on
+  `auth.uid()`. Service-role writes only for `admins`, `security_events`,
+  `subscriptions`, `stripe_webhook_events`, `paypal_webhook_events`.
+- **Webhook signatures verified** against the raw body for Stripe, and
+  via the PayPal `/v1/notifications/verify-webhook-signature`
+  round-trip for PayPal.
+- **Webhook idempotency + retry** — each provider has its own ledger
+  table with the event ID as primary key. On Supabase write failure the
+  function returns 5xx so the provider retries.
+- **CSP hardened** in `netlify.toml` — no `unsafe-eval`, no
+  `unsafe-inline` on `script-src`, third-party origins whitelisted.
+- **No production npm dependencies** — `package.json` ships an empty
+  `dependencies: {}`. Everything runtime is Node builtins or
+  esbuild-bundled from `devDependencies`.
+- **No service-role key, Stripe secret, or PayPal secret in the
+  frontend.** Only the Supabase anon key is shipped (designed for it,
+  RLS does the protection).
 
-Without these, the website will not match the intended security model.
+See [docs/LAUNCH_CHECKLIST.md](docs/LAUNCH_CHECKLIST.md) for the
+monitoring SQL queries to keep an eye on after launch.
 
-## Environment Variables
+## Compliance (Germany / EU)
 
-The current Netlify functions expect some or all of these variables:
+- **Impressum** with §5 DDG + §18 MStV details and §19 UStG
+  Kleinunternehmer notice.
+- **Datenschutzerklärung** covering hosting, Supabase auth, AI (OpenAI)
+  transfers including DPF + SCC for the US, retention table, full Art.
+  15-22 rights, and a documented response SLA.
+- **AGB** with the price (11,99 €/Monat), Fair-Use clause referencing
+  the split monthly caps (2000 interactive + 200 generation), and
+  digital-services Widerruf rules.
+- **Widerrufsbelehrung** with the standard 14-day form. The checkout
+  flow captures explicit Widerruf-Verzicht consent (BGB §312j, §356(5))
+  and persists it in Stripe metadata + the Netlify request log.
 
-```txt
-OPENAI_API_KEY
+## Getting started
 
-SUPABASE_URL
-SUPABASE_ANON_KEY
-SUPABASE_SERVICE_ROLE_KEY
+### Prerequisites
 
-STRIPE_SECRET_KEY
-STRIPE_PRICE_ID
-STRIPE_WEBHOOK_SECRET
+- Node 20+
+- Netlify CLI (`npm install -g netlify-cli`)
+- A Supabase project with the migrations applied (see below)
+- API keys for OpenAI, Stripe, PayPal (test or live)
+- Python 3.11+ if you also want to run the AI service locally
 
-PAYPAL_CLIENT_ID
-PAYPAL_CLIENT_SECRET
-PAYPAL_PLAN_ID
-PAYPAL_API_BASE
-
-ALLOWED_ORIGIN
-
-CHAT_RATE_LIMIT_MAX
-CHAT_RATE_LIMIT_WINDOW_MS
-
-AI_RATE_LIMIT_MAX
-AI_RATE_LIMIT_WINDOW_MS
-```
-
-Notes:
-
-- `PAYPAL_API_BASE` is optional and can point to sandbox for testing.
-- `ALLOWED_ORIGIN` should match the production site origin.
-
-## Local Development
-
-There is no heavy frontend build step. The app is a static frontend plus Netlify Functions.
-
-Typical local flow:
-
-1. Install the Netlify CLI if needed.
-2. Configure the required environment variables.
-3. Run the site with:
+### Run the frontend + functions locally
 
 ```bash
-netlify dev
+npm install
+cp .env.example .env
+# Fill in .env with your keys
+
+npm run dev          # netlify dev — runs frontend + functions on :8888
 ```
 
-This gives you:
+Opening `frontend/index.html` directly only renders static markup;
+auth, AI, payments, and chat all need the functions, so use `netlify dev`.
 
-- the frontend
-- local function routing
-- the same `/api/...` paths used in production
-
-Opening `frontend/index.html` directly is not enough if you need functions, auth flows, or API-backed features.
-
-## Deployment
-
-Production is set up for Netlify:
-
-- frontend publish directory: `frontend`
-- functions directory: `backend/functions`
-- redirects and security headers: `netlify.toml`
-
-If the site is connected to Netlify, deploying the latest repo state is essentially:
+### Run the Python AI service locally
 
 ```bash
+cd backend/python-ai
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env  # fill in
+uvicorn app.main:app --reload --port 8000
+```
+
+Then point Netlify at it with `AI_SERVICE_URL=http://localhost:8000`.
+
+### Apply Supabase migrations
+
+```bash
+# With the Supabase CLI:
+supabase db push
+
+# Or paste each file in supabase/migrations/ into the Supabase SQL editor
+# in filename-sorted order. They are idempotent.
+```
+
+Critical migrations for a working install:
+[`20260504_000001_admin_security.sql`](supabase/migrations/20260504_000001_admin_security.sql),
+[`20260504_000002_rls_hardening.sql`](supabase/migrations/20260504_000002_rls_hardening.sql),
+[`20260504_000004_storage_security.sql`](supabase/migrations/20260504_000004_storage_security.sql),
+[`20260505_000001_rag_foundation.sql`](supabase/migrations/20260505_000001_rag_foundation.sql),
+[`20260519_000004_profiles_subscriptions_rls_cleanup.sql`](supabase/migrations/20260519_000004_profiles_subscriptions_rls_cleanup.sql).
+
+### Environment variables
+
+See [.env.example](.env.example) for the full annotated list.
+
+## Scripts
+
+| Command | What it does |
+|---|---|
+| `npm run dev` | Start `netlify dev` (frontend + functions) |
+| `npm run build:frontend` | Compile TypeScript in `frontend/js/` to JS |
+| `npm run typecheck` | Type-check backend + frontend |
+| `npm run lint` | ESLint on `frontend/js/` |
+| `npm run test` | Node test runner over `tests/backend/**` |
+| `npm run test:e2e` | Playwright end-to-end tests |
+| `npm run format` | Prettier write |
+
+## Deploying
+
+```bash
+# Frontend + functions
 netlify deploy --prod
+
+# Python AI service
+cd backend/python-ai
+flyctl deploy
 ```
 
-In this workspace there are also helper scripts under `scripts/` for checks and deployment.
+Production deploy is wired to push-to-`main`; the commands above are
+for manual / hotfix deploys.
 
-## Current Caveats
+After any deploy that touches webhooks or subscription logic, run the
+verification queries in [docs/LAUNCH_CHECKLIST.md](docs/LAUNCH_CHECKLIST.md)
+to confirm policies and webhook ledgers look right.
 
-- `frontend/js/app.js` is still a compatibility-heavy file while the refactor continues.
-- Some newer backend-protected flows coexist with older direct Supabase frontend calls in other parts of the app.
-- The roadmap in `Minallo_code_improvement_roadmap.md` is still relevant for modular cleanup.
-- AI, chat, and admin flows depend on correct Netlify and Supabase environment configuration.
+## Documentation
 
-## Related Docs
+- [docs/CLAUDE.md](docs/CLAUDE.md) — codebase conventions and contributor notes
+- [docs/LAUNCH_CHECKLIST.md](docs/LAUNCH_CHECKLIST.md) — post-deploy steps + monitoring queries
+- [docs/schreibtrainer-ai-spec.md](docs/schreibtrainer-ai-spec.md) — full Deutsch Schreibtrainer behaviour spec
+- [docs/python-ai-endpoints.md](docs/python-ai-endpoints.md) — Python service request/response shapes
+- [docs/frontend-ts-migration.md](docs/frontend-ts-migration.md) — TS migration notes
 
-- [Minallo_code_improvement_roadmap.md](./Minallo_code_improvement_roadmap.md)
-- [Minallo_security_hardening_notes.md](./Minallo_security_hardening_notes.md)
-- [docs/Minallo_admin_security.sql](./docs/Minallo_admin_security.sql)
-- [docs/Minallo_rls_hardening.sql](./docs/Minallo_rls_hardening.sql)
-- [docs/Minallo_storage_security.sql](./docs/Minallo_storage_security.sql)
-- [docs/Minallo_chat_room_rls_patch.sql](./docs/Minallo_chat_room_rls_patch.sql)
+## License
+
+Proprietary. © 2026 Mohamed Ali Mariam (Minallo). All rights reserved.

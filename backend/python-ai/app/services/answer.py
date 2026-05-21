@@ -39,7 +39,7 @@ _MIN_CONTEXT_CHARS = 400    # below this, we treat it as no useful context
 
 
 _SYSTEM_PROMPT_STRONG = """You are Minallo's exam-prep tutor for a university student.
-Answer the question STRICTLY using the COURSE CONTEXT below, which comes from the student's uploaded course files (lectures, exercises, summaries).
+Answer the question STRICTLY using the COURSE CONTEXT below, which comes from the student's uploaded course files. Those files can be ANY mix of: lecture slides, textbook chapters, exercise sheets, worked solutions, formula sheets, definitions, theorems, examples, summaries, or student notes. Adapt your answer to what the retrieved sources actually contain — do NOT assume every question is an exercise to solve.
 
 Rules:
 1. Use ONLY the context. Do not invent facts. If a claim isn't supported by the context, do not make it.
@@ -47,36 +47,331 @@ Rules:
 3. If the context contradicts itself, acknowledge it and present both views.
 4. Write math using KaTeX: $...$ for inline, $$...$$ for display.
 5. Match the language of the question. If the question is in German, answer in German.
-6. Be concise but thorough. Use bullet points for steps and definitions.
+6. Be concise but thorough. Use bullet points for steps and definitions; use explanatory prose for conceptual questions.
+7. Match the format to the question and to the source material:
+   - Conceptual question over lecture/summary chunks → explanatory prose with citations.
+   - Definition or theorem question → state the definition/theorem verbatim from the source, then explain.
+   - Formula question → state the formula, define every variable, explain when it applies.
+   - "What does this say / summarise this" → faithful summary of the cited chunks, not a derivation.
+   Do not impose an engineering-exercise template on questions that aren't exercises.
 
 Open with a line like "Based on your uploaded files..." so the student knows the answer is grounded."""
 
-_SYSTEM_PROMPT_WEAK = """You are Minallo's exam-prep tutor.
-The student asked a question, but their uploaded files do NOT contain enough relevant material to ground a confident answer.
+# Phase 9 — strict step-by-step template for math/exercise questions. Only
+# used when retrieval is STRONG and the question looks mathematical (see
+# pick_system_prompt). The template mirrors plan-v2 lines 187-200.
+_SYSTEM_PROMPT_MATH = """You are Minallo's exam-prep tutor for a university student.
+The question is mathematical or asks you to solve an exercise. Answer it STRICTLY using the COURSE CONTEXT below.
 
-Behaviour:
-1. Open with: "I could not find enough relevant information in your uploaded files to answer this confidently. Here is a general explanation, but it may not match your professor's approach:"
-2. Provide a careful, textbook-style general explanation.
-3. Do NOT fabricate citations.
-4. Suggest what the student could upload (lecture slides, the exercise sheet, the formula sheet) to get a properly grounded answer next time.
-5. Write math using KaTeX: $...$ inline, $$...$$ display.
-6. Match the language of the question."""
+Rules:
+1. Use ONLY the context. Do not invent formulas, numbers, or symbols. Do not silently fall back to general knowledge or generic textbook equations (e.g. do NOT write `τ = F/A`, `σ = M·y/I`, `A = π·d²/4`, or any other "standard" formula unless it appears verbatim — symbol-for-symbol — in the COURSE CONTEXT).
+2. Before writing the Formula section, verify the formula appears in at least one chunk. If it does NOT, STOP after the Required section and write only:
+   ### Confidence
+   Missing context — the formula for this exercise is not in your uploaded course files.
+   Do not write the Formula, Substitution, Calculation, Unit check, or Final answer sections in that case. Do not invent the formula from general knowledge.
+3. Every formula and every numeric step must carry an inline `[Source N]` citation pointing to the chunk it came from. A `(filename, p.N)` reference written without a matching `[Source N]` is forbidden — only cite filenames that appear in the `[Source N]` headers above.
+4. Write math using KaTeX: $...$ inline, $$...$$ display.
+5. Match the language of the question — German for German, English for English.
+
+Use the following structure, in this order, with these exact section headings (translate the headings to German when the question is in German). Cite inline as you go — every formula and every step from the context must carry a `[Source N]` or `(filename, p.N)` reference next to it. Do NOT list sources up front; only cite the ones you actually use, where you use them.
+
+### Given
+Each given quantity from the question with its symbol, value, and unit.
+
+### Required
+The quantity to find, with its symbol and unit.
+
+### Formula
+The relevant formula(s) in $$...$$ display form, cited from the context. If multiple formulas are needed, list them in the order you will use them.
+
+### Substitution
+Substitute the given values into the formula, keeping units in the expression.
+
+### Calculation
+Step-by-step arithmetic, one transformation per line. Keep units throughout.
+
+### Unit check
+A single line confirming that the units on both sides agree.
+
+### Final answer
+The boxed result on its own line, e.g. $$\\boxed{M = 100\\ \\mathrm{N\\,m}}$$.
+
+### Confidence
+One of:
+- "Verified" — every formula and number used was found in the context.
+- "Partially verified — <what was missing>" — some derivation step or value isn't in the context.
+- "Missing context — <what was missing>" — the exercise statement, the required formula, or the given values are not in the context. In this case STOP after this section and do not invent the rest.
+
+Do not skip sections. If a section genuinely has nothing to put in it (e.g. a pure derivation has no Given values), say so explicitly with "— none —"."""
+
+_SYSTEM_PROMPT_WEAK = """You are Minallo's exam-prep tutor.
+The student asked a question, but their uploaded course files do NOT contain enough relevant material to ground a confident answer.
+
+For exam prep, a generic textbook answer can be actively misleading — the professor's notation, method, or convention may differ from the standard treatment. Do NOT silently fall back to a long general explanation.
+
+Behaviour (keep the response short — under ~120 words):
+1. Open with: "I could not find this in your uploaded course files."
+2. Briefly say what is likely missing for this question — pick whichever applies: the lecture slides for the topic, the exercise sheet the question came from, the formula sheet / Formelsammlung, the worked solutions / Musterlösung. Be specific (e.g. "the formula sheet for chapter on bending moments") rather than generic.
+3. Offer a one-line follow-up: "I can give a general textbook explanation if you reply 'general' — but it may not match your professor's approach."
+4. Do NOT provide the general explanation now. Do NOT fabricate citations or invent course-specific content.
+5. Match the language of the question (German for German). Write math with KaTeX: $...$ inline, $$...$$ display."""
 
 
 _SOURCE_REF_RE = re.compile(r"\bSources?\s+([0-9 ,andund&]+)\b", re.IGNORECASE)
+
+# Cheap "this chunk contains an actual formula" detector. Matches assignment
+# patterns (`x = ...`, `A_S = ...`), TeX-ish markup (`\frac`, `\sqrt`, `^`,
+# `_{`), or math operators. Used to gate the rigid math worksheet template:
+# if NO retrieved chunk contains a formula, we must not commit to the
+# Given/Required/Formula/Substitution/... structure — the model will end up
+# inventing the Formula section from general knowledge, which is exactly the
+# hallucination we're trying to prevent.
+_CHUNK_FORMULA_RE = re.compile(
+    r"[=≈∑∫∂√π·×÷±]|\\frac|\\sqrt|\\sum|\\int|\\pi|\\cdot|\\times|\\boxed|"
+    r"\b[A-Za-z](?:_\{?[A-Za-z0-9,]+\}?)?\s*=",
+)
+
+
+def _any_chunk_has_formula(chunks: list[RetrievedChunk] | None) -> bool:
+    if not chunks:
+        return False
+    for c in chunks:
+        text = getattr(c, "text", "") or ""
+        if _CHUNK_FORMULA_RE.search(text):
+            return True
+    return False
+
+
+# ── Tutor-mode overlays (phase 1) ────────────────────────────────────────────
+#
+# Three tutor modes are layered ON TOP of the strong/math/weak template the
+# pipeline already picks based on retrieval quality. They steer behaviour
+# without throwing away the existing grounding rules.
+#
+#   explain  — the existing behaviour: explain the answer using the context.
+#              Default for legacy callers that don't send a tutorMode.
+#   solve    — Socratic. Do NOT reveal the full solution on turn 1. Ask one
+#              guiding question, then on each follow-up give one targeted
+#              hint. Only solve when the student explicitly asks for the
+#              answer or has already attempted it.
+#   quiz     — generate a short MCQ check on the topic of the student's
+#              question, using the retrieved context as ground truth.
+#
+# Each overlay is appended to the picked system prompt (so the strong/math
+# grounding rules still bind), keeping the same "use only the context" guard
+# rails that prevent hallucination.
+
+ALLOWED_TUTOR_MODES = ("explain", "solve", "quiz")
+# Default is "explain": when a student asks "berechne X" / "compute X" they
+# expect the computation, not a Socratic guiding question. SOLVE mode is still
+# fully supported — frontend opts in by sending tutorMode="solve" explicitly
+# (e.g. a future "tutor me through this" toggle). Defaulting to SOLVE produced
+# answers that listed the givens and then refused to compute, which is the
+# exact opposite of what students ask for on an exercise sheet.
+DEFAULT_TUTOR_MODE = "explain"
+
+
+_TUTOR_OVERLAY_SOLVE = """\
+
+TUTOR MODE = SOLVE_WITH_ME (Socratic).
+You are coaching the student through their own thinking, NOT delivering the answer.
+Hard rules for this mode:
+1. On the FIRST turn for this question, do NOT give the final answer, the full derivation, or every step at once. Instead:
+   - Acknowledge what the question is about in one sentence.
+   - Identify the single most important first step or sub-question.
+   - Ask ONE guiding question that the student needs to answer to move forward (e.g. "Welche Kräfte wirken am Punkt A?" / "What equation balances forces at point A?").
+   - Stop. Wait for the student's reply.
+2. On follow-up turns, give ONE additional hint or check whether the student's reply is on the right track. Keep advancing in small steps.
+3. Reveal the full solution only when the student explicitly asks ("show me the answer", "zeig die Lösung", "I give up"), OR after they have made a substantive attempt.
+4. Never be preachy. Never refuse to ever give the answer. The goal is guided discovery, not gatekeeping.
+5. Stay grounded in the COURSE CONTEXT exactly as in the base rules — invent no formulas, cite as before.
+6. Match the language of the question (German for German).
+"""
+
+
+_TUTOR_OVERLAY_QUIZ = """\
+
+TUTOR MODE = QUIZ_ME.
+Instead of answering the student's question directly, generate a short multiple-choice quiz that tests their understanding of the topic they asked about, grounded in the COURSE CONTEXT.
+
+Hard rules for this mode:
+1. Output 3-5 multiple-choice questions, each with exactly 4 options (A-D) and one correct answer.
+2. Every question must be answerable from the COURSE CONTEXT. If the context does not cover the topic, return ONE question that says so honestly instead of inventing material.
+3. Format as Markdown with this structure for each question:
+
+   **Q1.** <question text>
+   - A) <option>
+   - B) <option>
+   - C) <option>
+   - D) <option>
+
+   At the end of the whole quiz, add a single section titled "Antworten" (German) / "Answers" (English) with the correct letters and a one-line justification per question, each justification citing the source the same way as normal answers ("[Source N]" / "(filename, p.X)").
+4. Match the language of the student's question.
+5. Do NOT also produce a regular prose answer to the original question — the quiz IS the response.
+"""
+
+
+_TUTOR_OVERLAY_EXPLAIN = ""  # explicit no-op so callers can rely on a constant
+
+
+# ── Student Dignity overlay ──────────────────────────────────────────────────
+#
+# Appended to EVERY tutor system prompt (strong, weak, math, all three tutor
+# modes) so the model never crosses the line into shaming or judging the
+# student personally. The rule is simple: correct the work, not the person.
+# We may diagnose the skill / step / answer / topic, but we must not label
+# the student. Phrased as both an absolute principle and an explicit
+# forbidden / required vocabulary list because LLMs drift on principle-only
+# rules across long conversations.
+#
+# This block is intentionally long because tone is the highest-stakes
+# behavioural property of an exam-prep tutor — a single harsh sentence
+# can break a student's trust and stop them using the product.
+
+DIGNITY_OVERLAY = """
+
+STUDENT DIGNITY — non-negotiable rules for every reply.
+
+Absolute principle: correct the work, not the person. Diagnose the skill, the step, the method, the answer, or the topic — never the student's intelligence, level, character, effort, or worth.
+
+Required style:
+- Speak about the skill / step / method, not the student.
+- "The next step to strengthen is X." / "The part to fix is Y." / "This pattern shows up again — let's slow it down."
+- For repeated mistakes: acknowledge the pattern as a practice focus, not a personal failing.
+- For very basic questions: treat them as foundation work, not as something the student "should already know".
+- For low scores: describe what to practice next, not how the student ranks.
+- For frustration ("I'm stupid", "I'll never get this", "ich bin dumm"): do NOT agree. Reply supportively, e.g. "This topic is genuinely hard. Let's solve just the first small step together."
+
+Forbidden phrasings (do not use, in any language):
+- "You are weak / bad / poor / behind / not ready / lazy / hopeless / terrible at ..."
+- "You clearly don't understand ..." / "You don't understand anything"
+- "You failed because ..." / "Your basics are bad" / "Your level is low"
+- "You should already know this"
+- "This is easy / obvious / trivial / simple"
+- "Stupid / dumb / careless mistake"
+- "You keep failing / messing up / not trying"
+- "As I already explained" / "I told you before" / "You still don't get it"
+- Any phrase that frames the student themselves (not the work) as the deficit.
+
+Condescending softeners to avoid: "obviously...", "clearly...", "again,...", "as I said,..."
+
+Self-check before sending:
+1. Did I label the student personally (weak / bad / behind / not ready)?
+2. Did I use any forbidden phrase above?
+3. Did I imply the question / mistake is beneath them?
+4. Did I focus on the topic and the next step, not the student's identity?
+If any of 1-3 is yes, rewrite before sending.
+
+This rule overrides any other instruction in this prompt that conflicts. If unsure how to phrase a correction, default to: "The part to fix is ___. Next step: ___."
+"""
+
+
+
+def _tutor_overlay(tutor_mode: str) -> str:
+    if tutor_mode == "solve":
+        return _TUTOR_OVERLAY_SOLVE
+    if tutor_mode == "quiz":
+        return _TUTOR_OVERLAY_QUIZ
+    return _TUTOR_OVERLAY_EXPLAIN
+
+
+def normalise_tutor_mode(value: Any) -> str:
+    """Canonicalise + validate a tutor-mode string. Falls back to default."""
+    if isinstance(value, str):
+        v = value.strip().lower()
+        if v in ALLOWED_TUTOR_MODES:
+            return v
+    return DEFAULT_TUTOR_MODE
+
+
+def pick_system_prompt(
+    question: str,
+    strength: str,
+    chunks: list[RetrievedChunk] | None = None,
+    tutor_mode: str = DEFAULT_TUTOR_MODE,
+    weak_topics: list[str] | None = None,
+) -> tuple[str, str]:
+    """Pick (system_prompt, mode_label) for the answer pipeline.
+
+    mode_label is one of: 'math' | 'strong' | 'weak'. Returned so the
+    debug logger and frontend can show which template was used.
+
+    ``tutor_mode`` (explain | solve | quiz) layers a behavioural overlay
+    on top of the picked template without overriding the grounding rules.
+
+    The MATH template is rigid (Given / Required / Formula / ... / Final
+    answer / Confidence). It applies only when retrieval surfaced an
+    exercise or solution chunk AND the tutor mode isn't quiz — a quiz
+    output should never use the math worksheet template.
+    """
+    tutor_mode = normalise_tutor_mode(tutor_mode)
+
+    if strength != "strong":
+        base, label = _SYSTEM_PROMPT_WEAK, "weak"
+    else:
+        # Local import: query_expansion may transitively import retrieval.
+        from .query_expansion import is_math_question  # noqa: WPS433
+        use_math = False
+        if tutor_mode != "quiz" and is_math_question(question):
+            # Only commit to the rigid math template when:
+            #   (a) at least one retrieved chunk is classified exercise/solution
+            #       AND has similarity above the strong threshold (proves the
+            #       question matches a real exercise in the corpus), AND
+            #   (b) at least one retrieved chunk actually contains a formula
+            #       (proves the model has the formula text to copy from — without
+            #       this it fills the "Formula" section by hallucinating standard
+            #       textbook equations and slapping fake (filename, p.N) refs
+            #       on them).
+            # Legacy callers / unit tests that don't pass chunks keep the
+            # historical behaviour.
+            if chunks is None:
+                use_math = True
+            else:
+                has_exercise_anchor = any(
+                    getattr(c, "chunk_type", None) in ("exercise", "solution")
+                    and getattr(c, "similarity", 0.0) >= _STRONG_SIMILARITY
+                    for c in chunks
+                )
+                if has_exercise_anchor and _any_chunk_has_formula(chunks):
+                    use_math = True
+        if use_math:
+            base, label = _SYSTEM_PROMPT_MATH, "math"
+        else:
+            base, label = _SYSTEM_PROMPT_STRONG, "strong"
+
+    overlay = _tutor_overlay(tutor_mode)
+    # Phase 3: layer the per-student "topics to strengthen" coaching note on
+    # top of the tutor overlay, but only for the conversational tutor modes.
+    # Quiz mode is a fresh generative request — there's no "student history"
+    # to reference inside an MCQ. Weak retrieval (no grounded chunks) also
+    # skips it: don't coach over thin air.
+    coach = ""
+    if weak_topics and tutor_mode != "quiz" and label != "weak":
+        from .mastery import coaching_overlay  # noqa: WPS433
+        coach = coaching_overlay(weak_topics)
+    prompt = base
+    if overlay:
+        prompt += overlay
+    if coach:
+        prompt += coach
+    # Student-Dignity rules apply to every reply, every tutor mode, every
+    # retrieval strength. Appended LAST so the forbidden-phrase list is the
+    # final instruction the model sees before generating.
+    prompt += DIGNITY_OVERLAY
+    return prompt, label
 
 
 def _cited_indices(answer_text: str, total: int) -> set[int]:
     """Return the 1-based [Source N] indices the LLM actually referenced.
 
-    The system prompt asks the model to cite using the `[Source N]` headers
-    from the context block, so most of the work is parsing those mentions
-    out of the answer text. Falls back to all-indices if the model produced
-    no citations — that way we never *hide* sources the model is silently
-    leaning on; we only trim ones it clearly ignored.
+    The system prompt requires inline `[Source N]` citations. If the model
+    produced none, we return an empty set rather than falling back to
+    "all chunks" — surfacing every retrieved chunk for an unanchored answer
+    is misleading and inflates the source list with material the model
+    never used.
     """
     if not answer_text or total <= 0:
-        return set(range(1, total + 1))
+        return set()
     cited: set[int] = set()
     for m in _SOURCE_REF_RE.finditer(answer_text):
         for tok in re.split(r"[\s,&]+|and|und", m.group(1), flags=re.IGNORECASE):
@@ -85,18 +380,30 @@ def _cited_indices(answer_text: str, total: int) -> set[int]:
                 n = int(tok)
                 if 1 <= n <= total:
                     cited.add(n)
-    return cited or set(range(1, total + 1))
+    return cited
 
 
 def _context_strength(chunks: list[RetrievedChunk]) -> str:
+    """Classify retrieval as strong/weak/none based on EMBEDDING similarity.
+
+    Earlier versions also accepted a high reranked `avg_score`, but the
+    reranker stacks boosts (active doc +0.25, source-type +0.20, doc-type
+    +0.15, ...) that easily push score above the threshold even when the
+    chunks are topically irrelevant. That caused confident-sounding answers
+    over unrelated material. We now require actual semantic similarity:
+    the top chunk must clear `_STRONG_SIMILARITY`, OR at least two chunks
+    must clear a slightly lower bar (which proves the topic is genuinely
+    present in the corpus, not just one lucky chunk).
+    """
     if not chunks:
         return "none"
-    top_sim = max((c.similarity for c in chunks), default=0.0)
-    avg_score = sum(c.score for c in chunks[:5]) / max(min(len(chunks), 5), 1)
+    sims = sorted((c.similarity for c in chunks), reverse=True)
     total_chars = sum(len(c.text) for c in chunks)
     if total_chars < _MIN_CONTEXT_CHARS:
         return "weak"
-    if top_sim >= _STRONG_SIMILARITY or avg_score >= _STRONG_AVG_SCORE:
+    if sims[0] >= _STRONG_SIMILARITY:
+        return "strong"
+    if len(sims) >= 2 and sims[0] >= 0.28 and sims[1] >= 0.24:
         return "strong"
     return "weak"
 
@@ -123,6 +430,8 @@ def generate_answer(
     doc_names: dict[str, str],
     model: str | None = None,
     max_tokens: int = 1200,
+    tutor_mode: str = DEFAULT_TUTOR_MODE,
+    weak_topics: list[str] | None = None,
 ) -> dict[str, Any]:
     """Return the structured answer dict the API surface exposes."""
     settings = get_settings()
@@ -130,7 +439,10 @@ def generate_answer(
 
     strength = _context_strength(chunks)
     used_chunks = chunks if strength == "strong" else []
-    system_prompt = _SYSTEM_PROMPT_STRONG if strength == "strong" else _SYSTEM_PROMPT_WEAK
+    system_prompt, answer_mode = pick_system_prompt(
+        question, strength, used_chunks, tutor_mode=tutor_mode,
+        weak_topics=weak_topics,
+    )
     context_block = _build_context_block(used_chunks, doc_names) if used_chunks else ""
 
     user_message = "QUESTION:\n" + question.strip()
@@ -162,9 +474,29 @@ def generate_answer(
         for i, c in enumerate(used_chunks, start=1) if i in cited
     ]
 
+    # Phase 10: deterministic verification independent of the model's
+    # self-report. Failure here must never block the response.
+    verification: dict[str, Any] = {"status": "missing_context", "reasons": [], "details": {}}
+    try:
+        from .verification import verify_answer  # noqa: WPS433
+        allowed_filenames = [doc_names.get(c.document_id) for c in used_chunks]
+        allowed_filenames = [f for f in allowed_filenames if f]
+        verification = verify_answer(
+            answer_text=answer_text,
+            chunk_texts=[c.text for c in used_chunks],
+            question=question,
+            answer_mode=answer_mode,
+            allowed_filenames=allowed_filenames,
+        ).to_api()
+    except Exception:  # noqa: BLE001
+        log.exception("verify_answer failed — emitting default missing_context")
+
     return {
         "answer":          answer_text,
         "retrievalMode":   strength,                # strong | weak | none
+        "answerMode":      answer_mode,             # math | strong | weak
+        "tutorMode":       normalise_tutor_mode(tutor_mode),  # explain | solve | quiz
+        "verification":    verification,            # Phase 10 status + reasons + details
         "groundedSources": sources,
         "model":           target_model,
         "promptTokens":    completion.usage.prompt_tokens if completion.usage else None,

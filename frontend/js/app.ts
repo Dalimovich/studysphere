@@ -59,6 +59,10 @@ import { runMultiSummary as _runMultiSummary } from './features/ai-chat/multi-su
 import {
   createCheckoutSession as _createCheckoutSession,
   createPortalSession as _createPortalSession,
+  pauseSubscription as _pauseSubscription,
+  resumeSubscription as _resumeSubscription,
+  cancelSubscription as _cancelSubscription,
+  applyRetentionDiscount as _applyRetentionDiscount,
   verifyPayment as _verifyPayment,
   activatePayPalSubscription as _activatePayPalSubscription,
   loadBillingConfig as _loadBillingConfig,
@@ -175,7 +179,28 @@ function _fetchPdfBytes(path: string, cb: (b: Uint8Array) => void, onError?: (e:
 }
 function openFile(f: unknown, course: LegacyCourse): void {
   _clearResumeFile();
+  _recordCourseFileOpen(course, f as { name?: string } | null | undefined);
   _openFile(f as Parameters<typeof _openFile>[0], course);
+}
+
+// Per-course set of file names the user has opened at least once. Stored in
+// localStorage as a JSON array (Set isn't JSON-serializable). Caller is the
+// only writer; readers (e.g. the courses grid) compute opened/total from this.
+const _OPENED_MAX = 500;
+function _recordCourseFileOpen(course: LegacyCourse | null | undefined, file: { name?: string } | null | undefined): void {
+  if (!course || !course.id || !file || !file.name) return;
+  try {
+    localStorage.setItem('ss_lastopen_' + course.id, String(Date.now()));
+  } catch { /* quota */ }
+  const key = 'ss_opened_' + course.id;
+  try {
+    const raw = localStorage.getItem(key);
+    const arr: string[] = raw ? JSON.parse(raw) : [];
+    if (arr.includes(file.name)) return;
+    arr.push(file.name);
+    if (arr.length > _OPENED_MAX) arr.splice(0, arr.length - _OPENED_MAX);
+    localStorage.setItem(key, JSON.stringify(arr));
+  } catch { /* corrupted entry or quota — skip silently */ }
 }
 function downloadFile(fname: string): unknown { return _downloadFile(fname); }
 window._fetchPdfBytes = _fetchPdfBytes;
@@ -183,7 +208,7 @@ window.openFile = openFile;
 window.downloadFile = downloadFile;
 
 // ── STATE ──────────────────────────────────────────────────────────────────
-let activeSemId = 'ws2526';
+let activeSemId = 'ss2526';
 let activeCourseId: string | null = null;
 let activeFileName: string | null = null;
 let currentCourseShort = '';
@@ -274,7 +299,7 @@ publishLegacyGlobals({
 });
 
 // ── COURSES DASHBOARD ─────────────────────────────────────────────────────
-let sdActiveSemId = 'ws2526';
+let sdActiveSemId = 'ss2526';
 (window as unknown as { sdActiveSemId: string }).sdActiveSemId = sdActiveSemId;
 exposeLegacyVar('sdActiveSemId', () => sdActiveSemId, (v: string) => {
   sdActiveSemId = v;
@@ -484,11 +509,29 @@ document.getElementById('pdfFit')?.addEventListener('click', () => {
 document.getElementById('pdfDownload')?.addEventListener('click', () => {
   if (activeFileName) downloadFile(activeFileName);
 });
+document.getElementById('pdfBack')?.addEventListener('click', () => {
+  const w = window as unknown as {
+    activeCourseRef?: { id?: string } & Record<string, unknown>;
+    showCourseSection?: (course: unknown, section: string) => void;
+    showPortalSection?: (section: string) => void;
+  };
+  if (w.activeCourseRef && typeof w.showCourseSection === 'function') {
+    w.showCourseSection(w.activeCourseRef, 'files');
+    return;
+  }
+  if (typeof w.showPortalSection === 'function') w.showPortalSection('courses');
+});
 document.getElementById('pdfAll')?.addEventListener('click', () => {
   pdfShowAll = !pdfShowAll;
   const btn = document.getElementById('pdfAll');
   if (btn) btn.textContent = pdfShowAll ? 'Single page' : 'All pages';
   renderPages();
+});
+// In-toolbar Study button — delegates to the existing topbar trigger so the
+// Focus Session popup, click-outside guard, and timer state all stay in sync.
+document.getElementById('pdfStudyBtn')?.addEventListener('click', () => {
+  const stBtn = document.getElementById('studyTechBtn') as HTMLButtonElement | null;
+  if (stBtn) stBtn.click();
 });
 
 // ── AI PANEL ──────────────────────────────────────────────────────────────
@@ -679,6 +722,10 @@ initLandingAuthBridge({ authBridge: _authBridge });
 (window as unknown as { _subService: Record<string, unknown> })._subService = {
   createCheckoutSession: _createCheckoutSession,
   createPortalSession: _createPortalSession,
+  pauseSubscription: _pauseSubscription,
+  resumeSubscription: _resumeSubscription,
+  cancelSubscription: _cancelSubscription,
+  applyRetentionDiscount: _applyRetentionDiscount,
   verifyPayment: _verifyPayment,
   activatePayPalSubscription: _activatePayPalSubscription,
   loadBillingConfig: _loadBillingConfig,

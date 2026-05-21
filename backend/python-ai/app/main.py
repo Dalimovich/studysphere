@@ -20,6 +20,7 @@ from .routers import index as index_router
 from .routers import misc as misc_router
 from .routers import notes_full as notes_full_router
 from .routers import stream as stream_router
+from .routers import writing_coach as writing_coach_router
 from .supabase_client import get_supabase
 
 settings = get_settings()
@@ -34,14 +35,26 @@ app = FastAPI(
 
 # CORS — the streaming /ask-stream endpoint is called directly from the
 # browser (bypasses the Netlify proxy so the connection can stay open for
-# SSE). Restrict to the production domain + Netlify preview hosts.
+# SSE). Restrict to the production domain + Netlify preview hosts. Localhost
+# origins are added in non-production environments only — without them a dev
+# frontend served from `localhost:8888` hitting prod `python-ai.fly.dev` gets
+# a 400 on the CORS preflight (the user is not bypassing auth — JWT still
+# verifies — they're just letting the browser pass the preflight).
+_cors_origins = [
+    "https://minallo.de",
+    "https://www.minallo.de",
+    "https://minallo-website.netlify.app",
+]
+if settings.environment != "production":
+    _cors_origins += [
+        "http://localhost:8888",
+        "http://127.0.0.1:8888",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://minallo.de",
-        "https://www.minallo.de",
-        "https://minallo-website.netlify.app",
-    ],
+    allow_origins=_cors_origins,
     allow_origin_regex=r"^https://deploy-preview-\d+--minallo\.netlify\.app$",
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
@@ -55,6 +68,7 @@ app.include_router(stream_router.router)
 app.include_router(chat_router.router)
 app.include_router(misc_router.router)
 app.include_router(notes_full_router.router)
+app.include_router(writing_coach_router.router)
 
 
 @app.get("/health")

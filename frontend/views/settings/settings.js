@@ -52,11 +52,17 @@ async function saveSettings(patch) {
 }
 
 (function bindSettingsControls() {
+  function _markDirty() {
+    var el = document.getElementById('settingsSaveState');
+    if (el) { el.textContent = _t('set_unsaved'); el.className = 'settings-save-state dirty'; }
+  }
+
   var settingsLanguage = document.getElementById('settingsLanguage');
   if (settingsLanguage) {
     settingsLanguage.value = window._lang || localStorage.getItem('ss_lang') || 'en';
     settingsLanguage.addEventListener('change', function () {
       if (typeof window.applyLanguage === 'function') window.applyLanguage(this.value);
+      _markDirty();
     });
   }
 
@@ -74,6 +80,7 @@ async function saveSettings(patch) {
     dmToggle.addEventListener('change', function () {
       if (typeof window._applyTheme === 'function') window._applyTheme(this.checked, this);
       else if (typeof _applyTheme === 'function') _applyTheme(this.checked, this);
+      _markDirty();
     });
     var nightBtn = document.getElementById('nightBtn');
     if (nightBtn) {
@@ -97,6 +104,7 @@ async function saveSettings(patch) {
     settingsAutoOpen.addEventListener('change', function () {
       _autoOpenEnabled = this.checked;
       window._autoOpenEnabled = _autoOpenEnabled;
+      _markDirty();
     });
   }
 
@@ -123,6 +131,7 @@ async function saveSettings(patch) {
     settingsSaveChat.addEventListener('change', function () {
       _saveChatEnabled = this.checked;
       window._saveChatEnabled = _saveChatEnabled;
+      _markDirty();
     });
   }
 
@@ -138,9 +147,10 @@ async function saveSettings(patch) {
   window.addEventListener('beforeunload', _ssUnloadSave);
   window.addEventListener('pagehide', _ssUnloadSave);
 
-  var dangerBtn = document.querySelector('.settings-danger-btn');
+  var dangerBtn = document.getElementById('clearChatHistoryBtn');
   if (dangerBtn) {
     dangerBtn.addEventListener('click', function () {
+      if (!confirm(_t('settings_clear_confirm'))) return;
       Object.keys(localStorage)
         .filter(function (k) {
           return k.startsWith('ss_chat_');
@@ -156,6 +166,10 @@ async function saveSettings(patch) {
   var saveSettingsBtn = document.getElementById('saveSettingsBtn');
   if (saveSettingsBtn) {
     saveSettingsBtn.addEventListener('click', async function () {
+      var btn = this;
+      var stateEl = document.getElementById('settingsSaveState');
+      btn.disabled = true;
+      if (stateEl) { stateEl.textContent = _t('set_saving'); stateEl.className = 'settings-save-state dirty'; }
       var lang =
         (document.getElementById('settingsLanguage') || {}).value ||
         window._lang ||
@@ -173,47 +187,47 @@ async function saveSettings(patch) {
             localStorage.removeItem(k);
           });
       }
-      await saveSettings({
-        language: lang,
-        auto_open_ai: autoOpen,
-        save_chat_history: saveChat,
-        dark_mode: darkMode
-      });
-      showToast(_t('toast_settings_saved'), _t('toast_settings_saved_sub'));
+      try {
+        await saveSettings({
+          language: lang,
+          auto_open_ai: autoOpen,
+          save_chat_history: saveChat,
+          dark_mode: darkMode
+        });
+        showToast(_t('toast_settings_saved'), _t('toast_settings_saved_sub'));
+        if (stateEl) { stateEl.textContent = _t('set_saved'); stateEl.className = 'settings-save-state saved'; }
+        setTimeout(function () {
+          btn.disabled = false;
+          var el = document.getElementById('settingsSaveState');
+          if (el) { el.textContent = ''; el.className = 'settings-save-state'; }
+        }, 1500);
+      } catch (err) {
+        console.error('saveSettings click error:', err);
+        btn.disabled = false;
+        if (stateEl) { stateEl.textContent = _t('set_save_failed'); stateEl.className = 'settings-save-state error'; }
+      }
     });
   }
 
   var logoutBtn = document.getElementById('logoutBtn');
   if (logoutBtn) {
-    logoutBtn.addEventListener('click', function () {
-      localStorage.removeItem('sb_token');
-      localStorage.removeItem('sb_refresh');
-      sessionStorage.removeItem('sb_sess_refresh');
+    logoutBtn.addEventListener('click', async function () {
+      // Defer to supabase.js — it already clears sb_sess_token/sb_sess_refresh
+      // in BOTH localStorage and sessionStorage, wipes per-course caches, and
+      // revokes the token server-side. The previous hand-rolled cleanup only
+      // touched sessionStorage so the persistent localStorage token survived
+      // and auth-bootstrap.js re-flagged the user as logged in on reload.
+      try {
+        if (window._sb && window._sb.auth) await window._sb.auth.signOut();
+      } catch (e) { /* network failure is fine — local state is already wiped */ }
       localStorage.removeItem('ss_user_type');
-      sessionStorage.removeItem('sb_sess_token');
-      sessionStorage.removeItem('ss_last_active');
-      sessionStorage.removeItem('ss_logged_in');
+      // Trial-device markers must clear too, otherwise a re-login on the
+      // same browser still reads _deviceHadTrial=true.
+      localStorage.removeItem('minallo_trial_used');
       window._userType = 'enrolled';
       window._germanTest = '';
       window._germanLevel = '';
-      _applyUserTypeUI();
-      _sbToken = null;
-      _currentUser = null;
-      var portal = document.getElementById('portal');
-      if (portal) {
-        portal.classList.remove('show');
-        portal.style.display = 'none';
-      }
-      var ai = document.getElementById('authIndicator');
-      if (ai) ai.style.display = 'none';
-      if (typeof _setAuthMode === 'function') _setAuthMode('signin');
-      var emailEl = document.getElementById('authEmail');
-      var pwEl = document.getElementById('authPassword');
-      if (emailEl) emailEl.value = '';
-      if (pwEl) pwEl.value = '';
-      var authModal = document.getElementById('authModal');
-      if (authModal) authModal.style.display = 'flex';
-      showToast(_t('toast_signed_out'), _t('toast_signed_out_sub'));
+      window.location.reload();
     });
   }
 
@@ -226,11 +240,11 @@ async function saveSettings(patch) {
       modal.innerHTML =
         '<div style="background:linear-gradient(135deg,#110d20,#0d0f1e);border:1px solid rgba(239,68,68,.3);border-radius:20px;padding:36px 32px;width:380px;max-width:calc(100vw - 32px);display:flex;flex-direction:column;gap:16px;text-align:center">' +
         '<div style="font-size:2rem">!</div>' +
-        '<div style="font-family:\'Fredoka One\',cursive;font-size:1.3rem;color:#f87171">Delete your account?</div>' +
-        '<div style="font-size:.82rem;color:rgba(255,255,255,.5);font-weight:700;line-height:1.6">This will permanently delete your account and all associated data including notes, settings, and chat history. <strong style="color:rgba(239,68,68,.8)">This cannot be undone.</strong></div>' +
+        '<div style="font-family:\'Fredoka One\',cursive;font-size:1.3rem;color:#f87171">' + _t('settings_delete_modal_title') + '</div>' +
+        '<div style="font-size:.82rem;color:rgba(255,255,255,.5);font-weight:700;line-height:1.6">' + _t('settings_delete_modal_desc') + '</div>' +
         '<div style="display:flex;gap:10px;margin-top:4px">' +
-        '<button id="delAccCancel" style="flex:1;padding:12px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:30px;font-family:\'Nunito\',sans-serif;font-weight:800;font-size:.88rem;color:rgba(255,255,255,.7);cursor:pointer">Cancel</button>' +
-        '<button id="delAccConfirm" style="flex:1;padding:12px;background:rgba(239,68,68,.2);border:1px solid rgba(239,68,68,.4);border-radius:30px;font-family:\'Nunito\',sans-serif;font-weight:800;font-size:.88rem;color:#f87171;cursor:pointer">Yes, delete</button>' +
+        '<button id="delAccCancel" style="flex:1;padding:12px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:30px;font-family:\'Nunito\',sans-serif;font-weight:800;font-size:.88rem;color:rgba(255,255,255,.7);cursor:pointer">' + _t('settings_delete_modal_cancel') + '</button>' +
+        '<button id="delAccConfirm" style="flex:1;padding:12px;background:rgba(239,68,68,.2);border:1px solid rgba(239,68,68,.4);border-radius:30px;font-family:\'Nunito\',sans-serif;font-weight:800;font-size:.88rem;color:#f87171;cursor:pointer">' + _t('settings_delete_modal_confirm') + '</button>' +
         '</div></div>';
       document.body.appendChild(modal);
 
@@ -240,7 +254,7 @@ async function saveSettings(patch) {
 
       document.getElementById('delAccConfirm').addEventListener('click', async function () {
         var btn = this;
-        btn.textContent = 'Deleting...';
+        btn.textContent = _t('set_deleting');
         btn.disabled = true;
         var token = _sbToken || sessionStorage.getItem('sb_sess_token');
         var uid = _currentUser && _currentUser.id;
@@ -274,17 +288,31 @@ async function saveSettings(patch) {
             } catch (e) {}
           }
         }
+        // Auth-user deletion must succeed before we wipe local state and
+        // reload — otherwise the user signs back in to a still-alive account
+        // (FK constraints to auth.users without ON DELETE CASCADE cause the
+        // Supabase Auth Admin API to return a 500 here; surface it instead of
+        // silently pretending the account was deleted).
+        var deleteOk = false;
         try {
-          await fetch('/api/admin-users', {
+          var delRes = await fetch('/api/admin-users', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
             body: JSON.stringify({ action: 'deleteself', token: token })
           });
-        } catch (e) {}
+          deleteOk = delRes.ok;
+        } catch (e) { deleteOk = false; }
+        if (!deleteOk) {
+          btn.textContent = _t('set_yes_delete');
+          btn.disabled = false;
+          showToast(_t('settings_delete_failed'), _t('settings_delete_failed_sub'));
+          return;
+        }
+        try { if (window._sb && window._sb.auth) await window._sb.auth.signOut(); } catch (e) {}
         localStorage.clear();
         sessionStorage.clear();
         document.body.removeChild(modal);
-        showToast('Account deleted', 'Your account has been permanently removed.');
+        showToast(_t('settings_account_deleted'), _t('settings_account_deleted_sub'));
         setTimeout(function () {
           window.location.reload();
         }, 1800);

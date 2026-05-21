@@ -19,10 +19,29 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from ..jwt_auth import verify_supabase_jwt
+from ..services.access_control import (
+    enforce_interactive_cap,
+    enforce_rate_limit,
+    require_active_subscription,
+)
+from ..services.answer import DEFAULT_TUTOR_MODE, normalise_tutor_mode
 from ..services.answer_stream import stream_answer
 from ..services.cache import fetch_document_version_hash, lookup_answer, save_answer
-from ..services.retrieval import retrieve_chunks
+from ..services.retrieval import retrieve_chunks, retrieve_exercise_block, retrieve_formula_block
+from ..services.retrieval_debug import DebugPayload, record_retrieval_debug
 from ..supabase_client import get_supabase
+
+# Same hourly cap as the Netlify /api/ai/ask path so the two surfaces share
+# one budget. Override via env if needed; defaults to 30/hour to leave headroom
+# for the new tighter limits and stay well inside per-user cost expectations.
+_ASK_STREAM_RATE_LIMIT_MAX = 30
+_ASK_STREAM_RATE_LIMIT_WINDOW_SECONDS = 60 * 60
+_MAX_STREAM_QUESTION_CHARS = 8000
+_MAX_STREAM_OPEN_FILE_CTX_CHARS = 20000
+# Mirror backend/lib/rate-limit.ts INTERACTIVE_MONTHLY_CAP. /ask-stream is an
+# interactive RAG call (cheap per request on gpt-4o-mini) so it lives in the
+# interactive bucket alongside /api/ai/ask and the writing coach.
+_INTERACTIVE_MONTHLY_CAP = 2000
 
 log = logging.getLogger(__name__)
 
@@ -53,8 +72,20 @@ def _verify_user_owns_documents(user_id: str, course_id: str, document_ids: list
 class AskStreamRequest(BaseModel):
     courseId: str
     documentIds: list[str] | None = None
+    activeDocumentId: str | None = None
     question: str
-    bypassCache: bool = False
+    # The file name + a slice of text from whatever the user is currently
+    # looking at in the PDF reader. Surfaced into the user message so the
+    # model can ground "this question / this section" references even when
+    # retrieval doesn't surface the exact chunk. Both optional.
+    activeFileName: str | None = None
+    openFileContext: str | None = None
+    # Tutor-mode overlay: explain | solve | quiz. Defaults to 'solve'.
+    tutorMode: str | None = None
+    # bypassCache is intentionally NOT exposed on the public API. The cache
+    # is keyed by document_version_hash so it invalidates automatically when
+    # documents change; letting the client opt out defeats the single biggest
+    # cost mitigation. Any field the client sends is ignored.
 
 
 def _sse_bytes(payload: str) -> bytes:
@@ -64,19 +95,51 @@ def _sse_bytes(payload: str) -> bytes:
 @router.post("/ask-stream")
 async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(verify_supabase_jwt)):
     user_id = user["id"]
+    # Paid feature — verify subscription before doing anything expensive.
+    require_active_subscription(user_id, "ask_stream")
+    enforce_interactive_cap(user_id, _INTERACTIVE_MONTHLY_CAP)
+    enforce_rate_limit(
+        user_id,
+        "ask_stream",
+        _ASK_STREAM_RATE_LIMIT_MAX,
+        _ASK_STREAM_RATE_LIMIT_WINDOW_SECONDS,
+        "AI request limit reached. Please try again later.",
+    )
+
     if payload.documentIds:
         for did in payload.documentIds:
             _require_uuid(did, "documentId")
+    if payload.activeDocumentId:
+        _require_uuid(payload.activeDocumentId, "activeDocumentId")
     doc_name_map = _verify_user_owns_documents(user_id, payload.courseId, payload.documentIds)
+    if payload.activeDocumentId:
+        doc_name_map.update(_verify_user_owns_documents(
+            user_id, payload.courseId, [payload.activeDocumentId]
+        ))
 
     question = (payload.question or "").strip()
     if not question:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="question is required")
+    if len(question) > _MAX_STREAM_QUESTION_CHARS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="question is too long")
+
+    tutor_mode = normalise_tutor_mode(payload.tutorMode or DEFAULT_TUTOR_MODE)
+    if payload.openFileContext and len(payload.openFileContext) > _MAX_STREAM_OPEN_FILE_CTX_CHARS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="openFileContext is too long")
 
     # ── Cache check (same logic as /ask) ─────────────────────────────────────
+    # When the request carries openFileContext (the user is reading a PDF
+    # and asking "this question / this section"), the answer is bound to
+    # whatever page is visible — not just the document set. Bypass cache to
+    # avoid returning a previous answer composed against a different page.
     version_hash = ""
     cached = None
-    if payload.documentIds and not payload.bypassCache:
+    has_open_ctx = bool(payload.openFileContext and payload.openFileContext.strip())
+    # Cache only makes sense for the legacy 'explain' mode. 'solve' is
+    # conversational and 'quiz' is generative, so we never want to serve
+    # a stale answer for either.
+    cacheable = tutor_mode == "explain"
+    if payload.documentIds and not has_open_ctx and cacheable:
         version_hash = fetch_document_version_hash(user_id, payload.courseId, payload.documentIds)
         cached = lookup_answer(
             user_id=user_id, course_id=payload.courseId,
@@ -87,10 +150,24 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
         # Emit the cached answer in a single 'done' event so the client
         # renders it without setup overhead.
         import json
+        # Cached answers carry the verification block they were generated
+        # with — honour it instead of falling back to the legacy
+        # retrievalMode→confidence mapping (which mislabels uncited answers
+        # as 'high').
+        cached_v = cached.get("verification") if isinstance(cached, dict) else None
+        cached_v_status = cached_v.get("status") if isinstance(cached_v, dict) else None
+        if cached_v_status == "verified":
+            cached_confidence = "high"
+        elif cached_v_status == "partially_verified":
+            cached_confidence = "medium"
+        elif cached_v_status == "missing_context":
+            cached_confidence = "low"
+        else:
+            cached_confidence = "high" if cached.get("retrievalMode") == "strong" else "low"
         yield _sse_bytes(json.dumps({
             "meta": True,
             "retrievalMode": cached.get("retrievalMode", "strong"),
-            "confidence": "high" if cached.get("retrievalMode") == "strong" else "low",
+            "confidence": cached_confidence,
             "unsupported": cached.get("retrievalMode") != "strong",
         }))
         # Send the answer as one token so the existing client loop renders it.
@@ -113,7 +190,8 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
         yield _sse_bytes(json.dumps({
             "done": True,
             "retrievalMode": cached.get("retrievalMode", "strong"),
-            "confidence": "high" if cached.get("retrievalMode") == "strong" else "low",
+            "confidence": cached_confidence,
+            "verification": cached_v or None,
             "unsupported": cached.get("retrievalMode") != "strong",
             "sources": sources_js,
             "cacheHit": True,
@@ -121,13 +199,43 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
         }))
 
     if cached:
+        record_retrieval_debug(DebugPayload(
+            user_id=user_id, course_id=payload.courseId,
+            endpoint="ask-stream", question=question,
+            active_document_id=payload.activeDocumentId,
+            selected_document_ids=payload.documentIds,
+            retrieval_strategy="cache",
+            retrieval_mode=cached.get("retrievalMode", "strong"),
+            candidate_doc_count=None, exercise_hit=None, chunks=[],
+            model=cached.get("model"), cache_hit=True,
+            prompt_tokens=cached.get("promptTokens"),
+            completion_tokens=cached.get("completionTokens"),
+        ))
         return StreamingResponse(cached_stream(), media_type="text/event-stream")
 
     # ── Retrieve ─────────────────────────────────────────────────────────────
+    exercise_hit = retrieve_exercise_block(
+        user_id=user_id, course_id=payload.courseId, query=question,
+        document_ids=payload.documentIds,
+        active_document_id=payload.activeDocumentId,
+    )
     chunks = retrieve_chunks(
         user_id=user_id, course_id=payload.courseId,
-        query=question, document_ids=payload.documentIds, top_k=12,
+        query=question, document_ids=payload.documentIds,
+        active_document_id=payload.activeDocumentId, top_k=12,
     )
+    if exercise_hit:
+        from .ask import _prepend_exercise_chunks  # reuse the same helper
+        chunks = _prepend_exercise_chunks(exercise_hit, chunks)
+
+    formula_hits = retrieve_formula_block(
+        user_id=user_id, course_id=payload.courseId, query=question,
+        document_ids=payload.documentIds,
+        active_document_id=payload.activeDocumentId,
+    )
+    if formula_hits:
+        from .ask import _prepend_formula_chunks  # reuse the same helper
+        chunks = _prepend_formula_chunks(formula_hits, chunks)
 
     missing_ids = [c.document_id for c in chunks if c.document_id not in doc_name_map]
     if missing_ids:
@@ -143,10 +251,19 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
     full_text_buf: list[str] = []
     captured_meta: dict[str, Any] = {}
 
+    # Phase 3: per-student weak-topic coaching note. Best-effort; failure
+    # here must never block answering.
+    from ..services.mastery import fetch_weak_topics  # noqa: WPS433
+    weak_topics = fetch_weak_topics(user_id, payload.courseId)
+
     def gen():
         import json
         gen_iter = stream_answer(
             question=question, chunks=chunks, doc_names=doc_name_map,
+            tutor_mode=tutor_mode,
+            active_file_name=payload.activeFileName,
+            open_file_context=payload.openFileContext,
+            weak_topics=weak_topics,
         )
         for chunk_bytes in gen_iter:
             # Decode the SSE event so we can intercept the closing 'done' frame.
@@ -183,7 +300,7 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
             yield chunk_bytes
 
         # After the generator finishes, persist to cache.
-        if version_hash and not payload.bypassCache and full_text_buf:
+        if version_hash and full_text_buf:
             try:
                 save_answer(
                     user_id=user_id, course_id=payload.courseId,
@@ -207,5 +324,34 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
                 )
             except Exception:
                 log.exception("cache save after stream failed (non-fatal)")
+
+        record_retrieval_debug(DebugPayload(
+            user_id=user_id, course_id=payload.courseId,
+            endpoint="ask-stream", question=question,
+            active_document_id=payload.activeDocumentId,
+            selected_document_ids=payload.documentIds,
+            retrieval_strategy=(
+                "+".join(
+                    (["exercise-exact"] if exercise_hit else [])
+                    + (["formula-exact"] if formula_hits else [])
+                    + ["vector+bm25"]
+                )
+            ),
+            retrieval_mode=captured_meta.get("retrievalMode"),
+            candidate_doc_count=len({c.document_id for c in chunks}) if chunks else 0,
+            exercise_hit=(
+                {
+                    "documentId": exercise_hit.document_id,
+                    "exerciseNumber": exercise_hit.exercise_number,
+                    "subpart": exercise_hit.subpart,
+                    "pageStart": exercise_hit.page_start,
+                    "pageEnd": exercise_hit.page_end,
+                } if exercise_hit else None
+            ),
+            chunks=chunks,
+            model=captured_meta.get("model"), cache_hit=False,
+            prompt_tokens=captured_meta.get("promptTokens"),
+            completion_tokens=captured_meta.get("completionTokens"),
+        ))
 
     return StreamingResponse(gen(), media_type="text/event-stream")

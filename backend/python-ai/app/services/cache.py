@@ -29,10 +29,19 @@ def question_hash(q: str) -> str:
     return hashlib.sha256(_normalize_question(q).encode("utf-8")).hexdigest()
 
 
+# Bump this when the answer pipeline changes (prompts, retrieval strength,
+# citation logic, ...). All existing cache rows become unreachable, forcing
+# regeneration on the next ask. Cheaper and safer than a manual DELETE.
+_CACHE_SCHEMA_VERSION = "v3-2026-05-19-rag-fixes"
+
+
 def document_version_hash(document_hashes: list[str | None]) -> str:
-    """sha256 over the sorted, non-null document_hash list."""
+    """sha256 over the sorted, non-null document_hash list, plus the
+    pipeline schema version. Bumping the schema version invalidates every
+    cached answer without touching the database."""
     cleaned = sorted(h for h in document_hashes if h)
-    return hashlib.sha256("|".join(cleaned).encode("utf-8")).hexdigest()
+    payload = _CACHE_SCHEMA_VERSION + "|" + "|".join(cleaned)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def fetch_document_version_hash(user_id: str, course_id: str, document_ids: list[str]) -> str:

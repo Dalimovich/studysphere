@@ -51,7 +51,13 @@ function _buildSystemPrompt() {
 }
 
 // ── askAI — core Q&A ──────────────────────────────────────────────────────
-askAI = function (question, skipUserBubble) {
+// `let` (not `var`!) is intentional. js/ai.js is loaded as a CLASSIC script,
+// not a module, so top-level `var` still becomes a window property — which
+// would clobber the RAG-first window.askAI installed by ai-ask-bridge. `let`
+// at the top of a non-module script stays out of window. The name `askAI` is
+// kept so the local reference at the bottom of this file (chipPrompt →
+// askAI(prompt)) still resolves to this legacy implementation.
+let askAI = function (question, skipUserBubble) {
   if (!question) return;
   generationStopped = false;
   currentGenId++;
@@ -287,7 +293,15 @@ askAI = function (question, skipUserBubble) {
       document.getElementById('aiSend').classList.remove('is-stop');
     });
 };
-window.askAI = askAI;
+// IMPORTANT: do NOT publish this legacy askAI as window.askAI. The TS bridge
+// (frontend/js/features/ai-chat/ai-ask.ts) installs a RAG-first askAI that
+// routes every course question to /ask-stream so Phase-1 verification +
+// confidence-from-verification + math-template gating apply. Overwriting it
+// here would silently bypass all grounding and let the model invent textbook
+// formulas (the Nachgiebigkeit / Schweißnaht regression). The legacy is kept
+// only as _legacyAskAI so the image-attachment hook in ai-ask-bridge can still
+// reach a vision-capable path when the user snips/attaches an image.
+window._legacyAskAI = askAI;
 
 // ── chipPrompt — quick action buttons ────────────────────────────────────
 function chipPrompt(type, level) {

@@ -1,5 +1,7 @@
 import { showCourseSection } from './course-view.js';
 import { indexExistingDocument } from '../../services/ai-service.js';
+import { guessSourceType as _guessFolderSourceType } from './source-type.js';
+import { filterOversizedFiles, warnRejected } from './upload-validate.js';
 import type { LegacyCourse } from '../../../globals.js';
 
 interface FolderUploadInput extends HTMLInputElement {
@@ -25,17 +27,6 @@ function _guessFolderDocMeta(fileName: string): DocMeta {
     return meta;
   }
   return meta;
-}
-
-function _guessFolderSourceType(fileName: string): string {
-  const n = fileName.toLowerCase();
-  if (n.includes('lösung') || n.includes('loesung') || n.includes('solution')) return 'solution';
-  if (n.includes('aufgabe') || n.includes('exercise') || n.includes('übung') || n.includes('ag_')) {
-    return 'exercise';
-  }
-  if (n.includes('exam') || n.includes('klausur') || n.includes('prüfung')) return 'exam';
-  if (n.includes('notes') || n.includes('notiz') || n.includes('mitschrift')) return 'notes';
-  return 'lecture';
 }
 
 interface CourseFileLite {
@@ -74,6 +65,7 @@ export function bindFolderEvents(co: HTMLElement, course: LegacyCourse): void {
           el.querySelector('.co-file-cb')?.classList.add('checked');
         }
       });
+      window._updateMultiBar?.();
     });
   });
 
@@ -154,8 +146,8 @@ export function bindFolderEvents(co: HTMLElement, course: LegacyCourse): void {
   if (folderUploadInput) {
     folderUploadInput.addEventListener('change', function (this: FolderUploadInput) {
       const targetFolder = this._targetFolder;
-      const files = Array.from(this.files || []);
-      if (!files.length || !targetFolder) return;
+      const picked = Array.from(this.files || []);
+      if (!picked.length || !targetFolder) return;
       const uid = window._currentUser && (window._currentUser.id || window._currentUser.sub);
       if (!uid) {
         if (typeof window.showToast === 'function') {
@@ -163,6 +155,10 @@ export function bindFolderEvents(co: HTMLElement, course: LegacyCourse): void {
         }
         return;
       }
+      const { valid: files, rejected } = filterOversizedFiles(picked);
+      warnRejected(rejected, files.length === 0);
+      try { this.value = ''; } catch { /* ignore */ }
+      if (!files.length) return;
       Promise.all(
         files.map((file) => window._ufUpload?.(uid, course, file, null, targetFolder))
       )

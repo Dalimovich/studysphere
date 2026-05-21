@@ -29,6 +29,7 @@ declare global {
     _activeSemesterId?: string;
     activeCourseId?: string | null;
     activeFileName?: string | null;
+    activeStorageName?: string | null;
     activeCourseRef?: LegacyCourse | null;
     activeCourseSection?: string;
 
@@ -227,6 +228,7 @@ declare global {
     // ── course-folders state ───────────────────────────────────────────
     _openFolders?: Set<string>;
     _selectedFiles?: Array<{ name: string; folder: string | null; sname: string | null }>;
+    _updateMultiBar?: () => void;
     _ufDeleteRemote?: (
       uid: string,
       course: LegacyCourse,
@@ -306,7 +308,10 @@ declare global {
 
     // ── course-files extras ────────────────────────────────────────────
     openAI?: () => void;
-    downloadFile?: (fname: string) => unknown;
+    downloadFile?: (
+      fname: string,
+      opts?: { storageName?: string | null; folder?: string | null; course?: LegacyCourse | null }
+    ) => unknown;
     _ufDelete?: (
       course: LegacyCourse,
       name: string,

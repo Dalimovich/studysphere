@@ -2,7 +2,6 @@
 // The rail module exposes itself via window.__minalloDocRail to avoid a
 // hard module dependency from core/panels into a feature module.
 function _notifyDocRail(route: 'pdf' | 'courses' | 'other'): void {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const dr = (window as any).__minalloDocRail as
     | { setRouteVisibility: (route: 'pdf' | 'courses' | 'other') => void }
     | undefined;
@@ -75,6 +74,7 @@ export function selectTopLevelView(which: TopLevelView, opts?: { stRunning?: boo
     // responsible for revealing the specific .portal-section they want.
     if (mainScroll) mainScroll.style.display = '';
     if (app) app.style.display = 'none';
+    document.body.classList.remove('minallo-in-course');
     _applyPortalChrome();
   }
 }
