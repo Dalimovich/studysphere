@@ -72,7 +72,7 @@ def stream_answer(
     chunks: list[RetrievedChunk],
     doc_names: dict[str, str],
     model: str | None = None,
-    max_tokens: int = 1200,
+    max_tokens: int = 2500,
     active_file_name: str | None = None,
     open_file_context: str | None = None,
     tutor_mode: str = DEFAULT_TUTOR_MODE,
