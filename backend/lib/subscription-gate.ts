@@ -18,6 +18,8 @@ interface SubscriptionRow {
   expires_at?: string | null;
 }
 
+interface AdminRow { user_id: string }
+
 const ACTIVE_STATUSES = new Set(['active', 'trialing']);
 
 /** Returns null when the user is allowed to use paid features, or a 402
@@ -28,6 +30,18 @@ export async function requireActiveSubscription(
   userId: string,
   reason: string
 ): Promise<LambdaResponse | null> {
+  // Admins bypass the paywall — same row in `admins` table that other admin
+  // endpoints (admin-users.ts) check against.
+  const adminRes = await supaRequest<AdminRow[]>(
+    'GET',
+    'admins?user_id=eq.' + encodeURIComponent(userId) + '&select=user_id&limit=1',
+    null,
+    serviceKey
+  );
+  if (Array.isArray(adminRes.body) && adminRes.body[0]?.user_id === userId) {
+    return null;
+  }
+
   const path =
     'subscriptions?user_id=eq.' + encodeURIComponent(userId) +
     '&select=status,plan,expires_at&limit=1';
