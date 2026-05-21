@@ -51,11 +51,13 @@ function _buildSystemPrompt() {
 }
 
 // ── askAI — core Q&A ──────────────────────────────────────────────────────
-// `var` scope is intentional — without it, this becomes an implicit global
-// assignment (non-strict mode) that clobbers the RAG-first window.askAI the
-// TS bridge installed. Keep the name `askAI` so the local reference at the
-// bottom of this file (chipPrompt → askAI(prompt)) still works.
-var askAI = function (question, skipUserBubble) {
+// `let` (not `var`!) is intentional. js/ai.js is loaded as a CLASSIC script,
+// not a module, so top-level `var` still becomes a window property — which
+// would clobber the RAG-first window.askAI installed by ai-ask-bridge. `let`
+// at the top of a non-module script stays out of window. The name `askAI` is
+// kept so the local reference at the bottom of this file (chipPrompt →
+// askAI(prompt)) still resolves to this legacy implementation.
+let askAI = function (question, skipUserBubble) {
   if (!question) return;
   generationStopped = false;
   currentGenId++;

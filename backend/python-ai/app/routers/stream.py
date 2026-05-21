@@ -150,10 +150,24 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
         # Emit the cached answer in a single 'done' event so the client
         # renders it without setup overhead.
         import json
+        # Cached answers carry the verification block they were generated
+        # with — honour it instead of falling back to the legacy
+        # retrievalMode→confidence mapping (which mislabels uncited answers
+        # as 'high').
+        cached_v = cached.get("verification") if isinstance(cached, dict) else None
+        cached_v_status = cached_v.get("status") if isinstance(cached_v, dict) else None
+        if cached_v_status == "verified":
+            cached_confidence = "high"
+        elif cached_v_status == "partially_verified":
+            cached_confidence = "medium"
+        elif cached_v_status == "missing_context":
+            cached_confidence = "low"
+        else:
+            cached_confidence = "high" if cached.get("retrievalMode") == "strong" else "low"
         yield _sse_bytes(json.dumps({
             "meta": True,
             "retrievalMode": cached.get("retrievalMode", "strong"),
-            "confidence": "high" if cached.get("retrievalMode") == "strong" else "low",
+            "confidence": cached_confidence,
             "unsupported": cached.get("retrievalMode") != "strong",
         }))
         # Send the answer as one token so the existing client loop renders it.
@@ -176,7 +190,8 @@ async def ask_stream_endpoint(payload: AskStreamRequest, user: dict = Depends(ve
         yield _sse_bytes(json.dumps({
             "done": True,
             "retrievalMode": cached.get("retrievalMode", "strong"),
-            "confidence": "high" if cached.get("retrievalMode") == "strong" else "low",
+            "confidence": cached_confidence,
+            "verification": cached_v or None,
             "unsupported": cached.get("retrievalMode") != "strong",
             "sources": sources_js,
             "cacheHit": True,

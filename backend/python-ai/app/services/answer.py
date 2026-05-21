@@ -162,7 +162,13 @@ def _any_chunk_has_formula(chunks: list[RetrievedChunk] | None) -> bool:
 # rails that prevent hallucination.
 
 ALLOWED_TUTOR_MODES = ("explain", "solve", "quiz")
-DEFAULT_TUTOR_MODE = "solve"
+# Default is "explain": when a student asks "berechne X" / "compute X" they
+# expect the computation, not a Socratic guiding question. SOLVE mode is still
+# fully supported — frontend opts in by sending tutorMode="solve" explicitly
+# (e.g. a future "tutor me through this" toggle). Defaulting to SOLVE produced
+# answers that listed the givens and then refused to compute, which is the
+# exact opposite of what students ask for on an exercise sheet.
+DEFAULT_TUTOR_MODE = "explain"
 
 
 _TUTOR_OVERLAY_SOLVE = """\

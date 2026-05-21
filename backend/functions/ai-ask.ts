@@ -24,13 +24,31 @@ interface GroundedSource {
   sectionTitle?: string | null;
 }
 
+interface VerificationBody {
+  status?: string;            // verified | partially_verified | missing_context
+  reasons?: string[];
+  details?: Record<string, unknown>;
+}
+
 interface AskResponseBody {
   answer?: string;
   retrievalMode?: string;
   tutorMode?: string | null;
+  verification?: VerificationBody | null;  // Phase 10 — supplied by Python /ask
   groundedSources?: GroundedSource[];
   cacheHit?: boolean;
   model?: string | null;
+}
+
+function _confidenceFromVerification(v?: VerificationBody | null, retrievalMode?: string): string {
+  // Verification is authoritative when Python returned it (Phase 10). Falls
+  // back to the legacy retrieval-mode mapping only when verification is
+  // missing entirely (e.g. an older cached response).
+  const status = v && v.status;
+  if (status === 'verified') return 'high';
+  if (status === 'partially_verified') return 'medium';
+  if (status === 'missing_context') return 'low';
+  return retrievalMode === 'strong' ? 'high' : 'low';
 }
 
 interface MappedSource {
@@ -133,7 +151,12 @@ export const handler = async (event: NetlifyEvent): Promise<LambdaResponse> => {
     answer: py.answer || '',
     retrievalMode: py.retrievalMode || 'strong',
     tutorMode: py.tutorMode ?? null,
-    confidence: py.retrievalMode === 'strong' ? 'high' : 'low',
+    // Confidence is derived from Phase-10 deterministic verification when
+    // available — NOT from retrievalMode alone. The previous mapping showed a
+    // green 'high' badge on answers the verifier had flagged missing_context
+    // (e.g. no [Source N] anchor, fabricated filename refs).
+    confidence: _confidenceFromVerification(py.verification, py.retrievalMode),
+    verification: py.verification ?? null,
     unsupported: py.retrievalMode !== 'strong',
     sources: _mapSources(py.groundedSources),
     cacheHit: Boolean(py.cacheHit),
